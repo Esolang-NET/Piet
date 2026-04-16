@@ -1,0 +1,38 @@
+{
+	"folders": [
+		{
+			"name": "root",
+			"path": "."
+		},
+		{
+			"name": "Esolang.Interpreter",
+			"path": "Interpreter"
+		},
+		{
+			"name": "Esolang.Parser",
+			"path": "Parser"
+		},
+		{
+			"path": "Parser.Tests"
+		},
+		{
+			"name": "Esolang.Processor",
+			"path": "Processor"
+		},
+		{
+			"path": "Processor.Tests"
+		}
+	],
+	"settings": {
+		"files.exclude": {
+			"**/.git": true,
+			"**/.svn": true,
+			"**/.hg": true,
+			"**/.DS_Store": true,
+			"**/Thumbs.db": true,
+			"Interpreter": true,
+			"Parser": true,
+			"Processor": true,
+		}
+	}
+}
