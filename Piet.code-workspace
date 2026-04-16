@@ -13,6 +13,7 @@
 			"path": "Parser"
 		},
 		{
+			"name": "Esolang.Parser.Tests",
 			"path": "Parser.Tests"
 		},
 		{
@@ -20,7 +21,16 @@
 			"path": "Processor"
 		},
 		{
+			"name": "Esolang.Processor.Tests",
 			"path": "Processor.Tests"
+		},
+		{
+			"name": "Esolang.Generator",
+			"path": "Generator"
+		},
+		{
+			"name": "Esolang.Generator.Tests",
+			"path": "Generator.Tests"
 		}
 	],
 	"settings": {
@@ -33,6 +43,10 @@
 			"Interpreter": true,
 			"Parser": true,
 			"Processor": true,
+			"Generator": true,
+			"Parser.Tests": true,
+			"Processor.Tests": true,
+			"Generator.Tests": true
 		}
 	}
 }
