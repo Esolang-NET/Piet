@@ -1,4 +1,7 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Text;
 
 namespace Esolang.Piet.Generator;
 
@@ -36,6 +39,16 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         """;
 
+    readonly struct EmittedMethod
+    {
+        public EmittedMethod(string source)
+        {
+            Source = source;
+        }
+
+        public string Source { get; }
+    }
+
     /// <summary>
     /// Initializes the generator and registers the attribute and method generation pipeline.
     /// </summary>
@@ -64,14 +77,141 @@ public partial class MethodGenerator : IIncrementalGenerator
         const string attributeNameSpaceName = NameSpaceName + "." + ClassNamePietAttribution;
         var source = context.SyntaxProvider.ForAttributeWithMetadataName(
             attributeNameSpaceName,
-            static (node, token) => true,
+            static (node, token) => node is MethodDeclarationSyntax,
             static (context, token) => context
         );
 
-        context.RegisterSourceOutput(source, static (context, source) =>
+        var generatedTargets = source.Collect();
+
+        context.RegisterSourceOutput(generatedTargets, static (context, sources) =>
         {
-            // Placeholder for method generation logic
-            // Will be implemented in MethodGenerator.Emit.cs
+            if (sources.IsDefaultOrEmpty)
+            {
+                return;
+            }
+
+            var builder = new StringBuilder(GeneratedMethodsFileHeader);
+            var emittedCount = 0;
+
+            foreach (var source in sources)
+            {
+                var emitted = Emit(context, source);
+                if (!emitted.HasValue)
+                {
+                    continue;
+                }
+
+                builder.AppendLine(emitted.Value.Source);
+                emittedCount++;
+            }
+
+            if (emittedCount > 0)
+            {
+                context.AddSource(GeneratedMethodsFileName, builder.ToString());
+            }
         });
+    }
+
+    static EmittedMethod? Emit(SourceProductionContext context, GeneratorAttributeSyntaxContext source)
+    {
+        if (source.TargetSymbol is not IMethodSymbol methodSymbol || source.TargetNode is not MethodDeclarationSyntax methodSyntax)
+        {
+            return null;
+        }
+
+        var imagePath = source.Attributes[0].ConstructorArguments.FirstOrDefault().Value as string;
+        if (string.IsNullOrWhiteSpace(imagePath))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.InvalidImagePathParameter,
+                methodSyntax.Identifier.GetLocation(),
+                methodSymbol.Name));
+            return null;
+        }
+
+        if (!methodSymbol.ReturnsVoid)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.InvalidReturnType,
+                methodSyntax.Identifier.GetLocation(),
+                methodSymbol.ReturnType.ToDisplayString()));
+            return null;
+        }
+
+        if (methodSymbol.TypeParameters.Length > 0)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.InvalidParameter,
+                methodSyntax.Identifier.GetLocation(),
+                methodSymbol.Name));
+            return null;
+        }
+
+        if (methodSymbol.ContainingType is null)
+        {
+            return null;
+        }
+
+        var ns = methodSymbol.ContainingNamespace?.IsGlobalNamespace == false
+            ? methodSymbol.ContainingNamespace.ToDisplayString()
+            : null;
+
+        var typeKeyword = methodSymbol.ContainingType.TypeKind switch
+        {
+            TypeKind.Struct when methodSymbol.ContainingType.IsRecord => "record struct",
+            TypeKind.Struct => "struct",
+            TypeKind.Interface => "interface",
+            TypeKind.Class when methodSymbol.ContainingType.IsRecord => "record",
+            _ => "class",
+        };
+
+        var containingTypeName = methodSymbol.ContainingType.Name;
+        var staticModifier = methodSymbol.IsStatic ? " static" : string.Empty;
+        var accessibility = GetAccessibility(methodSymbol.DeclaredAccessibility);
+        var parameterList = string.Join(", ", methodSymbol.Parameters.Select(FormatParameter));
+
+        var code = new StringBuilder();
+        if (ns is not null)
+        {
+            code.Append("namespace ").Append(ns).AppendLine(";");
+            code.AppendLine();
+        }
+
+        code.Append("partial ").Append(typeKeyword).Append(' ').Append(containingTypeName).AppendLine();
+        code.AppendLine("{");
+        code.Append("    ").Append(accessibility).Append(staticModifier).Append(" partial void ")
+            .Append(methodSymbol.Name).Append('(').Append(parameterList).AppendLine(")");
+        code.AppendLine("    {");
+        code.Append("        ").Append("// Placeholder until Piet execution code generation is implemented.").AppendLine();
+        code.AppendLine("    }");
+        code.AppendLine("}");
+
+        return new EmittedMethod(code.ToString());
+    }
+
+    static string GetAccessibility(Accessibility accessibility) => accessibility switch
+    {
+        Accessibility.Public => "public",
+        Accessibility.Internal => "internal",
+        Accessibility.Private => "private",
+        Accessibility.Protected => "protected",
+        Accessibility.ProtectedAndInternal => "private protected",
+        Accessibility.ProtectedOrInternal => "protected internal",
+        _ => "private",
+    };
+
+    static string FormatParameter(IParameterSymbol parameter)
+    {
+        var modifier = parameter.RefKind switch
+        {
+            RefKind.In => "in ",
+            RefKind.Out => "out ",
+            RefKind.Ref => "ref ",
+            _ => string.Empty,
+        };
+
+        var paramsPrefix = parameter.IsParams ? "params " : string.Empty;
+        var typeName = parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        return $"{paramsPrefix}{modifier}{typeName} {parameter.Name}";
     }
 }
