@@ -56,5 +56,11 @@
 			"**/Processor.Tests": true,
 			"**/Generator.Tests": true
 		}
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-vscode.powershell",
+			"ms-dotnettools.csdevkit"
+		]
 	}
 }
