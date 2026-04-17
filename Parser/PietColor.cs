@@ -1,4 +1,4 @@
-namespace Esolang.Piet;
+namespace Esolang.Piet.Parser;
 
 /// <summary>
 /// Represents the normalized Piet codel colors used by the language.

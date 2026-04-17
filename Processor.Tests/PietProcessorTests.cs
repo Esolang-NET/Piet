@@ -1,3 +1,5 @@
+using Esolang.Piet.Parser;
+
 namespace Esolang.Piet.Processor.Tests;
 
 [TestClass]

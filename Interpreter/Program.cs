@@ -1,4 +1,4 @@
-using Esolang.Piet;
+using Esolang.Piet.Parser;
 using Esolang.Piet.Processor;
 using System.CommandLine;
 

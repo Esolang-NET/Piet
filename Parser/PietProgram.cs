@@ -1,4 +1,4 @@
-namespace Esolang.Piet;
+namespace Esolang.Piet.Parser;
 
 /// <summary>
 /// Represents a parsed Piet program as a 2D codel map.

@@ -1,7 +1,7 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
-namespace Esolang.Piet;
+namespace Esolang.Piet.Parser;
 
 /// <summary>
 /// Parses Piet source images into normalized program data.

@@ -1,7 +1,8 @@
+using Esolang.Piet.Parser;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
-namespace Esolang.Piet.Tests;
+namespace Esolang.Piet.Parser.Tests;
 
 [TestClass]
 public sealed class PietParserTests
