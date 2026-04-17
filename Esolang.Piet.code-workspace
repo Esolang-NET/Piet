@@ -5,11 +5,11 @@
 			"path": "."
 		},
 		{
-			"name": "Esolang.Generator",
+			"name": "Esolang.Piet.Generator",
 			"path": "Generator"
 		},
 		{
-			"name": "Esolang.Generator.Tests",
+			"name": "Esolang.Piet.Generator.Tests",
 			"path": "Generator.Tests"
 		},
 		{
@@ -17,23 +17,23 @@
 			"path": "samples/Generator.UseConsole"
 		},
 		{
-			"name": "Esolang.Interpreter",
+			"name": "Esolang.Piet.Interpreter",
 			"path": "Interpreter"
 		},
 		{
-			"name": "Esolang.Parser",
+			"name": "Esolang.Piet.Parser",
 			"path": "Parser"
 		},
 		{
-			"name": "Esolang.Parser.Tests",
+			"name": "Esolang.Piet.Parser.Tests",
 			"path": "Parser.Tests"
 		},
 		{
-			"name": "Esolang.Processor",
+			"name": "Esolang.Piet.Processor",
 			"path": "Processor"
 		},
 		{
-			"name": "Esolang.Processor.Tests",
+			"name": "Esolang.Piet.Processor.Tests",
 			"path": "Processor.Tests"
 		},
 		{
