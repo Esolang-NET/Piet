@@ -1,9 +1,6 @@
 using Esolang.Piet;
-using System.Collections.Generic;
-using System.IO;
 using System.IO.Pipelines;
 using System.Text;
-using System.Threading;
 
 Console.WriteLine("Running Piet generated sample...");
 
