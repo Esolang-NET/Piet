@@ -38,22 +38,31 @@ In your project file, specify the PNG via `PietImage`.
 
 - Resolves Piet image paths from `PietImage` items.
 - Converts PNG to generator-readable AdditionalFiles via build targets.
-- Supports console-style execution and pipe/string-based bindings.
+- Supports explicit input/output bindings (string, TextReader/TextWriter, PipeReader/PipeWriter).
 
 ## Supported Method Signatures
 
 | Category | Supported types |
 | --- | --- |
 | Return type | `void`, `string`, `System.Threading.Tasks.Task<string>`, `System.Threading.Tasks.ValueTask<string>`, `System.Collections.Generic.IEnumerable<byte>`, `System.Collections.Generic.IAsyncEnumerable<byte>` |
-| Input parameter | `string`, `System.IO.Pipelines.PipeReader` |
-| Output parameter | `System.IO.Pipelines.PipeWriter` |
+| Input parameter | `string`, `System.IO.TextReader`, `System.IO.Pipelines.PipeReader` |
+| Output parameter | `System.IO.TextWriter`, `System.IO.Pipelines.PipeWriter` |
 | Other parameter | `System.Threading.CancellationToken` |
+
+## Required I/O diagnostics
+
+When the analyzed Piet program requires I/O, the method signature must expose a compatible mechanism.
+
+- `PT0007` is reported when output is required but no output mechanism is provided.
+: output mechanism means either a non-`void` return type, `System.IO.TextWriter`, or `System.IO.Pipelines.PipeWriter`.
+- `PT0008` is reported when input is required but no input mechanism is provided.
+: input mechanism means `string`, `System.IO.TextReader`, or `System.IO.Pipelines.PipeReader`.
 
 ## Signature Patterns
 
 The generator accepts one input source and one output destination at most.
 
-### 1. Console style (`void`)
+### 1. `void` with no explicit I/O
 
 ```csharp
 using Esolang.Piet;
@@ -61,16 +70,25 @@ using Esolang.Piet;
 partial class PietSample
 {
     [GeneratePietMethod("no-op.png")]
-    public static partial void RunToConsole();
+    public static partial void RunNoOp();
 }
 ```
 
-Uses `Console.In` / `Console.Out` internally.
+No implicit `Console.In` / `Console.Out` is injected.
 
 **Example usage:**
 
 ```csharp
-PietSample.RunToConsole();
+PietSample.RunNoOp();
+```
+
+If you want console behavior, write a wrapper explicitly:
+
+```csharp
+public static void RunToConsole()
+{
+    RunWithTextWriter(Console.Out);
+}
 ```
 
 ### 2. Return as `string`
@@ -153,7 +171,7 @@ partial class PietSamplehello-world.png")]
 }
 ```
 
-Yields UTF-8 encoded output bytes.
+Yields UTF-8 encoded output bytes after buffered execution.
 
 **Example usage:**
 
@@ -175,7 +193,7 @@ partial class PietSample
 }
 ```
 
-Async iterator that yields UTF-8 encoded output bytes. Checks cancellation between each byte.
+Async iterator that streams UTF-8 output bytes progressively through a pipe. Checks cancellation between reads and each yielded byte.
 
 **Example usage:**
 
@@ -250,9 +268,9 @@ Wraps the `PipeWriter` as an auto-flushing `StreamWriter`.
 
 ## Combination Rules
 
-- At most one input source: `string` or `PipeReader`.
-- At most one output destination: `PipeWriter`.
-- Output parameters cannot be combined with non-`void` return types.
+- At most one input source: `string`, `TextReader`, or `PipeReader`.
+- At most one output destination: `TextWriter` or `PipeWriter`.
+- Output parameters cannot be combined with non-`void` return types (`PT0011`).
 - `CancellationToken` may be freely combined with any other parameters.
 - Use at most one `CancellationToken` parameter.
 
@@ -276,3 +294,4 @@ For a concrete sample project, usage patterns, and sample image reference, see:
 | PT0008 | Required input interface not provided. |
 | PT0009 | Duplicate image path mapping. |
 | PT0010 | Input interface provided but not required (Hidden). |
+| PT0011 | Non-void return type conflicts with explicit output parameter. |

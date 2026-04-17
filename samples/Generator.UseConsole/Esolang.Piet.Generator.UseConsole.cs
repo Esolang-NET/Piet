@@ -33,6 +33,10 @@ Console.WriteLine($"RunToAsyncEnumerableBytes: {Encoding.UTF8.GetString(asyncByt
 var withStringInput = PietSample.RunWithStringInput("123");
 Console.WriteLine($"RunWithStringInput: {withStringInput}");
 
+// TextReader input parameter
+var withTextReader = PietSample.RunWithTextReader(new StringReader("456\n"));
+Console.WriteLine($"RunWithTextReader: {withTextReader}");
+
 // PipeReader input parameter
 var inputPipe = new Pipe();
 await inputPipe.Writer.WriteAsync(Encoding.UTF8.GetBytes("789\n"));
@@ -47,10 +51,20 @@ outputPipe.Writer.Complete();
 var pipeWriterResult = new StreamReader(outputPipe.Reader.AsStream()).ReadToEnd();
 Console.WriteLine($"RunWithPipeWriter: {pipeWriterResult}");
 
+// TextWriter output parameter
+var textWriterOutput = new StringWriter();
+PietSample.RunWithTextWriter(textWriterOutput);
+Console.WriteLine($"RunWithTextWriter: {textWriterOutput}");
+
 partial class PietSample
 {
+    public static void RunToConsole()
+    {
+        RunWithTextWriter(Console.Out);
+    }
+
     [GeneratePietMethod("no-op.png")]
-    public static partial void RunToConsole();
+    public static partial void RunNoOp();
 
     [GeneratePietMethod("hello-world.png")]
     public static partial string RunToString();
@@ -71,8 +85,14 @@ partial class PietSample
     public static partial string RunWithStringInput(string input);
 
     [GeneratePietMethod("input-output.png")]
+    public static partial string RunWithTextReader(TextReader input);
+
+    [GeneratePietMethod("input-output.png")]
     public static partial string RunWithPipeReader(PipeReader input);
 
     [GeneratePietMethod("hello-world.png")]
     public static partial void RunWithPipeWriter(PipeWriter output);
+
+    [GeneratePietMethod("hello-world.png")]
+    public static partial void RunWithTextWriter(TextWriter output);
 }

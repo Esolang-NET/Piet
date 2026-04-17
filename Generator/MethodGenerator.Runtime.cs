@@ -40,7 +40,7 @@ partial class MethodGenerator
                 };
                 internal static void Execute(byte[] codels, int width, int height)
                 {
-                    Execute(codels, width, height, global::System.Console.In, global::System.Console.Out);
+                    Execute(codels, width, height, global::System.IO.TextReader.Null, global::System.IO.TextWriter.Null);
                 }
                 internal static void Execute(byte[] codels, int width, int height,
                     global::System.IO.TextReader input, global::System.IO.TextWriter output)

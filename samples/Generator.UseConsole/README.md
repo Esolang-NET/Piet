@@ -49,30 +49,38 @@ RunToValueTaskString: Hello, world!
 RunToEnumerableBytes: Hello, world!
 RunToAsyncEnumerableBytes: Hello, world!
 RunWithStringInput:
+RunWithTextReader:
 RunWithPipeReader:
 RunWithPipeWriter: Hello, world!
+RunWithTextWriter: Hello, world!
 ```
 
 ## Signature patterns shown in this sample
 
-- `void` with console input/output
+- `void` with no explicit I/O
 - `string` return
 - `System.Threading.Tasks.Task<string>` return
 - `System.Threading.Tasks.ValueTask<string>` return
 - `System.Collections.Generic.IEnumerable<byte>` return
 - `System.Collections.Generic.IAsyncEnumerable<byte>` return
 - `string` input
+- `System.IO.TextReader` input
 - `System.IO.Pipelines.PipeReader` input
 - `System.IO.Pipelines.PipeWriter` output
+- `System.IO.TextWriter` output
 
 ### Method to image mapping
 
-- `RunToConsole` -> `no-op.png`
+- `RunNoOp` -> `no-op.png`
 - `RunToString` -> `hello-world.png`
 - `RunToTaskString` -> `hello-world.png`
 - `RunToValueTaskString` -> `hello-world.png`
 - `RunToEnumerableBytes` -> `hello-world.png`
 - `RunToAsyncEnumerableBytes` -> `hello-world.png`
 - `RunWithStringInput` -> `input-output.png`
+- `RunWithTextReader` -> `input-output.png`
 - `RunWithPipeReader` -> `input-output.png`
 - `RunWithPipeWriter` -> `hello-world.png`
+- `RunWithTextWriter` -> `hello-world.png`
+
+`RunToConsole` is a handwritten wrapper that forwards to `RunWithTextWriter(Console.Out)`.

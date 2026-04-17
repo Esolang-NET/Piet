@@ -118,4 +118,15 @@ public static class DiagnosticDescriptors
         category: Category,
         defaultSeverity: DiagnosticSeverity.Hidden,
         isEnabledByDefault: true);
+
+    /// <summary>
+    /// PT0011: Return type and output parameter cannot be combined.
+    /// </summary>
+    public static readonly DiagnosticDescriptor ReturnOutputConflict = new(
+        id: "PT0011",
+        title: "Return type and output parameter conflict",
+        messageFormat: "The method '{0}' cannot combine a non-void return type with an explicit output parameter",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }
