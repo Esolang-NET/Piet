@@ -2,10 +2,6 @@
 
 Piet source generator for .NET.
 
-## Changelog
-
-- [Repository changelog](../CHANGELOG.md)
-
 ## Install
 
 ```bash
