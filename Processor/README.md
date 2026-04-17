@@ -24,8 +24,8 @@ processor.Run();
 
 ## Current Status
 
-- `PietProcessor` can be constructed with a parsed `PietProgram`.
-- `Run()` is not implemented yet and currently throws `NotImplementedException`.
+- `PietProcessor` executes parsed `PietProgram` instances.
+- `Run()` supports `TextReader`/`TextWriter` I/O, and `RunAndOutputString()` returns captured output.
 
 ## Notes
 

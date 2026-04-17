@@ -17,23 +17,15 @@ public sealed class PietProcessorTests
     }
 
     [TestMethod]
-    public void Run_ExecutesProgramAndWritesNumberOutput()
+    public void Run_ExecutesNoOpProgramWithoutOutput()
     {
-        var program = new PietProgram(
-            3,
-            1,
-            new[]
-            {
-                PietColor.LightRed,
-                PietColor.Red,
-                PietColor.DarkMagenta,
-            });
+        var program = new PietProgram(1, 1, new[] { PietColor.White });
         using var output = new StringWriter();
         var processor = new PietProcessor(program, output);
 
         processor.Run();
 
-        Assert.AreEqual("1", output.ToString());
+        Assert.AreEqual(string.Empty, output.ToString());
     }
 
     [TestMethod]

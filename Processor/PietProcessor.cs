@@ -149,7 +149,7 @@ public sealed class PietProcessor
     {
         using var writer = new StringWriter();
         Run(input ?? Input, writer);
-        var result = writer.ToString().TrimEnd('\0');
+        var result = writer.ToString().TrimEnd('\0', '\r', '\n');
         return result.Length == 0 ? null : result;
     }
 

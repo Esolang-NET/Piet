@@ -63,4 +63,36 @@ public sealed class PietParserTests
                 File.Delete(path);
         }
     }
+
+    [TestMethod]
+    public void Parse_FallsBackWhenPngChunkCrcIsInvalid()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
+        try
+        {
+            using (var image = new Image<Rgba32>(1, 1))
+            {
+                image[0, 0] = new Rgba32(0xFF, 0xFF, 0xFF);
+                image.Save(path);
+            }
+
+            var bytes = File.ReadAllBytes(path);
+            bytes[29] = 0x00;
+            bytes[30] = 0x00;
+            bytes[31] = 0x00;
+            bytes[32] = 0x00;
+            File.WriteAllBytes(path, bytes);
+
+            var program = PietParser.Parse(path);
+
+            Assert.AreEqual(1, program.Width);
+            Assert.AreEqual(1, program.Height);
+            CollectionAssert.AreEqual(new[] { PietColor.White }, program.Codels.ToArray());
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
 }
