@@ -26,6 +26,7 @@
     <None Include="./README.md" Pack="true" PackagePath="\" />
     <None Include="../CHANGELOG.md" Pack="true" PackagePath="\" />
     <None Include="../LICENSE" Pack="true" PackagePath="\" />
+    <None Include="buildTransitive\Esolang.Piet.Generator.targets" Pack="true" PackagePath="buildTransitive\" />
   </ItemGroup>
 
   <ItemGroup>

@@ -96,4 +96,26 @@ public static class DiagnosticDescriptors
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    /// <summary>
+    /// PT0009: Duplicate image path mapping.
+    /// </summary>
+    public static readonly DiagnosticDescriptor DuplicateImagePathMapping = new(
+        id: "PT0009",
+        title: "Duplicate image path mapping",
+        messageFormat: "The Piet image path '{0}' is mapped by multiple AdditionalFiles entries",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    /// <summary>
+    /// PT0010: Input interface provided but not required.
+    /// </summary>
+    public static readonly DiagnosticDescriptor UnusedInputInterface = new(
+        id: "PT0010",
+        title: "Input interface provided but not required",
+        messageFormat: "The Piet program does not require input, but the method provides an input mechanism",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Hidden,
+        isEnabledByDefault: true);
 }

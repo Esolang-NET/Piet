@@ -14,7 +14,7 @@
 		},
 		{
 			"name": "samples/Esolang.Piet.Generator.UseConsole",
-			"path": "samples/Generator"
+			"path": "samples/Generator.UseConsole"
 		},
 		{
 			"name": "Esolang.Interpreter",
@@ -48,13 +48,13 @@
 			"**/.DS_Store": true,
 			"**/Thumbs.db": true,
 			"samples": true,
-			"Interpreter": true,
-			"Parser": true,
-			"Processor": true,
-			"Generator": true,
-			"Parser.Tests": true,
-			"Processor.Tests": true,
-			"Generator.Tests": true
+			"**/Interpreter": true,
+			"**/Parser": true,
+			"**/Processor": true,
+			"**/Generator": true,
+			"**/Parser.Tests": true,
+			"**/Processor.Tests": true,
+			"**/Generator.Tests": true
 		}
 	}
 }

@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+    <IsTestProject>false</IsTestProject>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="System.IO.Pipelines" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Use local source generator project as analyzer during repository development -->
+    <ProjectReference Include="..\..\Generator\Esolang.Piet.Generator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- ProjectReference does not bring buildTransitive targets, so import local targets explicitly. -->
+  <Import Project="..\..\Generator\buildTransitive\Esolang.Piet.Generator.targets"
+          Condition="Exists('..\..\Generator\buildTransitive\Esolang.Piet.Generator.targets')" />
+
+  <ItemGroup>
+    <PietImage Include="samples\no-op.png" PietLogicalPath="no-op.png" />
+    <PietImage Include="samples\hello-world.png" PietLogicalPath="hello-world.png" />
+    <PietImage Include="samples\input-output.png" PietLogicalPath="input-output.png" />
+  </ItemGroup>
+
+</Project>

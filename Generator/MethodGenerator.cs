@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Collections.Immutable;
 using System.Text;
 
 namespace Esolang.Piet.Generator;
@@ -49,6 +50,72 @@ public partial class MethodGenerator : IIncrementalGenerator
         public string Source { get; }
     }
 
+    enum ReturnKind
+    {
+        Void,
+        String,
+        TaskString,
+        ValueTaskString,
+        EnumerableByte,
+        AsyncEnumerableByte,
+        Invalid,
+    }
+
+    readonly struct ExecutionBinding
+    {
+        public ExecutionBinding(bool isValid, ReturnKind returnKind, bool hasExplicitInput, bool hasExplicitOutput, string inputExpression, string outputExpression, string? cancellationTokenName, string? errorId)
+        {
+            IsValid = isValid;
+            ReturnKind = returnKind;
+            HasExplicitInput = hasExplicitInput;
+            HasExplicitOutput = hasExplicitOutput;
+            InputExpression = inputExpression;
+            OutputExpression = outputExpression;
+            CancellationTokenName = cancellationTokenName;
+            ErrorId = errorId;
+        }
+
+        public bool IsValid { get; }
+
+        public ReturnKind ReturnKind { get; }
+
+        /// <summary>
+        /// True if the method has an explicit input mechanism (string or PipeReader parameter).
+        /// </summary>
+        public bool HasExplicitInput { get; }
+
+        /// <summary>
+        /// True if the method has an explicit output mechanism (non-void return type or PipeWriter parameter).
+        /// </summary>
+        public bool HasExplicitOutput { get; }
+
+        public string InputExpression { get; }
+
+        public string OutputExpression { get; }
+
+        /// <summary>
+        /// The name of the CancellationToken parameter, if present.
+        /// </summary>
+        public string? CancellationTokenName { get; }
+
+        public string? ErrorId { get; }
+    }
+
+    readonly struct AdditionalImageFile
+    {
+        public AdditionalImageFile(string path, string? text)
+        {
+            Path = path;
+            Text = text;
+        }
+
+        public string Path { get; }
+
+        public string? Text { get; }
+
+        public bool IsReadable => Text is not null;
+    }
+
     /// <summary>
     /// Initializes the generator and registers the attribute and method generation pipeline.
     /// </summary>
@@ -82,9 +149,20 @@ public partial class MethodGenerator : IIncrementalGenerator
         );
 
         var generatedTargets = source.Collect();
+        var additionalFiles = context.AdditionalTextsProvider
+            .Select(static (additionalText, token) =>
+            {
+                var text = additionalText.GetText(token);
+                return new AdditionalImageFile(additionalText.Path, text?.ToString());
+            })
+            .Collect();
+        var generationInputs = generatedTargets.Combine(additionalFiles);
 
-        context.RegisterSourceOutput(generatedTargets, static (context, sources) =>
+        context.RegisterSourceOutput(generationInputs, static (context, input) =>
         {
+            var sources = input.Left;
+            var imagePaths = input.Right;
+
             if (sources.IsDefaultOrEmpty)
             {
                 return;
@@ -95,7 +173,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
             foreach (var source in sources)
             {
-                var emitted = Emit(context, source);
+                var emitted = Emit(context, source, imagePaths);
                 if (!emitted.HasValue)
                 {
                     continue;
@@ -108,19 +186,22 @@ public partial class MethodGenerator : IIncrementalGenerator
             if (emittedCount > 0)
             {
                 context.AddSource(GeneratedMethodsFileName, builder.ToString());
+                context.AddSource(GeneratePietRuntimeFileName, PietRuntimeSource);
             }
         });
     }
 
-    static EmittedMethod? Emit(SourceProductionContext context, GeneratorAttributeSyntaxContext source)
+    static EmittedMethod? Emit(
+        SourceProductionContext context,
+        GeneratorAttributeSyntaxContext source,
+        ImmutableArray<AdditionalImageFile> additionalImageFiles)
     {
         if (source.TargetSymbol is not IMethodSymbol methodSymbol || source.TargetNode is not MethodDeclarationSyntax methodSyntax)
         {
             return null;
         }
 
-        var imagePath = source.Attributes[0].ConstructorArguments.FirstOrDefault().Value as string;
-        if (string.IsNullOrWhiteSpace(imagePath))
+        if (source.Attributes[0].ConstructorArguments.FirstOrDefault().Value is not string imagePath || string.IsNullOrWhiteSpace(imagePath))
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.InvalidImagePathParameter,
@@ -129,17 +210,55 @@ public partial class MethodGenerator : IIncrementalGenerator
             return null;
         }
 
-        if (!methodSymbol.ReturnsVoid)
+        var resolvedImageFile = TryResolveImagePath(imagePath, additionalImageFiles);
+        if (!resolvedImageFile.HasValue)
         {
             context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.InvalidReturnType,
+                DiagnosticDescriptors.ImageFileNotFound,
                 methodSyntax.Identifier.GetLocation(),
-                methodSymbol.ReturnType.ToDisplayString()));
+                imagePath));
+            return null;
+        }
+
+        if (!HasSupportedImageFormat(resolvedImageFile.Value))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.InvalidImageFormat,
+                methodSyntax.Identifier.GetLocation(),
+                imagePath));
             return null;
         }
 
         if (methodSymbol.TypeParameters.Length > 0)
         {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.InvalidParameter,
+                methodSyntax.Identifier.GetLocation(),
+                methodSymbol.Name));
+            return null;
+        }
+
+        var executionBinding = BindExecutionSignature(methodSymbol);
+        if (!executionBinding.IsValid)
+        {
+            if (string.Equals(executionBinding.ErrorId, DiagnosticDescriptors.InvalidReturnType.Id, StringComparison.Ordinal))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.InvalidReturnType,
+                    methodSyntax.Identifier.GetLocation(),
+                    methodSymbol.ReturnType.ToDisplayString()));
+                return null;
+            }
+
+            if (string.Equals(executionBinding.ErrorId, DiagnosticDescriptors.DuplicateParameter.Id, StringComparison.Ordinal))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.DuplicateParameter,
+                    methodSyntax.Identifier.GetLocation(),
+                    methodSymbol.Name));
+                return null;
+            }
+
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.InvalidParameter,
                 methodSyntax.Identifier.GetLocation(),
@@ -167,8 +286,18 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         var containingTypeName = methodSymbol.ContainingType.Name;
         var staticModifier = methodSymbol.IsStatic ? " static" : string.Empty;
+        var asyncModifier = executionBinding.ReturnKind == ReturnKind.AsyncEnumerableByte ? " async" : string.Empty;
         var accessibility = GetAccessibility(methodSymbol.DeclaredAccessibility);
-        var parameterList = string.Join(", ", methodSymbol.Parameters.Select(FormatParameter));
+        var parameterList = string.Join(", ", methodSymbol.Parameters.Select(p =>
+        {
+            if (executionBinding.ReturnKind == ReturnKind.AsyncEnumerableByte
+                && executionBinding.CancellationTokenName is not null
+                && string.Equals(p.Name, executionBinding.CancellationTokenName, StringComparison.Ordinal))
+            {
+                return "[global::System.Runtime.CompilerServices.EnumeratorCancellation] " + FormatParameter(p);
+            }
+            return FormatParameter(p);
+        }));
 
         var code = new StringBuilder();
         if (ns is not null)
@@ -179,10 +308,98 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         code.Append("partial ").Append(typeKeyword).Append(' ').Append(containingTypeName).AppendLine();
         code.AppendLine("{");
-        code.Append("    ").Append(accessibility).Append(staticModifier).Append(" partial void ")
+        var returnType = methodSymbol.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        code.Append("    ").Append(accessibility).Append(staticModifier).Append(asyncModifier).Append(" partial ").Append(returnType).Append(' ')
             .Append(methodSymbol.Name).Append('(').Append(parameterList).AppendLine(")");
+        var pngBytes = ExtractPngBytes(resolvedImageFile.Value);
+        if (pngBytes is null)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.InvalidImageFormat,
+                methodSyntax.Identifier.GetLocation(),
+                imagePath));
+            return null;
+        }
+
+        var codels = TryDecodePng(pngBytes, out var imageWidth, out var imageHeight);
+        if (codels is null || imageWidth <= 0 || imageHeight <= 0)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.InvalidImageFormat,
+                methodSyntax.Identifier.GetLocation(),
+                imagePath));
+            return null;
+        }
+
+        var (mightUseOutput, mightUseInput) = ScanPietIoCommands(codels, imageWidth, imageHeight);
+        if (mightUseOutput && !executionBinding.HasExplicitOutput)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.RequiredOutputInterface,
+                methodSyntax.Identifier.GetLocation()));
+            return null;
+        }
+
+        if (mightUseInput && !executionBinding.HasExplicitInput)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.RequiredInputInterface,
+                methodSyntax.Identifier.GetLocation()));
+            return null;
+        }
+
+        if (!mightUseInput && executionBinding.HasExplicitInput)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.UnusedInputInterface,
+                methodSyntax.Identifier.GetLocation()));
+        }
+
         code.AppendLine("    {");
-        code.Append("        ").Append("// Placeholder until Piet execution code generation is implemented.").AppendLine();
+        if (executionBinding.ReturnKind != ReturnKind.Void)
+        {
+            code.AppendLine("        var __pietOutput = new global::System.IO.StringWriter(global::System.Globalization.CultureInfo.InvariantCulture);");
+        }
+        code.Append("        global::Esolang.Piet.__Generated.PietRuntime.Execute(");
+
+        code.Append("new byte[] { ");
+        for (int i = 0; i < codels.Length; i++)
+        {
+            if (i > 0) code.Append(',');
+            code.Append(codels[i]);
+        }
+        code.Append(" }, ");
+        code.Append(imageWidth).Append(", ").Append(imageHeight).Append(", ")
+            .Append(executionBinding.InputExpression).Append(", ")
+            .Append(executionBinding.OutputExpression).AppendLine(");");
+
+        switch (executionBinding.ReturnKind)
+        {
+            case ReturnKind.String:
+                code.AppendLine("        return __pietOutput.ToString();");
+                break;
+            case ReturnKind.TaskString:
+                code.AppendLine("        return global::System.Threading.Tasks.Task.FromResult(__pietOutput.ToString());");
+                break;
+            case ReturnKind.ValueTaskString:
+                code.AppendLine("        return new global::System.Threading.Tasks.ValueTask<string>(__pietOutput.ToString());");
+                break;
+            case ReturnKind.EnumerableByte:
+                code.AppendLine("        foreach (var __pietByte in global::System.Text.Encoding.UTF8.GetBytes(__pietOutput.ToString()))");
+                code.AppendLine("            yield return __pietByte;");
+                break;
+            case ReturnKind.AsyncEnumerableByte:
+                code.AppendLine("        foreach (var __pietByte in global::System.Text.Encoding.UTF8.GetBytes(__pietOutput.ToString()))");
+                code.AppendLine("        {");
+                if (executionBinding.CancellationTokenName is not null)
+                {
+                    code.Append("            ").Append(executionBinding.CancellationTokenName).AppendLine(".ThrowIfCancellationRequested();");
+                }
+                code.AppendLine("            yield return __pietByte;");
+                code.AppendLine("        }");
+                break;
+        }
+
         code.AppendLine("    }");
         code.AppendLine("}");
 
@@ -214,4 +431,344 @@ public partial class MethodGenerator : IIncrementalGenerator
         var typeName = parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         return $"{paramsPrefix}{modifier}{typeName} {parameter.Name}";
     }
+
+    static ReturnKind GetReturnKind(IMethodSymbol methodSymbol)
+    {
+        if (methodSymbol.ReturnsVoid)
+            return ReturnKind.Void;
+
+        if (methodSymbol.ReturnType.SpecialType == SpecialType.System_String)
+            return ReturnKind.String;
+
+        var returnTypeName = methodSymbol.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        return returnTypeName switch
+        {
+            "global::System.Threading.Tasks.Task<string>" => ReturnKind.TaskString,
+            "global::System.Threading.Tasks.ValueTask<string>" => ReturnKind.ValueTaskString,
+            "global::System.Collections.Generic.IEnumerable<byte>" => ReturnKind.EnumerableByte,
+            "global::System.Collections.Generic.IAsyncEnumerable<byte>" => ReturnKind.AsyncEnumerableByte,
+            _ => ReturnKind.Invalid,
+        };
+    }
+
+    static ExecutionBinding BindExecutionSignature(IMethodSymbol methodSymbol)
+    {
+        var returnKind = GetReturnKind(methodSymbol);
+
+        if (returnKind == ReturnKind.Invalid)
+        {
+            return new ExecutionBinding(false, ReturnKind.Invalid, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.InvalidReturnType.Id);
+        }
+
+        string? inputExpression = null;
+        string? outputExpression = null;
+        string? cancellationTokenName = null;
+        var hasInput = false;
+        var hasOutput = false;
+
+        foreach (var parameter in methodSymbol.Parameters)
+        {
+            if (parameter.RefKind != RefKind.None)
+            {
+                return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.InvalidParameter.Id);
+            }
+
+            var typeName = parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+            if (string.Equals(typeName, "global::System.Threading.CancellationToken", StringComparison.Ordinal))
+            {
+                if (cancellationTokenName is not null)
+                {
+                    return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.DuplicateParameter.Id);
+                }
+
+                cancellationTokenName = parameter.Name;
+                continue;
+            }
+
+            if (parameter.Type.SpecialType == SpecialType.System_String)
+            {
+                if (hasInput)
+                {
+                    return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.DuplicateParameter.Id);
+                }
+
+                hasInput = true;
+                inputExpression = $"new global::System.IO.StringReader({parameter.Name} ?? string.Empty)";
+                continue;
+            }
+
+            if (string.Equals(typeName, "global::System.IO.Pipelines.PipeReader", StringComparison.Ordinal))
+            {
+                if (hasInput)
+                {
+                    return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.DuplicateParameter.Id);
+                }
+
+                hasInput = true;
+                inputExpression = $"new global::System.IO.StreamReader({parameter.Name}.AsStream())";
+                continue;
+            }
+
+            if (string.Equals(typeName, "global::System.IO.Pipelines.PipeWriter", StringComparison.Ordinal))
+            {
+                if (hasOutput)
+                {
+                    return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.DuplicateParameter.Id);
+                }
+
+                hasOutput = true;
+                outputExpression = $"new global::System.IO.StreamWriter({parameter.Name}.AsStream()) {{ AutoFlush = true }}";
+                continue;
+            }
+
+            return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.InvalidParameter.Id);
+        }
+
+        // Can't have both a non-void return type and a PipeWriter output parameter
+        if (returnKind != ReturnKind.Void && hasOutput)
+        {
+            return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.DuplicateParameter.Id);
+        }
+
+        var returnsOutput = returnKind != ReturnKind.Void;
+
+        if (inputExpression is null)
+        {
+            inputExpression = returnsOutput
+                ? "new global::System.IO.StringReader(string.Empty)"
+                : "global::System.Console.In";
+        }
+
+        if (outputExpression is null)
+        {
+            outputExpression = returnsOutput
+                ? "__pietOutput"
+                : "global::System.Console.Out";
+        }
+
+        return new ExecutionBinding(true, returnKind, hasInput, hasOutput || returnsOutput, inputExpression, outputExpression, cancellationTokenName, null);
+    }
+
+    static AdditionalImageFile? TryResolveImagePath(string imagePath, ImmutableArray<AdditionalImageFile> additionalImageFiles)
+    {
+        if (additionalImageFiles.IsDefaultOrEmpty)
+        {
+            return null;
+        }
+
+        var normalizedImagePath = NormalizePath(imagePath);
+
+        foreach (var additionalImageFile in additionalImageFiles)
+        {
+            var normalizedAdditionalPath = NormalizePath(additionalImageFile.Path);
+            if (string.Equals(normalizedAdditionalPath, normalizedImagePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return additionalImageFile;
+            }
+
+            if (normalizedAdditionalPath.EndsWith("/" + normalizedImagePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return additionalImageFile;
+            }
+
+            var normalizedAdditionalFileName = NormalizePath(GetFileName(normalizedAdditionalPath));
+            if (string.Equals(normalizedAdditionalFileName, normalizedImagePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return additionalImageFile;
+            }
+
+            if (TryGetTransformedOriginalImagePath(additionalImageFile, out var transformedImagePath)
+                && IsMatchingPath(normalizedImagePath, transformedImagePath))
+            {
+                return additionalImageFile;
+            }
+        }
+
+        return null;
+    }
+
+    static bool HasSupportedImageFormat(AdditionalImageFile resolvedImageFile)
+    {
+        var extension = GetExtension(resolvedImageFile.Path);
+        if (string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase))
+        {
+            return resolvedImageFile.IsReadable;
+        }
+
+        if (string.Equals(extension, ".txt", StringComparison.OrdinalIgnoreCase)
+            && TryGetTransformedOriginalImagePath(resolvedImageFile, out var transformedImagePath)
+            && string.Equals(GetExtension(transformedImagePath), ".png", StringComparison.OrdinalIgnoreCase))
+        {
+            return HasBase64Payload(resolvedImageFile.Text);
+        }
+
+        return false;
+    }
+
+    static bool TryGetTransformedOriginalImagePath(AdditionalImageFile imageFile, out string transformedImagePath)
+    {
+        transformedImagePath = string.Empty;
+        if (!imageFile.IsReadable || imageFile.Text is null)
+        {
+            return false;
+        }
+
+        const string prefix = "// PIET_IMAGE_PATH=";
+        var firstLine = GetFirstLine(imageFile.Text);
+        if (!firstLine.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var originalPath = firstLine.Substring(prefix.Length).Trim();
+        if (string.IsNullOrWhiteSpace(originalPath))
+        {
+            return false;
+        }
+
+        transformedImagePath = NormalizePath(originalPath);
+        return true;
+    }
+
+    static bool HasBase64Payload(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        var nonNullText = text!;
+
+        var firstNewlineIndex = nonNullText.IndexOf('\n');
+        if (firstNewlineIndex < 0)
+        {
+            return false;
+        }
+
+        var payload = nonNullText.Substring(firstNewlineIndex + 1)
+            .Replace("\r", string.Empty)
+            .Replace("\n", string.Empty)
+            .Trim();
+
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            return false;
+        }
+
+        try
+        {
+            _ = Convert.FromBase64String(payload);
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    static string GetFirstLine(string text)
+    {
+        var newlineIndex = text.IndexOf('\n');
+        if (newlineIndex < 0)
+        {
+            return text.Replace("\r", string.Empty);
+        }
+
+        return text.Substring(0, newlineIndex).Replace("\r", string.Empty);
+    }
+
+    static bool IsMatchingPath(string normalizedExpectedPath, string normalizedCandidatePath)
+    {
+        if (string.Equals(normalizedExpectedPath, normalizedCandidatePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (normalizedCandidatePath.EndsWith("/" + normalizedExpectedPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var candidateFileName = NormalizePath(GetFileName(normalizedCandidatePath));
+        return string.Equals(candidateFileName, normalizedExpectedPath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    static string GetFileName(string path)
+    {
+        var index = path.LastIndexOf('/');
+        if (index < 0)
+        {
+            return path;
+        }
+
+        return path.Substring(index + 1);
+    }
+
+    static string GetExtension(string path)
+    {
+        var fileName = GetFileName(path);
+        var dotIndex = fileName.LastIndexOf('.');
+        if (dotIndex < 0)
+        {
+            return string.Empty;
+        }
+
+        return fileName.Substring(dotIndex);
+    }
+
+    static string NormalizePath(string path) => path.Replace('\\', '/').Trim();
+
+    /// <summary>
+    /// Scans all adjacent codel pairs and detects whether the image may produce output
+    /// (hDiff=5,lDiff=1 or hDiff=5,lDiff=2) or require input (hDiff=4,lDiff=2 or hDiff=5,lDiff=0).
+    /// This is a conservative static approximation; false positives are possible.
+    /// </summary>
+    static (bool mightUseOutput, bool mightUseInput) ScanPietIoCommands(byte[] codels, int width, int height)
+    {
+        // hue index for each codel value (0=Black, 1=White, 2..20=18 colors)
+        int[] sHue   = { -1, -1, 0,0,0, 1,1,1, 2,2,2, 3,3,3, 4,4,4, 5,5,5 };
+        int[] sLight = { -1, -1, 0,1,2, 0,1,2, 0,1,2, 0,1,2, 0,1,2, 0,1,2 };
+
+        bool mightUseOutput = false;
+        bool mightUseInput = false;
+
+        for (int y = 0; y < height && !(mightUseOutput && mightUseInput); y++)
+        {
+            for (int x = 0; x < width && !(mightUseOutput && mightUseInput); x++)
+            {
+                byte c = codels[y * width + x];
+                if (c < 2) continue;
+
+                // Check right neighbor
+                if (x + 1 < width)
+                {
+                    byte nc = codels[y * width + (x + 1)];
+                    if (nc >= 2 && nc != c)
+                    {
+                        int cmd = (((sHue[nc] - sHue[c]) % 6 + 6) % 6) * 3
+                                + (((sLight[nc] - sLight[c]) % 3 + 3) % 3);
+                        if (cmd == 14 || cmd == 15) mightUseInput = true;
+                        if (cmd == 16 || cmd == 17) mightUseOutput = true;
+                    }
+                }
+
+                // Check bottom neighbor
+                if (y + 1 < height)
+                {
+                    byte nc = codels[(y + 1) * width + x];
+                    if (nc >= 2 && nc != c)
+                    {
+                        int cmd = (((sHue[nc] - sHue[c]) % 6 + 6) % 6) * 3
+                                + (((sLight[nc] - sLight[c]) % 3 + 3) % 3);
+                        if (cmd == 14 || cmd == 15) mightUseInput = true;
+                        if (cmd == 16 || cmd == 17) mightUseOutput = true;
+                    }
+                }
+            }
+        }
+
+        return (mightUseOutput, mightUseInput);
+    }
+
 }
