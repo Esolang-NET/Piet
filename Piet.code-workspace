@@ -5,6 +5,18 @@
 			"path": "."
 		},
 		{
+			"name": "Esolang.Generator",
+			"path": "Generator"
+		},
+		{
+			"name": "Esolang.Generator.Tests",
+			"path": "Generator.Tests"
+		},
+		{
+			"name": "samples/Esolang.Piet.Generator.UseConsole",
+			"path": "samples/Generator"
+		},
+		{
 			"name": "Esolang.Interpreter",
 			"path": "Interpreter"
 		},
@@ -25,12 +37,7 @@
 			"path": "Processor.Tests"
 		},
 		{
-			"name": "Esolang.Generator",
-			"path": "Generator"
-		},
-		{
-			"name": "Esolang.Generator.Tests",
-			"path": "Generator.Tests"
+			"path": "samples"
 		}
 	],
 	"settings": {
@@ -40,6 +47,7 @@
 			"**/.hg": true,
 			"**/.DS_Store": true,
 			"**/Thumbs.db": true,
+			"samples": true,
 			"Interpreter": true,
 			"Parser": true,
 			"Processor": true,
