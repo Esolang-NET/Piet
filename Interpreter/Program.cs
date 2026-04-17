@@ -14,7 +14,7 @@ rootCommand.SetAction(parseResult =>
 {
     var path = parseResult.GetValue(inputArgument);
     var program = PietParser.Parse(path!);
-    var processor = new PietProcessor(program);
+    var processor = new PietProcessor(program, Console.Out, Console.In);
     processor.Run();
     return 0;
 });
