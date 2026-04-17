@@ -727,8 +727,8 @@ public partial class MethodGenerator : IIncrementalGenerator
     static (bool mightUseOutput, bool mightUseInput) ScanPietIoCommands(byte[] codels, int width, int height)
     {
         // hue index for each codel value (0=Black, 1=White, 2..20=18 colors)
-        int[] sHue = { -1, -1, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5 };
-        int[] sLight = { -1, -1, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2 };
+        int[] sHue = [-1, -1, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5];
+        int[] sLight = [-1, -1, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2];
 
         bool mightUseOutput = false;
         bool mightUseInput = false;
