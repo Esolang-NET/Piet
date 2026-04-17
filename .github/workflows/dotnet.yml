@@ -1,0 +1,86 @@
+name: build and test
+
+on:
+  push:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**.cs'
+      - '**.csproj'
+      - '**.slnx'
+      - '**.props'
+      - '**.targets'
+      - 'global.json'
+      - '.github/workflows/**'
+
+env:
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  build-and-test:
+    name: build-and-test-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore
+
+      - name: Test
+        run: dotnet test --no-build --verbosity normal
+
+      - name: Tool E2E (pack/install/run)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .artifacts/tool-e2e
+          mkdir -p .artifacts/tool-e2e
+
+          dotnet pack Interpreter/Esolang.Piet.Interpreter.csproj -o .artifacts/tool-e2e
+
+          nupkg_path=$(find .artifacts/tool-e2e -maxdepth 1 -type f -name 'dotnet-piet.*.nupkg' | head -n 1)
+          if [ -z "$nupkg_path" ]; then
+            echo "Failed to find dotnet-piet nupkg in .artifacts/tool-e2e"
+            exit 1
+          fi
+
+          nupkg_name=$(basename "$nupkg_path")
+          tool_version=${nupkg_name#dotnet-piet.}
+          tool_version=${tool_version%.nupkg}
+          echo "Detected tool version: $tool_version"
+
+          dotnet tool install dotnet-piet \
+            --tool-path .artifacts/tool-e2e/path \
+            --add-source .artifacts/tool-e2e \
+            --version "$tool_version"
+
+          ./.artifacts/tool-e2e/path/dotnet-piet --help
+
+          output=$(./.artifacts/tool-e2e/path/dotnet-piet samples/Generator.UseConsole/samples/hello-world.png)
+          echo "$output"
+          echo "$output" | grep -qx "Hello, world!"
+
+          dotnet tool uninstall dotnet-piet --tool-path .artifacts/tool-e2e/path
+
+      - name: Pack
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: dotnet pack -o artifacts/
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        with:
+          name: artifacts
+          path: artifacts/
