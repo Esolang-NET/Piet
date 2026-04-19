@@ -21,4 +21,10 @@ For runnable examples and sample image usage, see:
 
 ## Status
 
-This repository is in early bootstrap state. The package layout is in place, and the next implementation steps are parser normalization, processor execution semantics, and CLI integration.
+Core flow is implemented end-to-end:
+
+- `Esolang.Piet.Parser` parses and normalizes Piet images.
+- `Esolang.Piet.Processor` executes parsed programs.
+- `dotnet-piet` runs Piet image files from the command line.
+
+Current work is focused on stabilization, diagnostics, and release readiness.

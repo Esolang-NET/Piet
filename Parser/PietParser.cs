@@ -12,6 +12,7 @@ public static class PietParser
 {
     /// <summary>
     /// Loads a Piet program from an image file.
+    /// Falls back to an internal PNG decoder when strict image decoding fails.
     /// </summary>
     public static PietProgram Parse(string path)
     {
