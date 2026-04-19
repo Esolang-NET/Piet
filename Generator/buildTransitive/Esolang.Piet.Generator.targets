@@ -1,0 +1,54 @@
+<Project>
+  <UsingTask TaskName="PietConvertImageToAdditionalText"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <InputFile Required="true" ParameterType="System.String" />
+      <OutputFile Required="true" ParameterType="System.String" />
+      <LogicalPath Required="true" ParameterType="System.String" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var bytes = File.ReadAllBytes(InputFile);
+        var base64 = Convert.ToBase64String(bytes);
+
+        var outputDirectory = Path.GetDirectoryName(OutputFile);
+        if (!string.IsNullOrEmpty(outputDirectory))
+        {
+            Directory.CreateDirectory(outputDirectory);
+        }
+
+        File.WriteAllText(
+            OutputFile,
+            "// PIET_IMAGE_PATH=" + LogicalPath + Environment.NewLine + base64);
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="GeneratePietAdditionalFiles"
+          BeforeTargets="CoreCompile"
+          Condition="'@(PietImage)' != ''"
+          Inputs="@(PietImage)"
+          Outputs="@(PietImage -> '$(IntermediateOutputPath)PietGenerated\%(Filename)%(Extension).piet.txt')">
+    <MakeDir Directories="$(IntermediateOutputPath)PietGenerated" />
+
+    <ItemGroup>
+      <_PietGeneratedFile Include="@(PietImage)">
+        <GeneratedPath>$(IntermediateOutputPath)PietGenerated\%(Filename)%(Extension).piet.txt</GeneratedPath>
+        <LogicalPath Condition="'%(PietImage.PietLogicalPath)' == ''">%(Filename)%(Extension)</LogicalPath>
+        <LogicalPath Condition="'%(PietImage.PietLogicalPath)' != ''">%(PietImage.PietLogicalPath)</LogicalPath>
+      </_PietGeneratedFile>
+    </ItemGroup>
+
+    <PietConvertImageToAdditionalText
+      InputFile="%(_PietGeneratedFile.FullPath)"
+      OutputFile="%(_PietGeneratedFile.GeneratedPath)"
+      LogicalPath="%(_PietGeneratedFile.LogicalPath)" />
+
+    <ItemGroup>
+      <AdditionalFiles Include="%(_PietGeneratedFile.GeneratedPath)" />
+    </ItemGroup>
+  </Target>
+</Project>

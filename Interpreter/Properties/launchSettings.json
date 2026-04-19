@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Piet.HelloWorld": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "workingDirectory": "..",
+      "commandLineArgs": "samples/Generator.UseConsole/samples/hello-world.png"
+    }
+  }
+}

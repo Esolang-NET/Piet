@@ -1,0 +1,1415 @@
+using Basic.Reference.Assemblies;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
+using System.IO;
+using System.Collections.Immutable;
+using System.Text;
+
+namespace Esolang.Piet.Generator.Tests;
+
+[TestClass]
+public class MethodGeneratorTests
+{
+    // Minimal 1×1 RGB PNG with LightRed (0xFF,0xC0,0xC0). CRC fields are zeroed (not validated by decoder).
+    static readonly byte[] MinimalLightRedPng = new byte[]
+    {
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+        0x00, 0x00, 0x00, 0x0D,                          // IHDR length=13
+        0x49, 0x48, 0x44, 0x52,                          // IHDR
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,  // width=1, height=1
+        0x08, 0x02, 0x00, 0x00, 0x00,                    // 8-bit RGB
+        0x00, 0x00, 0x00, 0x00,                          // CRC (placeholder)
+        0x00, 0x00, 0x00, 0x0F,                          // IDAT length=15
+        0x49, 0x44, 0x41, 0x54,                          // IDAT
+        0x78, 0x01,                                      // zlib header
+        0x01, 0x04, 0x00, 0xFB, 0xFF,                    // deflate stored block
+        0x00, 0xFF, 0xC0, 0xC0,                          // filter=None, R=0xFF,G=0xC0,B=0xC0
+        0x05, 0x41, 0x02, 0x80,                          // Adler-32
+        0x00, 0x00, 0x00, 0x00,                          // CRC (placeholder)
+        0x00, 0x00, 0x00, 0x00,                          // IEND length=0
+        0x49, 0x45, 0x4E, 0x44,                          // IEND
+        0x00, 0x00, 0x00, 0x00,                          // CRC (placeholder)
+    };
+
+    // 2×1 RGB PNG: LightRed(0xFF,0xC0,0xC0) → Magenta(0xFF,0x00,0xFF).
+    // Transition produces hDiff=5,lDiff=1 → cmd 16 (out number). Used to test PT0007.
+    static readonly byte[] TwoPixelOutputPng = new byte[]
+    {
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+        0x00, 0x00, 0x00, 0x0D,                          // IHDR length=13
+        0x49, 0x48, 0x44, 0x52,                          // IHDR
+        0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01,  // width=2, height=1
+        0x08, 0x02, 0x00, 0x00, 0x00,                    // 8-bit RGB
+        0x00, 0x00, 0x00, 0x00,                          // CRC (placeholder)
+        0x00, 0x00, 0x00, 0x12,                          // IDAT length=18
+        0x49, 0x44, 0x41, 0x54,                          // IDAT
+        0x78, 0x01,                                      // zlib header
+        0x01, 0x07, 0x00, 0xF8, 0xFF,                    // deflate stored block (LEN=7)
+        0x00, 0xFF, 0xC0, 0xC0, 0xFF, 0x00, 0xFF,        // filter=None, LightRed, Magenta
+        0x00, 0x00, 0x00, 0x00,                          // Adler-32 (not validated)
+        0x00, 0x00, 0x00, 0x00,                          // CRC (placeholder)
+        0x00, 0x00, 0x00, 0x00,                          // IEND length=0
+        0x49, 0x45, 0x4E, 0x44,                          // IEND
+        0x00, 0x00, 0x00, 0x00,                          // CRC (placeholder)
+    };
+
+    // 2×1 RGB PNG: LightRed(0xFF,0xC0,0xC0) → DarkBlue(0x00,0x00,0xC0).
+    // Transition produces hDiff=4,lDiff=2 → cmd 14 (in number). Used to test PT0008.
+    static readonly byte[] TwoPixelInputPng = new byte[]
+    {
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+        0x00, 0x00, 0x00, 0x0D,                          // IHDR length=13
+        0x49, 0x48, 0x44, 0x52,                          // IHDR
+        0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01,  // width=2, height=1
+        0x08, 0x02, 0x00, 0x00, 0x00,                    // 8-bit RGB
+        0x00, 0x00, 0x00, 0x00,                          // CRC (placeholder)
+        0x00, 0x00, 0x00, 0x12,                          // IDAT length=18
+        0x49, 0x44, 0x41, 0x54,                          // IDAT
+        0x78, 0x01,                                      // zlib header
+        0x01, 0x07, 0x00, 0xF8, 0xFF,                    // deflate stored block (LEN=7)
+        0x00, 0xFF, 0xC0, 0xC0, 0x00, 0x00, 0xC0,        // filter=None, LightRed, DarkBlue
+        0x00, 0x00, 0x00, 0x00,                          // Adler-32 (not validated)
+        0x00, 0x00, 0x00, 0x00,                          // CRC (placeholder)
+        0x00, 0x00, 0x00, 0x00,                          // IEND length=0
+        0x49, 0x45, 0x4E, 0x44,                          // IEND
+        0x00, 0x00, 0x00, 0x00,                          // CRC (placeholder)
+    };
+
+    static string MakeTransformedText(string logicalPath, byte[] pngBytes) =>
+        $"// PIET_IMAGE_PATH={logicalPath}\n{Convert.ToBase64String(pngBytes)}";
+
+    static byte[] BuildStoredRgbPng(int width, int height, byte[] rawScanlineBytes)
+    {
+        static void WriteInt32BE(List<byte> list, int value)
+        {
+            list.Add((byte)((value >> 24) & 0xFF));
+            list.Add((byte)((value >> 16) & 0xFF));
+            list.Add((byte)((value >> 8) & 0xFF));
+            list.Add((byte)(value & 0xFF));
+        }
+
+        var png = new List<byte>();
+        png.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+
+        WriteInt32BE(png, 13);
+        png.AddRange(new byte[] { 0x49, 0x48, 0x44, 0x52 });
+        WriteInt32BE(png, width);
+        WriteInt32BE(png, height);
+        png.AddRange(new byte[] { 0x08, 0x02, 0x00, 0x00, 0x00 });
+        png.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
+
+        var idatPayload = new List<byte>
+        {
+            0x78, 0x01,
+            0x01,
+            (byte)(rawScanlineBytes.Length & 0xFF),
+            (byte)((rawScanlineBytes.Length >> 8) & 0xFF),
+            (byte)(~rawScanlineBytes.Length & 0xFF),
+            (byte)((~rawScanlineBytes.Length >> 8) & 0xFF),
+        };
+        idatPayload.AddRange(rawScanlineBytes);
+        idatPayload.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
+
+        WriteInt32BE(png, idatPayload.Count);
+        png.AddRange(new byte[] { 0x49, 0x44, 0x41, 0x54 });
+        png.AddRange(idatPayload);
+        png.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
+
+        WriteInt32BE(png, 0);
+        png.AddRange(new byte[] { 0x49, 0x45, 0x4E, 0x44 });
+        png.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
+
+        return png.ToArray();
+    }
+
+    public TestContext TestContext { get; set; } = default!;
+    CancellationToken CancellationToken => TestContext.CancellationToken;
+    Compilation baseCompilation = default!;
+
+    [TestInitialize]
+    public void InitializeCompilation()
+    {
+        IEnumerable<PortableExecutableReference> references =
+#if NET10_0_OR_GREATER
+            Net100.References.All;
+#elif NET9_0_OR_GREATER
+            Net90.References.All;
+#elif NET8_0_OR_GREATER
+            Net80.References.All;
+#elif NET472_OR_GREATER
+            Net472.References.All;
+#else
+            throw new InvalidOperationException("Unsupported target framework for generator tests.");
+#endif
+
+        var referenceList = references.ToList();
+        var hasPipelinesReference = referenceList.Any(static r =>
+            string.Equals(Path.GetFileNameWithoutExtension(r.FilePath), "System.IO.Pipelines", StringComparison.OrdinalIgnoreCase));
+        if (!hasPipelinesReference)
+        {
+            var pipelinesAssemblyLocation = typeof(System.IO.Pipelines.PipeReader).Assembly.Location;
+            if (!string.IsNullOrWhiteSpace(pipelinesAssemblyLocation))
+            {
+                referenceList.Add(MetadataReference.CreateFromFile(pipelinesAssemblyLocation));
+            }
+        }
+
+        baseCompilation = CSharpCompilation.Create(
+            "generator-tests",
+            references: referenceList,
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    [TestMethod]
+    public void Generator_Initialization_Succeeds()
+    {
+        var generator = new MethodGenerator();
+        Assert.IsNotNull(generator);
+    }
+
+    [TestMethod]
+    public void Generator_WithValidAttribute_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public partial void Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/program.png.piet.txt",
+                MakeTransformedText("program.png", MinimalLightRedPng)));
+        var runResult = driver.GetRunResult();
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run()")),
+            "Expected generated method implementation was not found.");
+
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.\n"
+            + string.Join("\n", outputCompilation.GetDiagnostics(CancellationToken).Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithInvalidImagePath_ReportsDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("")]
+                public partial void Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(source, out _, out _);
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0001"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithMissingImageFile_ReportsDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("missing.png")]
+                public partial void Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(source, out _, out _);
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0005"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithInvalidImageFormat_ReportsDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("invalid.png")]
+                public partial void Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("invalid.png", null));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0006"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithTransformedImageText_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial void Run();
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run()")),
+            "Expected generated method implementation was not found.");
+
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.\n"
+            + string.Join("\n", outputCompilation.GetDiagnostics(CancellationToken).Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithStringReturn_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial string Run();
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("return __pietOutput.ToString();")),
+            "Expected generated string return path was not found.");
+
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.\n"
+            + string.Join("\n", outputCompilation.GetDiagnostics(CancellationToken).Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithTextReaderAndTextWriterParameters_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial void Run(System.IO.TextReader input, System.IO.TextWriter output);
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run(global::System.IO.TextReader input, global::System.IO.TextWriter output)")),
+            "Expected generated method implementation with TextReader/TextWriter parameters was not found.");
+
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0007" || x.Id == "PT0008"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.\n"
+            + string.Join("\n", outputCompilation.GetDiagnostics(CancellationToken).Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithUnsupportedParameter_ReportsDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial void Run(int value);
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0003"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithMultipleInputKinds_ReportsDuplicateParameterDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("input.png")]
+                public partial void Run(string input, System.IO.TextReader reader);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/input.png.piet.txt",
+                MakeTransformedText("input.png", TwoPixelInputPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0004"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithReturnTypeAndOutputParameter_ReportsReturnOutputConflictDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial string Run(System.IO.TextWriter output);
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithInvalidTransformedImageText_ReportsDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial void Run();
+            }
+            """;
+
+        var transformed = "// PIET_IMAGE_PATH=samples/hello-world.png\ninvalid-base64";
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0006"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithOutputImage_AndNoOutputMechanism_ReportsDiagnostic()
+    {
+        // void method with no output parameter/return value → should report PT0007
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("output.png")]
+                public partial void Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/output.png.piet.txt",
+                MakeTransformedText("output.png", TwoPixelOutputPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0007"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithOutputImage_AndStringReturn_DoesNotReportMissingOutputDiagnostic()
+    {
+        // string return → explicit output mechanism → no PT0007
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("output.png")]
+                public partial string Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/output.png.piet.txt",
+                MakeTransformedText("output.png", TwoPixelOutputPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0007"),
+            "PT0007 should not be reported when the method has a string return type.");
+    }
+
+    [TestMethod]
+    public void Generator_WithInputImage_AndNoInputMechanism_ReportsDiagnostic()
+    {
+        // void method with no input parameter → should report PT0008
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("input.png")]
+                public partial void Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/input.png.piet.txt",
+                MakeTransformedText("input.png", TwoPixelInputPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0008"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithInputImage_AndPipeReaderParameter_DoesNotReportMissingInputDiagnostic()
+    {
+        // PipeReader parameter → explicit input mechanism → no PT0008
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("input.png")]
+                public partial void Run(System.IO.Pipelines.PipeReader input);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/input.png.piet.txt",
+                MakeTransformedText("input.png", TwoPixelInputPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0008"),
+            "PT0008 should not be reported when the method has a PipeReader parameter.");
+    }
+
+    [TestMethod]
+    public void Generator_WithInputImage_AndTextReaderParameter_DoesNotReportMissingInputDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("input.png")]
+                public partial void Run(System.IO.TextReader input);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/input.png.piet.txt",
+                MakeTransformedText("input.png", TwoPixelInputPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0008"),
+            "PT0008 should not be reported when the method has a TextReader parameter.");
+    }
+
+    [TestMethod]
+    public void Generator_WithOutputImage_AndTextWriterParameter_DoesNotReportMissingOutputDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("output.png")]
+                public partial void Run(System.IO.TextWriter output);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/output.png.piet.txt",
+                MakeTransformedText("output.png", TwoPixelOutputPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0007"),
+            "PT0007 should not be reported when the method has a TextWriter parameter.");
+    }
+
+    [TestMethod]
+    public void Generator_WithUnusedInputParameter_ReportsHiddenDiagnostic_AndGeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public partial void Run(System.IO.Pipelines.PipeReader input);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/program.png.piet.txt",
+                MakeTransformedText("program.png", MinimalLightRedPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0010" && x.Severity == DiagnosticSeverity.Hidden),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run(global::System.IO.Pipelines.PipeReader input)")),
+            "Expected generated method implementation was not found.");
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.");
+    }
+
+    [TestMethod]
+    public void Generator_WithTaskStringReturn_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial System.Threading.Tasks.Task<string> Run();
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("Task.FromResult(__pietOutput.ToString())")),
+            "Expected Task.FromResult return path was not found.");
+
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.");
+    }
+
+    [TestMethod]
+    public void Generator_WithIEnumerableByteReturn_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial System.Collections.Generic.IEnumerable<byte> Run();
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("yield return __pietByte;")),
+            "Expected yield return byte path was not found.");
+
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.");
+    }
+
+    [TestMethod]
+    public void Generator_WithCancellationTokenParameter_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial void Run(System.Threading.CancellationToken ct = default);
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("global::System.Threading.CancellationToken ct")),
+            "Expected CancellationToken parameter was not found in generated code.");
+
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.");
+    }
+
+    [TestMethod]
+    public void Generator_WithoutGeneratePietMethodAttribute_DoesNotEmitMethodSource()
+    {
+        const string source = "public class Sample { public void Run() { } }";
+
+        var driver = RunGeneratorsAndUpdateCompilation(source, out var outputCompilation, out var diagnostics);
+        var runResult = driver.GetRunResult();
+        var generatedHints = runResult.Results.SelectMany(static r => r.GeneratedSources).Select(static s => s.HintName).ToArray();
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        Assert.IsFalse(generatedHints.Contains(MethodGenerator.GeneratedMethodsFileName, StringComparer.Ordinal));
+        Assert.IsFalse(generatedHints.Contains(MethodGenerator.GeneratePietRuntimeFileName, StringComparer.Ordinal));
+
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.");
+    }
+
+    [TestMethod]
+    public void Generator_WithInvalidReturnType_ReportsDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public partial int Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/program.png.piet.txt",
+                MakeTransformedText("program.png", MinimalLightRedPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0002"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithGenericMethod_ReportsDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public partial void Run<T>();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/program.png.piet.txt",
+                MakeTransformedText("program.png", MinimalLightRedPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0003"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithRefParameter_ReportsDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public partial void Run(ref int value);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/program.png.piet.txt",
+                MakeTransformedText("program.png", MinimalLightRedPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0003"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithDuplicateCancellationToken_ReportsDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public partial void Run(System.Threading.CancellationToken ct1, System.Threading.CancellationToken ct2);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/program.png.piet.txt",
+                MakeTransformedText("program.png", MinimalLightRedPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0004"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithStringAndPipeReader_ReportsDuplicateParameterDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("input.png")]
+                public partial void Run(string input, System.IO.Pipelines.PipeReader reader);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/input.png.piet.txt",
+                MakeTransformedText("input.png", TwoPixelInputPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0004"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithDuplicatePipeWriter_ReportsDuplicateParameterDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("output.png")]
+                public partial void Run(System.IO.Pipelines.PipeWriter output1, System.IO.Pipelines.PipeWriter output2);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/output.png.piet.txt",
+                MakeTransformedText("output.png", TwoPixelOutputPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0004"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithDuplicateTextWriter_ReportsDuplicateParameterDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("output.png")]
+                public partial void Run(System.IO.TextWriter output1, System.IO.TextWriter output2);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/output.png.piet.txt",
+                MakeTransformedText("output.png", TwoPixelOutputPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0004"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithGlobalNamespaceAndStaticMethod_GeneratesMethod()
+    {
+        const string source = """
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public static partial void Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/program.png.piet.txt",
+                MakeTransformedText("program.png", MinimalLightRedPng)));
+        var runResult = driver.GetRunResult();
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        var generatedMethod = runResult.GeneratedTrees
+            .Select(static tree => tree.GetText().ToString())
+            .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
+
+        Assert.IsTrue(generatedMethod.Contains("public static partial"), "Expected static modifier was not found.");
+        Assert.IsFalse(generatedMethod.Contains("namespace "), "Global namespace method should not emit a namespace declaration.");
+
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.");
+    }
+
+    [TestMethod]
+    public void Generator_WithUnreadableTransformedText_ReportsImageNotFoundDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial void Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", null));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+                generatorDiagnostics.Any(static x => x.Id == "PT0005"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithTransformedTextWithoutPrefix_ReportsImageNotFoundDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial void Run();
+            }
+            """;
+
+        var transformed = "// NOT_PIET=hello-world.png\n" + Convert.ToBase64String(MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+                generatorDiagnostics.Any(static x => x.Id == "PT0005"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithTransformedTextWithEmptyImagePath_ReportsImageNotFoundDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial void Run();
+            }
+            """;
+
+        var transformed = "// PIET_IMAGE_PATH=   \n" + Convert.ToBase64String(MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+                generatorDiagnostics.Any(static x => x.Id == "PT0005"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithTransformedTextWithoutNewline_ReportsDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial void Run();
+            }
+            """;
+
+        var transformed = "// PIET_IMAGE_PATH=hello-world.png";
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0006"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithTransformedTextWithEmptyPayload_ReportsDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial void Run();
+            }
+            """;
+
+        var transformed = "// PIET_IMAGE_PATH=hello-world.png\n   ";
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0006"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithVerticalOutputTransition_ReportsMissingOutputDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("vertical-output.png")]
+                public partial void Run();
+            }
+            """;
+
+        var verticalOutputPng = BuildStoredRgbPng(1, 2, new byte[]
+        {
+            0x00, 0xFF, 0xC0, 0xC0,
+            0x00, 0xFF, 0x00, 0xFF,
+        });
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/vertical-output.png.piet.txt",
+                MakeTransformedText("vertical-output.png", verticalOutputPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0007"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithBlackPixelProgram_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("black.png")]
+                public partial void Run();
+            }
+            """;
+
+        var blackPng = BuildStoredRgbPng(1, 1, new byte[]
+        {
+            0x00, 0x00, 0x00, 0x00,
+        });
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/black.png.piet.txt",
+                MakeTransformedText("black.png", blackPng)));
+        var runResult = driver.GetRunResult();
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run()")),
+            "Expected generated method implementation was not found.");
+
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.");
+    }
+
+#if NET8_0_OR_GREATER
+    [TestMethod]
+    public void Generator_WithValueTaskStringReturn_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial System.Threading.Tasks.ValueTask<string> Run();
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("new global::System.Threading.Tasks.ValueTask<string>")),
+            "Expected ValueTask<string> return path was not found.");
+
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.");
+    }
+
+    [TestMethod]
+    public void Generator_WithIAsyncEnumerableByteReturn_GeneratesAsyncMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial System.Collections.Generic.IAsyncEnumerable<byte> Run(System.Threading.CancellationToken ct = default);
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        var generatedText = runResult.GeneratedTrees
+            .Select(static tree => tree.GetText().ToString())
+            .FirstOrDefault(static t => t.Contains("IAsyncEnumerable")) ?? string.Empty;
+
+        Assert.IsTrue(generatedText.Contains("async partial"), "Expected async modifier in generated code.");
+        Assert.IsTrue(generatedText.Contains("EnumeratorCancellation"), "Expected [EnumeratorCancellation] attribute in generated code.");
+        Assert.IsTrue(generatedText.Contains("new global::System.IO.Pipelines.Pipe()"), "Expected Pipe-based streaming path was not found.");
+        Assert.IsTrue(generatedText.Contains("await __pietPipe.Reader.ReadAsync()"), "Expected async Pipe read loop was not found.");
+        Assert.IsTrue(generatedText.Contains("yield return __pietChunk[__pietIndex];"), "Expected yield return byte path was not found.");
+        Assert.IsTrue(generatedText.Contains("ct.ThrowIfCancellationRequested();"), "Expected cancellation check was not found.");
+
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.");
+    }
+
+    [TestMethod]
+    public void Generator_WithPipeReaderInput_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("input.png")]
+                public partial string Run(System.IO.Pipelines.PipeReader input);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/input.png.piet.txt",
+                MakeTransformedText("input.png", TwoPixelInputPng)));
+        var runResult = driver.GetRunResult();
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("new global::System.IO.StreamReader(input.AsStream())")),
+            "Expected PipeReader.AsStream() wrapper was not found in generated code.");
+
+        var pipeReaderErrors = outputCompilation.GetDiagnostics(CancellationToken)
+            .Where(static x => x.Severity == DiagnosticSeverity.Error)
+            .Select(static x => x.ToString())
+            .ToArray();
+
+        Assert.IsFalse(
+            pipeReaderErrors.Length > 0,
+            "Compilation contains errors after running generator. " + string.Join(" | ", pipeReaderErrors));
+    }
+
+    [TestMethod]
+    public void Generator_WithPipeWriterOutput_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("output.png")]
+                public partial void Run(System.IO.Pipelines.PipeWriter output);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/output.png.piet.txt",
+                MakeTransformedText("output.png", TwoPixelOutputPng)));
+        var runResult = driver.GetRunResult();
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("new global::System.IO.StreamWriter(output.AsStream())")),
+            "Expected PipeWriter.AsStream() wrapper was not found in generated code.");
+
+        var pipeWriterErrors = outputCompilation.GetDiagnostics(CancellationToken)
+            .Where(static x => x.Severity == DiagnosticSeverity.Error)
+            .Select(static x => x.ToString())
+            .ToArray();
+
+        Assert.IsFalse(
+            pipeWriterErrors.Length > 0,
+            "Compilation contains errors after running generator. " + string.Join(" | ", pipeWriterErrors));
+    }
+#endif
+
+    GeneratorDriver RunGeneratorsAndUpdateCompilation(
+        string source,
+        out Compilation outputCompilation,
+        out ImmutableArray<Diagnostic> diagnostics,
+        params AdditionalText[] additionalTexts)
+    {
+        var parseOptions = new CSharpParseOptions(LanguageVersion.CSharp14);
+        var syntaxTree = CSharpSyntaxTree.ParseText(source, parseOptions, cancellationToken: CancellationToken);
+        var inputCompilation = baseCompilation.AddSyntaxTrees(syntaxTree);
+
+        var sourceGenerator = new MethodGenerator().AsSourceGenerator();
+        GeneratorDriver driver = CSharpGeneratorDriver.Create([sourceGenerator], additionalTexts, parseOptions);
+        driver = driver.RunGeneratorsAndUpdateCompilation(inputCompilation, out outputCompilation, out diagnostics, CancellationToken);
+        return driver;
+    }
+
+    sealed class TestAdditionalText(string path, string? content) : AdditionalText
+    {
+        readonly SourceText? sourceText = content is null ? null : SourceText.From(content, Encoding.UTF8);
+
+        public override string Path { get; } = path;
+
+        public override SourceText? GetText(CancellationToken cancellationToken = default) => sourceText;
+    }
+}

@@ -1,0 +1,66 @@
+{
+	"folders": [
+		{
+			"name": "root",
+			"path": "."
+		},
+		{
+			"name": "Esolang.Piet.Generator",
+			"path": "Generator"
+		},
+		{
+			"name": "Esolang.Piet.Generator.Tests",
+			"path": "Generator.Tests"
+		},
+		{
+			"name": "samples/Esolang.Piet.Generator.UseConsole",
+			"path": "samples/Generator.UseConsole"
+		},
+		{
+			"name": "Esolang.Piet.Interpreter",
+			"path": "Interpreter"
+		},
+		{
+			"name": "Esolang.Piet.Parser",
+			"path": "Parser"
+		},
+		{
+			"name": "Esolang.Piet.Parser.Tests",
+			"path": "Parser.Tests"
+		},
+		{
+			"name": "Esolang.Piet.Processor",
+			"path": "Processor"
+		},
+		{
+			"name": "Esolang.Piet.Processor.Tests",
+			"path": "Processor.Tests"
+		},
+		{
+			"path": "samples"
+		}
+	],
+	"settings": {
+		"files.exclude": {
+			"**/.git": true,
+			"**/.svn": true,
+			"**/.hg": true,
+			"**/.DS_Store": true,
+			"**/Thumbs.db": true,
+			"samples": true,
+			"**/Interpreter": true,
+			"**/Parser": true,
+			"**/Processor": true,
+			"**/Generator": true,
+			"**/Parser.Tests": true,
+			"**/Processor.Tests": true,
+			"**/Generator.Tests": true
+		}
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-vscode.powershell",
+			"ms-dotnettools.csdevkit"
+		]
+	}
+}
