@@ -1,0 +1,138 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing git tag to publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  publish:
+    name: publish-packages-and-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build --verbosity normal
+
+      - name: Pack
+        run: |
+          dotnet pack Generator/Esolang.Piet.Generator.csproj -c Release -o artifacts/nuget
+          dotnet pack Parser/Esolang.Piet.Parser.csproj -c Release -o artifacts/nuget
+          dotnet pack Processor/Esolang.Piet.Processor.csproj -c Release -o artifacts/nuget
+          dotnet pack Interpreter/Esolang.Piet.Interpreter.csproj -c Release -o artifacts/nuget
+
+      - name: Publish to NuGet.org
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NUGET_API_KEY:-}" ]; then
+            echo "NUGET_API_KEY secret is not configured."
+            exit 1
+          fi
+
+          shopt -s nullglob
+
+          for pkg in artifacts/nuget/*.nupkg; do
+            case "$pkg" in
+              *.snupkg)
+                continue
+                ;;
+            esac
+
+            dotnet nuget push "$pkg" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
+
+          for symbol_pkg in artifacts/nuget/*.snupkg; do
+            dotnet nuget push "$symbol_pkg" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
+
+      - name: Publish to GitHub Packages (NuGet)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_OWNER: ${{ github.repository_owner }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          source_url="https://nuget.pkg.github.com/${GITHUB_OWNER}/index.json"
+          shopt -s nullglob
+
+          # GitHub Packages does not use symbol package feeds.
+          for pkg in artifacts/nuget/*.nupkg; do
+            case "$pkg" in
+              *.snupkg)
+                continue
+                ;;
+            esac
+
+            dotnet nuget push "$pkg" \
+              --api-key "$GITHUB_TOKEN" \
+              --source "$source_url" \
+              --skip-duplicate
+          done
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}"
+          shopt -s nullglob
+          assets=(artifacts/nuget/*.nupkg artifacts/nuget/*.snupkg)
+
+          prerelease_flag=""
+          if [[ "$tag" == *-* ]]; then
+            prerelease_flag="--prerelease"
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            if [ ${#assets[@]} -gt 0 ]; then
+              gh release upload "$tag" "${assets[@]}" --clobber
+            fi
+          else
+            gh release create "$tag" \
+              "${assets[@]}" \
+              --title "$tag" \
+              --generate-notes \
+              $prerelease_flag
+          fi
