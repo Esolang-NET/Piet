@@ -397,13 +397,23 @@ public partial class MethodGenerator : IIncrementalGenerator
             code.AppendLine("        });");
             code.AppendLine("        try");
             code.AppendLine("        {");
+            if (executionBinding.CancellationTokenName is not null)
+            {
+                code.Append("            var __pietReadCancellationToken = ")
+                    .Append(executionBinding.CancellationTokenName)
+                    .AppendLine(";");
+            }
+            else
+            {
+                code.AppendLine("            var __pietReadCancellationToken = default(global::System.Threading.CancellationToken);");
+            }
             code.AppendLine("            while (true)");
             code.AppendLine("            {");
             if (executionBinding.CancellationTokenName is not null)
             {
                 code.Append("                ").Append(executionBinding.CancellationTokenName).AppendLine(".ThrowIfCancellationRequested();");
             }
-            code.AppendLine("                var __pietReadResult = await __pietPipe.Reader.ReadAsync();");
+            code.AppendLine("                var __pietReadResult = await __pietPipe.Reader.ReadAsync(__pietReadCancellationToken);");
             code.AppendLine("                var __pietBuffer = __pietReadResult.Buffer;");
             code.AppendLine("                foreach (var __pietSegment in __pietBuffer)");
             code.AppendLine("                {");

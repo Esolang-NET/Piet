@@ -1302,7 +1302,7 @@ public class MethodGeneratorTests
         Assert.IsTrue(generatedText.Contains("async partial"), "Expected async modifier in generated code.");
         Assert.IsTrue(generatedText.Contains("EnumeratorCancellation"), "Expected [EnumeratorCancellation] attribute in generated code.");
         Assert.IsTrue(generatedText.Contains("new global::System.IO.Pipelines.Pipe()"), "Expected Pipe-based streaming path was not found.");
-        Assert.IsTrue(generatedText.Contains("await __pietPipe.Reader.ReadAsync()"), "Expected async Pipe read loop was not found.");
+        Assert.IsTrue(generatedText.Contains("await __pietPipe.Reader.ReadAsync(__pietReadCancellationToken)"), "Expected async Pipe read loop was not found.");
         Assert.IsTrue(generatedText.Contains("yield return __pietChunk[__pietIndex];"), "Expected yield return byte path was not found.");
         Assert.IsTrue(generatedText.Contains("ct.ThrowIfCancellationRequested();"), "Expected cancellation check was not found.");
 
