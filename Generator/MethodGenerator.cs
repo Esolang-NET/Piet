@@ -136,7 +136,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                         /// Generate a Piet method implementation.
                         /// </summary>
                         /// <param name="imagePath">Path to the Piet image file.</param>
-                        internal {{ClassNamePietAttribution}}(string imagePath) { }
+                        /// <param name="codelSize">Optional codel size for the Piet image.</param>
+                        internal {{ClassNamePietAttribution}}(string imagePath, int? codelSize = null) { }
                     }
                 }
                 """));
@@ -339,8 +340,20 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         // --- 画像デコード拡張 ---
         var extension = GetExtension(resolvedImageFile.Value.Path);
+        // 属性でCodelSize指定があればそれを優先、なければ追加ファイルのPIET_CODEL_SIZEコメントを使う
+        int codelSize = GetCodelSizeFromAdditionalFile(resolvedImageFile.Value);
+        // 属性引数（2つ目以降）にcodelSizeがあれば上書き
+        if (source.Attributes[0].ConstructorArguments.Length > 1)
+        {
+            var arg = source.Attributes[0].ConstructorArguments[1];
+            if (arg.Value is int attrCodelSize && attrCodelSize > 0)
+            {
+                codelSize = attrCodelSize;
+            }
+        }
         byte[]? codels = null;
         int imageWidth = 0, imageHeight = 0;
+        // codelSizeは今後の属性優先ロジックで上書き可能にする
         if (string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase))
         {
             var pngBytes = ExtractPngBytes(resolvedImageFile.Value);
@@ -898,6 +911,8 @@ public partial class MethodGenerator : IIncrementalGenerator
         {
             return false;
         }
+        const string secondPrefix = "// PIET_CODEL_SIZE=";
+        var secondsLine = GetSE
 
         var originalPath = firstLine.Substring(prefix.Length).Trim();
         if (string.IsNullOrWhiteSpace(originalPath))
@@ -996,6 +1011,24 @@ public partial class MethodGenerator : IIncrementalGenerator
     }
 
     static string NormalizePath(string path) => path.Replace('\\', '/').Trim();
+
+    // --- AdditionalFileコメントからPIET_CODEL_SIZEを取得 ---
+    static int GetCodelSizeFromAdditionalFile(AdditionalImageFile file)
+    {
+        if (file.Text is null) return 1;
+        var lines = file.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("// PIET_CODEL_SIZE=", StringComparison.Ordinal))
+            {
+                var value = trimmed.Substring("// PIET_CODEL_SIZE=".Length);
+                if (int.TryParse(value, out var result) && result > 0)
+                    return result;
+            }
+        }
+        return 1;
+    }
 
     /// <summary>
     /// Scans all adjacent codel pairs and detects whether the image may produce output

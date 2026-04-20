@@ -13,55 +13,64 @@ public static class PietParser
     /// Loads a Piet program from an image file.
     /// Falls back to an internal PNG decoder when strict image decoding fails.
     /// </summary>
-    public static PietProgram Parse(string path)
+    public static PietProgram Parse(string path, int codelSize = 1)
     {
         // 拡張子が .txt の場合は ascii-piet 形式、.ppm の場合は PPM 形式として扱う
         var ext = Path.GetExtension(path).ToLowerInvariant();
         if (ext == ".txt")
         {
+            if (codelSize != 1) throw new ArgumentException("ascii-piet形式はcodelSize=1のみ対応");
             return AsciiPietParser.Parse(path);
         }
         if (ext == ".ppm")
         {
+            if (codelSize != 1) throw new ArgumentException("PPM形式はcodelSize=1のみ対応");
             return PpmPietParser.Parse(path);
         }
         try
         {
             using var image = Image.Load<Rgba32>(path);
-            var colors = new PietColor[image.Width * image.Height];
-
-            for (var y = 0; y < image.Height; y++)
+            int codelWidth = image.Width / codelSize;
+            int codelHeight = image.Height / codelSize;
+            var colors = new PietColor[codelWidth * codelHeight];
+            for (var y = 0; y < codelHeight; y++)
             {
-                for (var x = 0; x < image.Width; x++)
+                for (var x = 0; x < codelWidth; x++)
                 {
-                    colors[(y * image.Width) + x] = Normalize(image[x, y]);
+                    // 左上ピクセルの色で代表とする（平均化したい場合はここを修正）
+                    colors[(y * codelWidth) + x] = Normalize(image[x * codelSize, y * codelSize]);
                 }
             }
-
-            return new PietProgram(image.Width, image.Height, colors);
+            return new PietProgram(codelWidth, codelHeight, colors);
         }
         catch (InvalidImageContentException)
         {
-            return ParseWithRawPngFallback(path);
+            return ParseWithRawPngFallback(path, codelSize);
         }
         catch (UnknownImageFormatException)
         {
-            return ParseWithRawPngFallback(path);
+            return ParseWithRawPngFallback(path, codelSize);
         }
     }
 
-    static PietProgram ParseWithRawPngFallback(string path)
+    static PietProgram ParseWithRawPngFallback(string path, int codelSize = 1)
     {
         var pngBytes = File.ReadAllBytes(path);
         var codels = TryDecodePng(pngBytes, out var width, out var height);
         if (codels is null || width <= 0 || height <= 0)
             throw new InvalidImageContentException("Failed to parse Piet PNG image.");
 
-        var colors = new PietColor[codels.Length];
-        for (var i = 0; i < codels.Length; i++)
-            colors[i] = (PietColor)codels[i];
-
-        return new PietProgram(width, height, colors);
+        int codelWidth = width / codelSize;
+        int codelHeight = height / codelSize;
+        var colors = new PietColor[codelWidth * codelHeight];
+        for (var y = 0; y < codelHeight; y++)
+        {
+            for (var x = 0; x < codelWidth; x++)
+            {
+                colors[(y * codelWidth) + x] = (PietColor)codels[(y * codelSize) * width + (x * codelSize)];
+            }
+        }
+        return new PietProgram(codelWidth, codelHeight, colors);
     }
 
     static byte[]? TryDecodePng(byte[] pngBytes, out int width, out int height)

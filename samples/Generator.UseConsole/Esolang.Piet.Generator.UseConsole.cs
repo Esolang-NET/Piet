@@ -77,7 +77,7 @@ partial class PietSample
     [GeneratePietMethod("ppm-sample.ppm")]
     public static partial string RunPpm();
 
-    [GeneratePietMethod("sample.gif")]
+    [GeneratePietMethod("sample.png")]
     public static partial string RunGif();
 
     public static void RunToConsole()

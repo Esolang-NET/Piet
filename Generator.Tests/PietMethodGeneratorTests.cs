@@ -1492,4 +1492,68 @@ public class MethodGeneratorTests
 
         public override SourceText? GetText(CancellationToken cancellationToken = default) => sourceText;
     }
+
+    [TestMethod]
+    public void Generator_WithCodelSizeAttribute_OverridesAdditionalFile()
+    {
+        // 追加ファイルはPIET_CODEL_SIZE=1だが、属性で3を指定した場合は3が優先される
+        const string source = 
+"""
+namespace Demo;
+
+public partial class Sample
+{
+    [Esolang.Piet.GeneratePietMethod("program.png", 3)]
+    public static partial void Run();
+}
+""";
+        // 追加ファイルにはCodelSize=1を埋め込む
+        var transformed = "// PIET_IMAGE_PATH=program.png\n// PIET_CODEL_SIZE=1\n" + Convert.ToBase64String(MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/program.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        // 生成コードにcodelSize=3が反映されているか（例: 配列長やコメント等で判定）
+        var generated = runResult.GeneratedTrees.Select(t => t.GetText().ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
+        Assert.IsNotNull(generated, "Method not generated");
+        Assert.IsTrue(generated.Contains("codelSize = 3") || generated.Contains("3 /* codelSize */"), "codelSize=3 not reflected in generated code");
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.");
+    }
+
+    [TestMethod]
+    public void Generator_WithCodelSizeFromAdditionalFile_UsedWhenNoAttribute()
+    {
+        // 属性でcodelSize指定なし、追加ファイルPIET_CODEL_SIZE=2の場合は2が使われる
+        const string source = 
+"""
+namespace Demo;
+
+public partial class Sample
+{
+    [Esolang.Piet.GeneratePietMethod("program.png")]
+    public static partial void Run();
+}
+""";
+        var transformed = "// PIET_IMAGE_PATH=program.png\n// PIET_CODEL_SIZE=2\n" + Convert.ToBase64String(MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/program.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generated = runResult.GeneratedTrees.Select(t => t.GetText().ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
+        Assert.IsNotNull(generated, "Method not generated");
+        Assert.IsTrue(generated.Contains("codelSize = 2") || generated.Contains("2 /* codelSize */"), "codelSize=2 not reflected in generated code");
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.");
+    }
 }

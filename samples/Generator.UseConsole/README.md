@@ -17,7 +17,6 @@ This sample uses multiple image formats:
 - `samples/input-output.png` (PNG, input + output)
 - `samples/ascii-piet-sample.txt` (ascii-piet text, output)
 - `samples/ppm-sample.ppm` (PPM, output)
-- `samples/sample.gif` (GIF, output)
 
 
 Preview:
@@ -27,7 +26,6 @@ Preview:
 ![input-output.png](samples/input-output.png)
 ascii-piet: `samples/ascii-piet-sample.txt`
 ppm: `samples/ppm-sample.ppm`
-gif: `samples/sample.gif`
 
 ## Config in csproj
 
@@ -41,7 +39,7 @@ Images are connected through `PietImage` items (PNG, .txt, .ppm, .gif all suppor
   <PietImage Include="samples\input-output.png" PietLogicalPath="input-output.png" />
   <PietImage Include="samples\ascii-piet-sample.txt" PietLogicalPath="ascii-piet-sample.txt" />
   <PietImage Include="samples\ppm-sample.ppm" PietLogicalPath="ppm-sample.ppm" />
-  <PietImage Include="samples\sample.gif" PietLogicalPath="sample.gif" />
+  <PietImage Include="samples\sample.png" PietLogicalPath="sample.png" CodelSize="11" />
 </ItemGroup>
 ```
 

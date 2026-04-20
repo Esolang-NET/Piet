@@ -82,3 +82,5 @@ dotnet tool install -g dotnet-piet --prerelease
 ## See also
 
 - Piet language reference: https://www.dangermouse.net/esoteric/piet.html
+
+**Note:** GIF (`.gif`) 形式は現状未サポートです。
