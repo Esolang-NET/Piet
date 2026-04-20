@@ -32,3 +32,7 @@ Console.WriteLine($"Top-left codel: {program[0, 0]}");
 - Input is read from an image file path.
 - Unsupported colors cause parsing to fail.
 - This package focuses on normalization, not execution.
+
+## See also
+
+- Piet language reference: https://www.dangermouse.net/esoteric/piet.html
