@@ -8,7 +8,10 @@ Piet source generator for .NET.
 dotnet add package Esolang.Piet.Generator
 ```
 
+
 ## Usage
+
+You can use PNG, GIF, ascii-piet text (.txt), or Netpbm PPM (P3, .ppm) as Piet source images.
 
 Use `GeneratePietMethodAttribute` on a `partial` method.
 
@@ -17,18 +20,40 @@ using Esolang.Piet;
 
 partial class PietSample
 {
-    [GeneratePietMethod("program.png")]
-    public static partial void Run();
+        [GeneratePietMethod("program.png")]
+        public static partial void Run();
+
+        [GeneratePietMethod("samples/ascii-piet-sample.txt")]
+        public static partial void RunAsciiPiet();
+
+        [GeneratePietMethod("samples/ppm-sample.ppm")]
+        public static partial void RunPpm();
+
+        [GeneratePietMethod("samples/sample.gif")]
+        public static partial void RunGif();
 }
 ```
 
-In your project file, specify the PNG via `PietImage`.
+In your project file, specify the image via `PietImage` (PNG, .txt, .ppm all supported):
 
 ```xml
 <ItemGroup>
-  <PietImage Include="Assets\program.png" PietLogicalPath="program.png" />
+    <PietImage Include="Assets\program.png" PietLogicalPath="program.png" />
+    <PietImage Include="samples\ascii-piet-sample.txt" PietLogicalPath="ascii-piet-sample.txt" />
+    <PietImage Include="samples\ppm-sample.ppm" PietLogicalPath="ppm-sample.ppm" />
+    <PietImage Include="samples\sample.gif" PietLogicalPath="sample.gif" />
 </ItemGroup>
 ```
+
+
+## Supported Piet Image Formats
+
+- PNG (standard)
+- GIF (static, `.gif`)
+- ascii-piet text format (`.txt`)
+- Netpbm PPM (P3, `.ppm`)
+
+拡張子で自動判別されます。
 
 ## Features
 
@@ -289,3 +314,4 @@ For a concrete sample project and runnable examples, see [samples/Generator.UseC
 ## See also
 
 - Piet language reference: https://www.dangermouse.net/esoteric/piet.html
+- ascii-piet encoding specification: https://github.com/dloscutoff/ascii-piet#encoding-specification

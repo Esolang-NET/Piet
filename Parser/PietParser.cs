@@ -1,6 +1,5 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using System.Collections.Generic;
 using System.IO.Compression;
 
 namespace Esolang.Piet.Parser;
@@ -16,6 +15,16 @@ public static class PietParser
     /// </summary>
     public static PietProgram Parse(string path)
     {
+        // 拡張子が .txt の場合は ascii-piet 形式、.ppm の場合は PPM 形式として扱う
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        if (ext == ".txt")
+        {
+            return AsciiPietParser.Parse(path);
+        }
+        if (ext == ".ppm")
+        {
+            return PpmPietParser.Parse(path);
+        }
         try
         {
             using var image = Image.Load<Rgba32>(path);
@@ -226,7 +235,10 @@ public static class PietParser
         return c;
     }
 
-    static int MapToPietColor(byte r, byte g, byte b)
+    /// <summary>
+    /// RGB値をPietColorインデックスに変換します。対応しない色は-1を返します。
+    /// </summary>
+    public static int MapToPietColor(byte r, byte g, byte b)
     {
         if (r == 0x00 && g == 0x00 && b == 0x00) return 0;
         if (r == 0xFF && g == 0xFF && b == 0xFF) return 1;

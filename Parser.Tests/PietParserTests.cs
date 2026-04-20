@@ -1,4 +1,3 @@
-using Esolang.Piet.Parser;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Reflection;
@@ -14,8 +13,6 @@ public sealed class PietParserTests
     static readonly MethodInfo ApplyPngFilterMethod = typeof(PietParser)
         .GetMethod("ApplyPngFilter", BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    static readonly MethodInfo MapToPietColorMethod = typeof(PietParser)
-        .GetMethod("MapToPietColor", BindingFlags.NonPublic | BindingFlags.Static)!;
 
     [TestMethod]
     public void Parse_ReturnsNormalizedProgram()
@@ -202,7 +199,7 @@ public sealed class PietParserTests
         ApplyPngFilterMethod.Invoke(null, new object[] { 4, row, prev, 3 });
         CollectionAssert.AreEqual(new byte[] { 2, 2, 2 }, row);
 
-        var color = (int)MapToPietColorMethod.Invoke(null, new object[] { (byte)0x12, (byte)0x34, (byte)0x56 })!;
+        var color = PietParser.MapToPietColor(0x12, 0x34, 0x56);
         Assert.AreEqual(-1, color);
     }
 }

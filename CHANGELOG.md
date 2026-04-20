@@ -6,8 +6,10 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+
 ### Added
 
+- Piet.Parser: ascii-piet テキスト形式（.txt）、Netpbm PPM (P3, .ppm) 画像形式のパース対応。
 - Source generator now reports warning `PT0012` when the consumer language version is below C# 8.0.
 - Added generator tests to validate C# 12 parse-option compatibility and minimum-language warning behavior.
 
