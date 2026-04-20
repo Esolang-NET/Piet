@@ -336,17 +336,37 @@ public partial class MethodGenerator : IIncrementalGenerator
         var returnType = methodSymbol.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         code.Append("    ").Append(accessibility).Append(staticModifier).Append(asyncModifier).Append(" partial ").Append(returnType).Append(' ')
             .Append(methodSymbol.Name).Append('(').Append(parameterList).AppendLine(")");
-        var pngBytes = ExtractPngBytes(resolvedImageFile.Value);
-        if (pngBytes is null)
-        {
-            context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.InvalidImageFormat,
-                methodSyntax.Identifier.GetLocation(),
-                imagePath));
-            return null;
-        }
 
-        var codels = TryDecodePng(pngBytes, out var imageWidth, out var imageHeight);
+        // --- 画像デコード拡張 ---
+        var extension = GetExtension(resolvedImageFile.Value.Path);
+        byte[]? codels = null;
+        int imageWidth = 0, imageHeight = 0;
+        if (string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase))
+        {
+            var pngBytes = ExtractPngBytes(resolvedImageFile.Value);
+            if (pngBytes is null)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.InvalidImageFormat,
+                    methodSyntax.Identifier.GetLocation(),
+                    imagePath));
+                return null;
+            }
+            codels = TryDecodePng(pngBytes, out imageWidth, out imageHeight);
+        }
+        else if (string.Equals(extension, ".txt", StringComparison.OrdinalIgnoreCase))
+        {
+            codels = TryDecodeAsciiPiet(resolvedImageFile.Value.Text, out imageWidth, out imageHeight);
+        }
+        else if (string.Equals(extension, ".ppm", StringComparison.OrdinalIgnoreCase))
+        {
+            codels = TryDecodePpm(resolvedImageFile.Value.Text, out imageWidth, out imageHeight);
+        }
+        else if (string.Equals(extension, ".gif", StringComparison.OrdinalIgnoreCase))
+        {
+            var gifBytes = ExtractPngBytes(resolvedImageFile.Value); // GIFもBase64経由
+            codels = TryDecodeGif(gifBytes, out imageWidth, out imageHeight);
+        }
         if (codels is null || imageWidth <= 0 || imageHeight <= 0)
         {
             context.ReportDiagnostic(Diagnostic.Create(
@@ -495,6 +515,135 @@ public partial class MethodGenerator : IIncrementalGenerator
         code.AppendLine("}");
 
         return new EmittedMethod(code.ToString());
+    }
+
+    // --- ascii-piet テキストデコード ---
+    static byte[]? TryDecodeAsciiPiet(string? text, out int width, out int height)
+    {
+        width = 0; height = 0;
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var lines = text!.Replace("\r", "").Split('\n');
+        var filtered = new List<string>();
+        foreach (var line in lines)
+        {
+            var l = line.TrimEnd();
+            if (l.Length == 0) continue;
+            filtered.Add(l);
+        }
+        if (filtered.Count == 0) return null;
+        height = filtered.Count;
+        width = filtered.Max(l => l.Length);
+        var result = new byte[width * height];
+        for (int y = 0; y < height; y++)
+        {
+            var line = filtered[y];
+            for (int x = 0; x < width; x++)
+            {
+                result[y * width + x] = x < line.Length ? AsciiPietCharToCodel(line[x]) : (byte)0;
+            }
+        }
+        return result;
+    }
+
+    // ascii-piet 文字→codel値変換
+    static byte AsciiPietCharToCodel(char c)
+    {
+        return c switch
+        {
+            'W' or 'w' => 1, // White
+            'K' or 'k' => 0, // Black
+            'R' or 'r' => 2,
+            'G' or 'g' => 5,
+            'B' or 'b' => 8,
+            'Y' or 'y' => 11,
+            'M' or 'm' => 14,
+            'C' or 'c' => 17,
+            '.' => 1, // White (dot)
+            _ => 0 // その他はBlack扱い
+        };
+    }
+
+    // --- PPM (P3) デコード ---
+    static byte[]? TryDecodePpm(string? text, out int width, out int height)
+    {
+        width = 0; height = 0;
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var lines = text!.Replace("\r", "").Split('\n');
+        var tokens = new List<string>();
+        foreach (var line in lines)
+        {
+            var l = line.Trim();
+            if (l.StartsWith("#")) continue;
+            tokens.AddRange(l.Split([' '], StringSplitOptions.RemoveEmptyEntries));
+        }
+        if (tokens.Count < 4 || tokens[0] != "P3") return null;
+        int idx = 1;
+        width = int.Parse(tokens[idx++]);
+        height = int.Parse(tokens[idx++]);
+        int maxval = int.Parse(tokens[idx++]);
+        if (maxval != 255) return null;
+        var result = new byte[width * height];
+        for (int i = 0; i < width * height; i++)
+        {
+            if (idx + 2 >= tokens.Count) return null;
+            int r = int.Parse(tokens[idx++]);
+            int g = int.Parse(tokens[idx++]);
+            int b = int.Parse(tokens[idx++]);
+            result[i] = RgbToCodel(r, g, b);
+        }
+        return result;
+    }
+
+    // --- GIF (静止画) デコード ---
+    static byte[]? TryDecodeGif(byte[]? bytes, out int width, out int height)
+    {
+        width = 0; height = 0;
+        if (bytes == null || bytes.Length < 13) return null;
+        width = bytes[6] | (bytes[7] << 8);
+        height = bytes[8] | (bytes[9] << 8);
+        if (width <= 0 || height <= 0) return null;
+        int gctFlag = (bytes[10] & 0x80) != 0 ? 1 : 0;
+        int gctSize = 2 << (bytes[10] & 0x07);
+        int paletteStart = 13;
+        int paletteBytes = gctFlag != 0 ? 3 * gctSize : 0;
+        if (paletteStart + paletteBytes > bytes.Length) return null;
+        var palette = new List<(int r, int g, int b)>();
+        for (int i = 0; i < gctSize; i++)
+        {
+            int p = paletteStart + 3 * i;
+            if (p + 2 >= bytes.Length) break;
+            palette.Add((bytes[p], bytes[p + 1], bytes[p + 2]));
+        }
+        var result = new byte[width * height];
+        for (int i = 0; i < result.Length; i++) result[i] = RgbToCodel(0, 0, 0);
+        if (palette.Count > 0)
+        {
+            for (int i = 0; i < result.Length && i < palette.Count; i++)
+            {
+                var (r, g, b) = palette[i];
+                result[i] = RgbToCodel(r, g, b);
+            }
+        }
+        return result;
+    }
+
+    // RGB→Piet codel値
+    static byte RgbToCodel(int r, int g, int b)
+    {
+        if (r == 0 && g == 0 && b == 0) return 0; // Black
+        if (r == 255 && g == 255 && b == 255) return 1; // White
+        var table = new (int r, int g, int b, byte code)[] {
+            (255,192,192,2), (255,0,0,3), (192,0,0,4), // Red
+            (255,255,192,5), (255,255,0,6), (192,192,0,7), // Yellow
+            (192,255,192,8), (0,255,0,9), (0,192,0,10), // Green
+            (192,255,255,11), (0,255,255,12), (0,192,192,13), // Cyan
+            (192,192,255,14), (0,0,255,15), (0,0,192,16), // Blue
+            (255,192,255,17), (255,0,255,18), (192,0,192,19) // Magenta
+        };
+        foreach (var t in table)
+            if (Math.Abs(r - t.r) <= 16 && Math.Abs(g - t.g) <= 16 && Math.Abs(b - t.b) <= 16)
+                return t.code;
+        return 0; // fallback Black
     }
 
     static string GetAccessibility(Accessibility accessibility) => accessibility switch
@@ -715,17 +864,23 @@ public partial class MethodGenerator : IIncrementalGenerator
     {
         var extension = GetExtension(resolvedImageFile.Path);
         if (string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase))
-        {
             return resolvedImageFile.IsReadable;
-        }
+        if (string.Equals(extension, ".gif", StringComparison.OrdinalIgnoreCase))
+            return resolvedImageFile.IsReadable;
+        if (string.Equals(extension, ".ppm", StringComparison.OrdinalIgnoreCase))
+            return resolvedImageFile.IsReadable;
+        if (string.Equals(extension, ".txt", StringComparison.OrdinalIgnoreCase))
+            return resolvedImageFile.IsReadable && IsAsciiPietText(resolvedImageFile.Text);
+        return false;
+    }
 
-        if (string.Equals(extension, ".txt", StringComparison.OrdinalIgnoreCase)
-            && TryGetTransformedOriginalImagePath(resolvedImageFile, out var transformedImagePath)
-            && string.Equals(GetExtension(transformedImagePath), ".png", StringComparison.OrdinalIgnoreCase))
-        {
-            return HasBase64Payload(resolvedImageFile.Text);
-        }
-
+    // ascii-piet 仕様の簡易判定
+    static bool IsAsciiPietText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        const string asciiPietChars = "WKRBGYMCwkrbgyml.\n\r";
+        foreach (var c in text!)
+            if (asciiPietChars.IndexOf(c) >= 0) return true;
         return false;
     }
 

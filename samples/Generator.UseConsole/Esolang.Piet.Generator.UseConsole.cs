@@ -1,6 +1,19 @@
+
 using Esolang.Piet;
 using System.IO.Pipelines;
 using System.Text;
+
+// ascii-piet (.txt) 画像の出力例
+var asciiPiet = PietSample.RunAsciiPiet();
+Console.WriteLine($"RunAsciiPiet: {asciiPiet}");
+
+// PPM (.ppm) 画像の出力例
+var ppm = PietSample.RunPpm();
+Console.WriteLine($"RunPpm: {ppm}");
+
+// GIF (.gif) 画像の出力例
+var gif = PietSample.RunGif();
+Console.WriteLine($"RunGif: {gif}");
 
 Console.WriteLine("Running Piet generated sample...");
 
@@ -58,6 +71,15 @@ Console.WriteLine($"RunWithTextWriter: {textWriterOutput}");
 
 partial class PietSample
 {
+    [GeneratePietMethod("ascii-piet-sample.txt")]
+    public static partial string RunAsciiPiet();
+
+    [GeneratePietMethod("ppm-sample.ppm")]
+    public static partial string RunPpm();
+
+    [GeneratePietMethod("sample.gif")]
+    public static partial string RunGif();
+
     public static void RunToConsole()
     {
         RunWithTextWriter(Console.Out);
