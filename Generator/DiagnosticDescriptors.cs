@@ -129,4 +129,15 @@ public static class DiagnosticDescriptors
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    /// <summary>
+    /// PT0012: Language version may be too low for generated code.
+    /// </summary>
+    public static readonly DiagnosticDescriptor LanguageVersionTooLow = new(
+        id: "PT0012",
+        title: "Language version may be too low",
+        messageFormat: "The method '{0}' may require C# 8.0 or later, but the current language version is '{1}'",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
 }

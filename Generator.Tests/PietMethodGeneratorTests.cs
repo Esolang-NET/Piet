@@ -1237,6 +1237,73 @@ public class MethodGeneratorTests
             "Compilation contains errors after running generator.");
     }
 
+    [TestMethod]
+    public void Generator_WithCSharp12_ParseOptions_CompilesGeneratedCode()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("black.png")]
+                public partial void Run();
+            }
+            """;
+
+        var blackPng = BuildStoredRgbPng(1, 1, new byte[]
+        {
+            0x00, 0x00, 0x00, 0x00,
+        });
+
+        _ = RunGeneratorsAndUpdateCompilationWithLanguageVersion(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            LanguageVersion.CSharp12,
+            new TestAdditionalText("obj/black.png.piet.txt",
+                MakeTransformedText("black.png", blackPng)));
+
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator with C#12 parse options.");
+    }
+
+    [TestMethod]
+    public void Generator_WithLanguageVersionBelowCSharp8_ReportsLanguageVersionWarning()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("black.png")]
+                public partial void Run();
+            }
+            """;
+
+        var blackPng = BuildStoredRgbPng(1, 1, new byte[]
+        {
+            0x00, 0x00, 0x00, 0x00,
+        });
+
+        var driver = RunGeneratorsAndUpdateCompilationWithLanguageVersion(
+            source,
+            out _,
+            out _,
+            LanguageVersion.CSharp7_3,
+            new TestAdditionalText("obj/black.png.piet.txt",
+                MakeTransformedText("black.png", blackPng)));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0012" && x.Severity == DiagnosticSeverity.Warning),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
 #if NET8_0_OR_GREATER
     [TestMethod]
     public void Generator_WithValueTaskStringReturn_GeneratesMethod()
@@ -1393,8 +1460,21 @@ public class MethodGeneratorTests
         out Compilation outputCompilation,
         out ImmutableArray<Diagnostic> diagnostics,
         params AdditionalText[] additionalTexts)
+        => RunGeneratorsAndUpdateCompilationWithLanguageVersion(
+            source,
+            out outputCompilation,
+            out diagnostics,
+            LanguageVersion.CSharp14,
+            additionalTexts);
+
+    GeneratorDriver RunGeneratorsAndUpdateCompilationWithLanguageVersion(
+        string source,
+        out Compilation outputCompilation,
+        out ImmutableArray<Diagnostic> diagnostics,
+        LanguageVersion languageVersion,
+        params AdditionalText[] additionalTexts)
     {
-        var parseOptions = new CSharpParseOptions(LanguageVersion.CSharp14);
+        var parseOptions = new CSharpParseOptions(languageVersion);
         var syntaxTree = CSharpSyntaxTree.ParseText(source, parseOptions, cancellationToken: CancellationToken);
         var inputCompilation = baseCompilation.AddSyntaxTrees(syntaxTree);
 
