@@ -156,12 +156,18 @@ public partial class MethodGenerator : IIncrementalGenerator
                 return new AdditionalImageFile(additionalText.Path, text?.ToString());
             })
             .Collect();
-        var generationInputs = generatedTargets.Combine(additionalFiles);
+        var languageVersion = context.ParseOptionsProvider
+            .Select(static (parseOptions, token) =>
+                parseOptions is CSharpParseOptions csharpParseOptions
+                    ? csharpParseOptions.LanguageVersion
+                    : LanguageVersion.Default);
+        var generationInputs = generatedTargets.Combine(additionalFiles).Combine(languageVersion);
 
         context.RegisterSourceOutput(generationInputs, static (context, input) =>
         {
-            var sources = input.Left;
-            var imagePaths = input.Right;
+            var sources = input.Left.Left;
+            var imagePaths = input.Left.Right;
+            var currentLanguageVersion = input.Right;
 
             if (sources.IsDefaultOrEmpty)
             {
@@ -173,7 +179,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
             foreach (var source in sources)
             {
-                var emitted = Emit(context, source, imagePaths);
+                var emitted = Emit(context, source, imagePaths, currentLanguageVersion);
                 if (!emitted.HasValue)
                 {
                     continue;
@@ -194,11 +200,21 @@ public partial class MethodGenerator : IIncrementalGenerator
     static EmittedMethod? Emit(
         SourceProductionContext context,
         GeneratorAttributeSyntaxContext source,
-        ImmutableArray<AdditionalImageFile> additionalImageFiles)
+        ImmutableArray<AdditionalImageFile> additionalImageFiles,
+        LanguageVersion currentLanguageVersion)
     {
         if (source.TargetSymbol is not IMethodSymbol methodSymbol || source.TargetNode is not MethodDeclarationSyntax methodSyntax)
         {
             return null;
+        }
+
+        if (!IsLanguageVersionAtLeastCSharp8(currentLanguageVersion))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.LanguageVersionTooLow,
+                methodSyntax.Identifier.GetLocation(),
+                methodSymbol.Name,
+                currentLanguageVersion.ToString()));
         }
 
         if (source.Attributes[0].ConstructorArguments.FirstOrDefault().Value is not string imagePath || string.IsNullOrWhiteSpace(imagePath))
@@ -397,13 +413,23 @@ public partial class MethodGenerator : IIncrementalGenerator
             code.AppendLine("        });");
             code.AppendLine("        try");
             code.AppendLine("        {");
+            if (executionBinding.CancellationTokenName is not null)
+            {
+                code.Append("            var __pietReadCancellationToken = ")
+                    .Append(executionBinding.CancellationTokenName)
+                    .AppendLine(";");
+            }
+            else
+            {
+                code.AppendLine("            var __pietReadCancellationToken = default(global::System.Threading.CancellationToken);");
+            }
             code.AppendLine("            while (true)");
             code.AppendLine("            {");
             if (executionBinding.CancellationTokenName is not null)
             {
                 code.Append("                ").Append(executionBinding.CancellationTokenName).AppendLine(".ThrowIfCancellationRequested();");
             }
-            code.AppendLine("                var __pietReadResult = await __pietPipe.Reader.ReadAsync();");
+            code.AppendLine("                var __pietReadResult = await __pietPipe.Reader.ReadAsync(__pietReadCancellationToken);");
             code.AppendLine("                var __pietBuffer = __pietReadResult.Buffer;");
             code.AppendLine("                foreach (var __pietSegment in __pietBuffer)");
             code.AppendLine("                {");
@@ -515,6 +541,16 @@ public partial class MethodGenerator : IIncrementalGenerator
             _ => ReturnKind.Invalid,
         };
     }
+
+    static bool IsLanguageVersionAtLeastCSharp8(LanguageVersion languageVersion)
+        => languageVersion switch
+        {
+            LanguageVersion.Default => true,
+            LanguageVersion.Latest => true,
+            LanguageVersion.Preview => true,
+            LanguageVersion.LatestMajor => true,
+            _ => languageVersion >= LanguageVersion.CSharp8,
+        };
 
     static ExecutionBinding BindExecutionSignature(IMethodSymbol methodSymbol)
     {

@@ -260,6 +260,11 @@ Wraps `PipeWriter` as an auto-flushing `StreamWriter`.
 - `CancellationToken` may be combined with other supported parameters.
 - Use at most one `CancellationToken` parameter.
 
+## Language Version
+
+- Generated code expects C# 8.0 or later features (for example, async iterators and nullable context directives).
+- If the consumer project language version is lower than C# 8.0, the generator reports `PT0012` as a warning.
+
 ## Samples
 
 For a concrete sample project and runnable examples, see [samples/Generator.UseConsole/README.md](../samples/Generator.UseConsole/README.md).
@@ -279,3 +284,8 @@ For a concrete sample project and runnable examples, see [samples/Generator.UseC
 | PT0009 | Duplicate image path mapping. |
 | PT0010 | Input interface provided but not required (Hidden). |
 | PT0011 | Non-void return type conflicts with explicit output parameter. |
+| PT0012 | Consumer language version may be too low (C# 8.0 or later is recommended). |
+
+## See also
+
+- Piet language reference: https://www.dangermouse.net/esoteric/piet.html
