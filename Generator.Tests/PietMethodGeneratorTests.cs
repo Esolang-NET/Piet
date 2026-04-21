@@ -77,7 +77,7 @@ public class MethodGeneratorTests
     };
 
     static string MakeTransformedText(string logicalPath, byte[] pngBytes) =>
-        $"// PIET_IMAGE_PATH={logicalPath}\n{Convert.ToBase64String(pngBytes)}";
+        $"// PIET_IMAGE_PATH={logicalPath}\n// PIET_CODEL_SIZE=1\n{Convert.ToBase64String(pngBytes)}";
 
     static byte[] BuildStoredRgbPng(int width, int height, byte[] rawScanlineBytes)
     {
@@ -1099,7 +1099,7 @@ public class MethodGeneratorTests
             }
             """;
 
-        var transformed = "// PIET_IMAGE_PATH=   \n" + Convert.ToBase64String(MinimalLightRedPng);
+        var transformed = "// PIET_IMAGE_PATH=   \n// PIET_CODEL_SIZE=1\n" + Convert.ToBase64String(MinimalLightRedPng);
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
             out _,
@@ -1126,7 +1126,7 @@ public class MethodGeneratorTests
             }
             """;
 
-        var transformed = "// PIET_IMAGE_PATH=hello-world.png";
+        var transformed = "// PIET_IMAGE_PATH=hello-world.png\n// PIET_CODEL_SIZE=1\n";
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
             out _,
@@ -1153,7 +1153,7 @@ public class MethodGeneratorTests
             }
             """;
 
-        var transformed = "// PIET_IMAGE_PATH=hello-world.png\n   ";
+        var transformed = "// PIET_IMAGE_PATH=hello-world.png\n// PIET_CODEL_SIZE=1\n   ";
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
             out _,
@@ -1232,8 +1232,9 @@ public class MethodGeneratorTests
             runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run()")),
             "Expected generated method implementation was not found.");
 
+        var diagnostics_ = outputCompilation.GetDiagnostics(CancellationToken);
         Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            diagnostics_.Any(static x => x.Severity == DiagnosticSeverity.Error),
             "Compilation contains errors after running generator.");
     }
 
@@ -1516,7 +1517,7 @@ public partial class Sample
             new TestAdditionalText("obj/program.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
         // 生成コードにcodelSize=3が反映されているか（例: 配列長やコメント等で判定）
-        var generated = runResult.GeneratedTrees.Select(t => t.GetText().ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
+        var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
         Assert.IsNotNull(generated, "Method not generated");
         Assert.IsTrue(generated.Contains("codelSize = 3") || generated.Contains("3 /* codelSize */"), "codelSize=3 not reflected in generated code");
         Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
@@ -1547,7 +1548,7 @@ public partial class Sample
             out var diagnostics,
             new TestAdditionalText("obj/program.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
-        var generated = runResult.GeneratedTrees.Select(t => t.GetText().ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
+        var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
         Assert.IsNotNull(generated, "Method not generated");
         Assert.IsTrue(generated.Contains("codelSize = 2") || generated.Contains("2 /* codelSize */"), "codelSize=2 not reflected in generated code");
         Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),

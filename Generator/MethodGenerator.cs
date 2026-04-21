@@ -61,59 +61,56 @@ public partial class MethodGenerator : IIncrementalGenerator
         Invalid,
     }
 
-    readonly struct ExecutionBinding
+    readonly struct ExecutionBinding(bool isValid, MethodGenerator.ReturnKind returnKind, bool hasExplicitInput, bool hasExplicitOutput, string inputExpression, string outputExpression, string? cancellationTokenName, string? errorId)
     {
-        public ExecutionBinding(bool isValid, ReturnKind returnKind, bool hasExplicitInput, bool hasExplicitOutput, string inputExpression, string outputExpression, string? cancellationTokenName, string? errorId)
-        {
-            IsValid = isValid;
-            ReturnKind = returnKind;
-            HasExplicitInput = hasExplicitInput;
-            HasExplicitOutput = hasExplicitOutput;
-            InputExpression = inputExpression;
-            OutputExpression = outputExpression;
-            CancellationTokenName = cancellationTokenName;
-            ErrorId = errorId;
-        }
+        public bool IsValid { get; } = isValid;
 
-        public bool IsValid { get; }
-
-        public ReturnKind ReturnKind { get; }
+        public ReturnKind ReturnKind { get; } = returnKind;
 
         /// <summary>
         /// True if the method has an explicit input mechanism (string, TextReader or PipeReader parameter).
         /// </summary>
-        public bool HasExplicitInput { get; }
+        public bool HasExplicitInput { get; } = hasExplicitInput;
 
         /// <summary>
         /// True if the method has an explicit output mechanism (non-void return type, TextWriter or PipeWriter parameter).
         /// </summary>
-        public bool HasExplicitOutput { get; }
+        public bool HasExplicitOutput { get; } = hasExplicitOutput;
 
-        public string InputExpression { get; }
+        public string InputExpression { get; } = inputExpression;
 
-        public string OutputExpression { get; }
+        public string OutputExpression { get; } = outputExpression;
 
         /// <summary>
         /// The name of the CancellationToken parameter, if present.
         /// </summary>
-        public string? CancellationTokenName { get; }
+        public string? CancellationTokenName { get; } = cancellationTokenName;
 
-        public string? ErrorId { get; }
+        public string? ErrorId { get; } = errorId;
     }
 
-    readonly struct AdditionalImageFile
+    readonly struct AdditionalImageFile(string path, string? text, int? codelSize = null, string? transformedOriginalPath = null)
     {
-        public AdditionalImageFile(string path, string? text)
-        {
-            Path = path;
-            Text = text;
-        }
+        public string Path { get; } = path;
 
-        public string Path { get; }
+        public string? Text { get; } = text;
 
-        public string? Text { get; }
+        public int? CodelSize { get; } = codelSize;
+
+        public string? TransformedOriginalPath { get; } = transformedOriginalPath;
 
         public bool IsReadable => Text is not null;
+        public static AdditionalImageFile Make(string path, string? text)
+        {
+            if (string.IsNullOrWhiteSpace(path) || text is null)
+            {
+                return new(path, text);
+            }
+            var codelSize = TryGetCodelSize(text, out var codelSize_) ? codelSize_ : (int?)null;
+            var transformedOriginalPath = TryGetTransformedOriginalImagePath(text, out var transformedImagePath) ? transformedImagePath : null;
+            var newText = string.Join("\n", text.Split('\n').Where(line => !line.StartsWith("// ")));
+            return new(path, newText, codelSize, transformedOriginalPath);
+        }
     }
 
     /// <summary>
@@ -137,7 +134,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                         /// </summary>
                         /// <param name="imagePath">Path to the Piet image file.</param>
                         /// <param name="codelSize">Optional codel size for the Piet image.</param>
-                        internal {{ClassNamePietAttribution}}(string imagePath, int? codelSize = null) { }
+                        internal {{ClassNamePietAttribution}}(string imagePath, int codelSize = 0) { }
                     }
                 }
                 """));
@@ -154,7 +151,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             .Select(static (additionalText, token) =>
             {
                 var text = additionalText.GetText(token);
-                return new AdditionalImageFile(additionalText.Path, text?.ToString());
+                return AdditionalImageFile.Make(additionalText.Path, text?.ToString());
             })
             .Collect();
         var languageVersion = context.ParseOptionsProvider
@@ -197,6 +194,8 @@ public partial class MethodGenerator : IIncrementalGenerator
             }
         });
     }
+
+    static int DefaultCodelSize = 1;
 
     static EmittedMethod? Emit(
         SourceProductionContext context,
@@ -341,7 +340,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         // --- 画像デコード拡張 ---
         var extension = GetExtension(resolvedImageFile.Value.Path);
         // 属性でCodelSize指定があればそれを優先、なければ追加ファイルのPIET_CODEL_SIZEコメントを使う
-        int codelSize = GetCodelSizeFromAdditionalFile(resolvedImageFile.Value);
+        int codelSize = resolvedImageFile.Value.CodelSize ?? DefaultCodelSize;
         // 属性引数（2つ目以降）にcodelSizeがあれば上書き
         if (source.Attributes[0].ConstructorArguments.Length > 1)
         {
@@ -535,6 +534,7 @@ public partial class MethodGenerator : IIncrementalGenerator
     {
         width = 0; height = 0;
         if (string.IsNullOrWhiteSpace(text)) return null;
+
         var lines = text!.Replace("\r", "").Split('\n');
         var filtered = new List<string>();
         foreach (var line in lines)
@@ -863,7 +863,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 return additionalImageFile;
             }
 
-            if (TryGetTransformedOriginalImagePath(additionalImageFile, out var transformedImagePath)
+            if (!string.IsNullOrEmpty(additionalImageFile.TransformedOriginalPath) && additionalImageFile is { TransformedOriginalPath: { } transformedImagePath } 
                 && IsMatchingPath(normalizedImagePath, transformedImagePath))
             {
                 return additionalImageFile;
@@ -897,22 +897,44 @@ public partial class MethodGenerator : IIncrementalGenerator
         return false;
     }
 
-    static bool TryGetTransformedOriginalImagePath(AdditionalImageFile imageFile, out string transformedImagePath)
+    static bool TryGetCodelSize(string text, out int codelSize)
+    {
+        codelSize = 0;
+        if (text is null)
+        {
+            return false;
+        }
+
+        const string prefix = "// PIET_CODEL_SIZE=";
+        var firstLine = GetSecondLine(text);
+        if (!firstLine.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var sizeText = firstLine.Substring(prefix.Length).Trim();
+        if (!int.TryParse(sizeText, out codelSize))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    static bool TryGetTransformedOriginalImagePath(string text, out string transformedImagePath)
     {
         transformedImagePath = string.Empty;
-        if (!imageFile.IsReadable || imageFile.Text is null)
+        if (string.IsNullOrWhiteSpace(text))
         {
             return false;
         }
 
         const string prefix = "// PIET_IMAGE_PATH=";
-        var firstLine = GetFirstLine(imageFile.Text);
+        var firstLine = GetFirstLine(text);
         if (!firstLine.StartsWith(prefix, StringComparison.Ordinal))
         {
             return false;
         }
-        const string secondPrefix = "// PIET_CODEL_SIZE=";
-        var secondsLine = GetSE
 
         var originalPath = firstLine.Substring(prefix.Length).Trim();
         if (string.IsNullOrWhiteSpace(originalPath))
@@ -970,6 +992,23 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         return text.Substring(0, newlineIndex).Replace("\r", string.Empty);
     }
+    static string GetSecondLine(string text)
+    {
+        var newlineIndex = text.IndexOf('\n');
+        if (newlineIndex < 0)
+        {
+            return string.Empty;
+        }
+
+        var secondLineStart = newlineIndex + 1;
+        var secondLineEnd = text.IndexOf('\n', secondLineStart);
+        if (secondLineEnd < 0)
+        {
+            return string.Empty;
+        }
+
+        return text.Substring(secondLineStart, secondLineEnd - secondLineStart).Replace("\r", string.Empty);
+    }
 
     static bool IsMatchingPath(string normalizedExpectedPath, string normalizedCandidatePath)
     {
@@ -1011,24 +1050,6 @@ public partial class MethodGenerator : IIncrementalGenerator
     }
 
     static string NormalizePath(string path) => path.Replace('\\', '/').Trim();
-
-    // --- AdditionalFileコメントからPIET_CODEL_SIZEを取得 ---
-    static int GetCodelSizeFromAdditionalFile(AdditionalImageFile file)
-    {
-        if (file.Text is null) return 1;
-        var lines = file.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-        foreach (var line in lines)
-        {
-            var trimmed = line.Trim();
-            if (trimmed.StartsWith("// PIET_CODEL_SIZE=", StringComparison.Ordinal))
-            {
-                var value = trimmed.Substring("// PIET_CODEL_SIZE=".Length);
-                if (int.TryParse(value, out var result) && result > 0)
-                    return result;
-            }
-        }
-        return 1;
-    }
 
     /// <summary>
     /// Scans all adjacent codel pairs and detects whether the image may produce output

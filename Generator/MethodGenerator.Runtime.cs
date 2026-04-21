@@ -304,15 +304,10 @@ partial class MethodGenerator
         if (!file.IsReadable || file.Text is null)
             return null;
 
-        if (!TryGetTransformedOriginalImagePath(file, out _))
+        if (string.IsNullOrEmpty(file.TransformedOriginalPath))
             return null;
 
-        var text = file.Text;
-        var newlineIndex = text.IndexOf('\n');
-        if (newlineIndex < 0)
-            return null;
-
-        var payload = text.Substring(newlineIndex + 1)
+        var payload = file.Text!
             .Replace("\r", string.Empty)
             .Replace("\n", string.Empty)
             .Trim();
