@@ -338,7 +338,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             .Append(methodSymbol.Name).Append('(').Append(parameterList).AppendLine(")");
 
         // --- 画像デコード拡張 ---
-        var extension = GetExtension(resolvedImageFile.Value.Path);
+        var extension = GetExtension(resolvedImageFile.Value.TransformedOriginalPath ?? resolvedImageFile.Value.Path);
         // 属性でCodelSize指定があればそれを優先、なければ追加ファイルのPIET_CODEL_SIZEコメントを使う
         int codelSize = resolvedImageFile.Value.CodelSize ?? DefaultCodelSize;
         // 属性引数（2つ目以降）にcodelSizeがあれば上書き
