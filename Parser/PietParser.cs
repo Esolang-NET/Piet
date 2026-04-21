@@ -25,11 +25,13 @@ public static class PietParser
             if (codelSize != 1) throw new ArgumentException("ascii-piet形式はcodelSize=1のみ対応");
             return AsciiPietParser.Parse(bytes);
         }
+
         if (ext == ".ppm")
         {
             if (codelSize != 1) throw new ArgumentException("PPM形式はcodelSize=1のみ対応");
             return PpmPietParser.Parse(bytes);
         }
+        
         try
         {
             using var image = Image.Load<Rgba32>(bytes);
@@ -53,58 +55,21 @@ public static class PietParser
         catch (UnknownImageFormatException)
         {
             return ParseWithRawPngFallback(bytes, codelSize);
-        }
-        
+        }    
     }
+
     /// <summary>
     /// Loads a Piet program from an image file.
     /// Falls back to an internal PNG decoder when strict image decoding fails.
     /// </summary>
     public static PietProgram Parse(string path, int codelSize = 1)
     {
+        var bytes = File.ReadAllBytes(path);
         // 拡張子が .txt の場合は ascii-piet 形式、.ppm の場合は PPM 形式として扱う
         var ext = Path.GetExtension(path).ToLowerInvariant();
-        if (ext == ".txt")
-        {
-            if (codelSize != 1) throw new ArgumentException("ascii-piet形式はcodelSize=1のみ対応");
-            return AsciiPietParser.Parse(path);
-        }
-        if (ext == ".ppm")
-        {
-            if (codelSize != 1) throw new ArgumentException("PPM形式はcodelSize=1のみ対応");
-            return PpmPietParser.Parse(path);
-        }
-        try
-        {
-            using var image = Image.Load<Rgba32>(path);
-            int codelWidth = image.Width / codelSize;
-            int codelHeight = image.Height / codelSize;
-            var colors = new PietColor[codelWidth * codelHeight];
-            for (var y = 0; y < codelHeight; y++)
-            {
-                for (var x = 0; x < codelWidth; x++)
-                {
-                    // 左上ピクセルの色で代表とする（平均化したい場合はここを修正）
-                    colors[(y * codelWidth) + x] = Normalize(image[x * codelSize, y * codelSize]);
-                }
-            }
-            return new PietProgram(codelWidth, codelHeight, colors);
-        }
-        catch (InvalidImageContentException)
-        {
-            return ParseWithRawPngFallback(path, codelSize);
-        }
-        catch (UnknownImageFormatException)
-        {
-            return ParseWithRawPngFallback(path, codelSize);
-        }
+        return Parse(bytes, ext, codelSize);
     }
 
-    static PietProgram ParseWithRawPngFallback(string path, int codelSize = 1)
-    {
-        var pngBytes = File.ReadAllBytes(path);
-        return ParseWithRawPngFallback(pngBytes, codelSize);
-    }
     static PietProgram ParseWithRawPngFallback(byte[] pngBytes, int codelSize = 1)
     {
         var codels = TryDecodePng(pngBytes, out var width, out var height);

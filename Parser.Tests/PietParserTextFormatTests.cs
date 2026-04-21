@@ -11,8 +11,8 @@ public sealed class PietParserTextFormatTests
         {
             File.WriteAllLines(path, new[]
             {
-                "l?",
-                "@C"
+                "l_",
+                " C"
             });
             var program = PietParser.Parse(path);
             Assert.AreEqual(2, program.Width);
