@@ -11,10 +11,6 @@ Console.WriteLine($"RunAsciiPiet: {asciiPiet}");
 var ppm = PietSample.RunPpm();
 Console.WriteLine($"RunPpm: {ppm}");
 
-// GIF (.gif) 画像の出力例
-var gif = PietSample.RunGif();
-Console.WriteLine($"RunGif: {gif}");
-
 Console.WriteLine("Running Piet generated sample...");
 
 // void return — runs to Console
@@ -76,9 +72,6 @@ partial class PietSample
 
     [GeneratePietMethod("ppm-sample.ppm")]
     public static partial string RunPpm();
-
-    [GeneratePietMethod("sample.png")]
-    public static partial string RunGif();
 
     public static void RunToConsole()
     {
