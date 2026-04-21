@@ -28,6 +28,7 @@ public static class PpmPietParser
         using var stream = new MemoryStream(bytes);
         return InternalParse(stream);
     }
+    
     static PietProgram InternalParse(Stream stream)
     {
         using var reader = new StreamReader(stream);

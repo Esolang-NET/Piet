@@ -11,60 +11,49 @@ public static class AsciiPietParser
     /// <summary>
     /// ascii-piet 公式仕様に基づく文字→PietColor 対応表（通常用・行末用どちらも同じ色にマッピング）
     /// </summary>
-    private static readonly Dictionary<char, PietColor> CharToColor = new()
+    private static readonly Dictionary<char, (PietColor Color, bool IsEndOfLine)> CharToColor = new()
     {
         // Black
-        { '@', PietColor.Black },
+         {' ', (PietColor.Black, false) }, { '@', (PietColor.Black, true) },
         // Dark blue
-        { 'a', PietColor.DarkBlue }, { 'A', PietColor.DarkBlue },
+        { 'a', (PietColor.DarkBlue, false) }, { 'A', (PietColor.DarkBlue, true) },
         // Dark green
-        { 'b', PietColor.DarkGreen }, { 'B', PietColor.DarkGreen },
+        { 'b', (PietColor.DarkGreen, false) }, { 'B', (PietColor.DarkGreen, true) },
         // Dark cyan
-        { 'c', PietColor.DarkCyan }, { 'C', PietColor.DarkCyan },
+        { 'c', (PietColor.DarkCyan, false) }, { 'C', (PietColor.DarkCyan, true) },
         // Dark red
-        { 'd', PietColor.DarkRed }, { 'D', PietColor.DarkRed },
+        { 'd', (PietColor.DarkRed, false) }, { 'D', (PietColor.DarkRed, true) },
         // Dark magenta
-        { 'e', PietColor.DarkMagenta }, { 'E', PietColor.DarkMagenta },
+        { 'e', (PietColor.DarkMagenta, false) }, { 'E', (PietColor.DarkMagenta, true) },
         // Dark yellow
-        { 'f', PietColor.DarkYellow }, { 'F', PietColor.DarkYellow },
+        { 'f', (PietColor.DarkYellow, false) }, { 'F', (PietColor.DarkYellow, true) },
         // Blue
-        { 'i', PietColor.Blue }, { 'I', PietColor.Blue },
+        { 'i', (PietColor.Blue, false) }, { 'I', (PietColor.Blue, true) },
         // Green
-        { 'j', PietColor.Green }, { 'J', PietColor.Green },
+        { 'j', (PietColor.Green, false) }, { 'J', (PietColor.Green, true) },
         // Cyan
-        { 'k', PietColor.Cyan }, { 'K', PietColor.Cyan },
+        { 'k', (PietColor.Cyan, false) }, { 'K', (PietColor.Cyan, true) },
         // Red
-        { 'l', PietColor.Red }, { 'L', PietColor.Red },
+        { 'l', (PietColor.Red, false) }, { 'L', (PietColor.Red, true) },
         // Magenta
-        { 'm', PietColor.Magenta }, { 'M', PietColor.Magenta },
+        { 'm', (PietColor.Magenta, false) }, { 'M', (PietColor.Magenta, true) },
         // Yellow
-        { 'n', PietColor.Yellow }, { 'N', PietColor.Yellow },
+        { 'n', (PietColor.Yellow, false) }, { 'N', (PietColor.Yellow, true) },
         // Light blue
-        { 'q', PietColor.LightBlue }, { 'Q', PietColor.LightBlue },
+        { 'q', (PietColor.LightBlue, false) }, { 'Q', (PietColor.LightBlue, true) },
         // Light green
-        { 'r', PietColor.LightGreen }, { 'R', PietColor.LightGreen },
+        { 'r', (PietColor.LightGreen, false) }, { 'R', (PietColor.LightGreen, true) },
         // Light cyan
-        { 's', PietColor.LightCyan }, { 'S', PietColor.LightCyan },
+        { 's', (PietColor.LightCyan, false) }, { 'S', (PietColor.LightCyan, true) },
         // Light red
-        { 't', PietColor.LightRed }, { 'T', PietColor.LightRed },
+        { 't', (PietColor.LightRed, false) }, { 'T', (PietColor.LightRed, true) },
         // Light magenta
-        { 'u', PietColor.LightMagenta }, { 'U', PietColor.LightMagenta },
+        { 'u', (PietColor.LightMagenta, false) }, { 'U', (PietColor.LightMagenta, true) },
         // Light yellow
-        { 'v', PietColor.LightYellow }, { 'V', PietColor.LightYellow },
+        { 'v', (PietColor.LightYellow, false) }, { 'V', (PietColor.LightYellow, true) },
         // White
-        { '?', PietColor.White }, { '_', PietColor.White },
+        { '?', (PietColor.White, false) }, { '_', (PietColor.White, true) },
     };
-
-    /// <summary>
-    /// Loads a Piet program from an ascii-piet text file.
-    /// </summary>
-    public static PietProgram Parse(string path)
-    {
-        var lines = File.ReadAllLines(path)
-            .Where(l => !string.IsNullOrWhiteSpace(l))
-            .ToArray();
-        return InternalParse(lines);
-    }
 
     /// <summary>
     /// Loads a Piet program from an ascii-piet text file represented as a byte array.
@@ -75,29 +64,38 @@ public static class AsciiPietParser
     public static PietProgram Parse(byte[] bytes)
     {
         var text = Encoding.UTF8.GetString(bytes);
-        var lines = text.Split('\n');
+        var lines = text.Replace("\r", "").Replace("\n", "");
         return InternalParse(lines);
     }
-    static PietProgram InternalParse(string[] lines)
+    
+    static PietProgram InternalParse(string lines)
     {
         if (lines.Length == 0)
             throw new InvalidDataException("ascii-piet file is empty");
 
-        int height = lines.Length;
-        int width = lines.Max(l => l.Length);
-        var codels = new List<PietColor>(width * height);
-
-        for (int y = 0; y < height; y++)
+        List<List<PietColor>> lineList = [];
+        int x = 0;
+        int y = 0;
+        List<PietColor>? currentLine = null;
+        foreach (var ch in lines)
         {
-            var line = lines[y].PadRight(width);
-            for (int x = 0; x < width; x++)
+            if (!CharToColor.TryGetValue(ch, out var colorInfo))
+                throw new InvalidDataException($"Unknown ascii-piet char: '{ch}' (0x{(int)ch:X}) at ({x},{y})");
+            if (x == 0) lineList.Add(currentLine = []);
+            var (color, isEndOfLine) = colorInfo;
+            currentLine!.Add(color);
+            if (isEndOfLine)
             {
-                char ch = line[x];
-                if (!CharToColor.TryGetValue(ch, out var color))
-                    throw new InvalidDataException($"Unknown ascii-piet char: '{ch}' at ({x},{y})");
-                codels.Add(color);
+                x = 0;
+                y++;
+                currentLine = null;
+                continue;
             }
+            x++;
         }
+        var width = lineList.Max(l => l.Count);
+        var height = lineList.Count;
+        var codels = lineList.SelectMany(line => line.Concat(Enumerable.Repeat(PietColor.Black, width - line.Count))).ToArray();
         return new PietProgram(width, height, codels);
     }
 }
