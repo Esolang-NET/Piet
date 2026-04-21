@@ -108,7 +108,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             }
             var codelSize = TryGetCodelSize(text, out var codelSize_) ? codelSize_ : (int?)null;
             var transformedOriginalPath = TryGetTransformedOriginalImagePath(text, out var transformedImagePath) ? transformedImagePath : null;
-            var newText = string.Join("\n", text.Split('\n').Where(line => !line.StartsWith("// ")));
+            var newText = string.Join("\n", text.Split('\n').SkipWhile((_, index) => index > 1));
             return new(path, newText, codelSize, transformedOriginalPath);
         }
     }
