@@ -1509,7 +1509,7 @@ public partial class Sample
 }
 """;
         // 追加ファイルにはCodelSize=1を埋め込む
-        var transformed = "// PIET_IMAGE_PATH=program.png\n// PIET_CODEL_SIZE=1\n" + Convert.ToBase64String(MinimalLightRedPng);
+        var transformed = "// PIET_IMAGE_PATH=program.png\n// PIET_CODEL_SIZE=3\n" + Convert.ToBase64String(MinimalLightRedPng);
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
             out var outputCompilation,
