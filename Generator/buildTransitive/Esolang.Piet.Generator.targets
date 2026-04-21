@@ -23,8 +23,8 @@
 
         File.WriteAllText(
           OutputFile,
-          "// PIET_IMAGE_PATH=" + LogicalPath + Environment.NewLine +
-          "// PIET_CODEL_SIZE=" + CodelSize + Environment.NewLine +
+          "// PIET_IMAGE_PATH=" + LogicalPath + "\n" +
+          "// PIET_CODEL_SIZE=" + CodelSize + "\n" +
           base64);
       ]]></Code>
     </Task>

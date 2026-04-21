@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace Esolang.Piet.Parser;
 
 /// <summary>
@@ -61,6 +63,23 @@ public static class AsciiPietParser
         var lines = File.ReadAllLines(path)
             .Where(l => !string.IsNullOrWhiteSpace(l))
             .ToArray();
+        return InternalParse(lines);
+    }
+
+    /// <summary>
+    /// Loads a Piet program from an ascii-piet text file represented as a byte array.
+    /// The byte array is decoded as UTF-8 text.
+    /// </summary>
+    /// <param name="bytes"></param>
+    /// <returns></returns>
+    public static PietProgram Parse(byte[] bytes)
+    {
+        var text = Encoding.UTF8.GetString(bytes);
+        var lines = text.Split('\n');
+        return InternalParse(lines);
+    }
+    static PietProgram InternalParse(string[] lines)
+    {
         if (lines.Length == 0)
             throw new InvalidDataException("ascii-piet file is empty");
 

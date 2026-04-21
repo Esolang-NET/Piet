@@ -108,7 +108,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             }
             var codelSize = TryGetCodelSize(text, out var codelSize_) ? codelSize_ : (int?)null;
             var transformedOriginalPath = TryGetTransformedOriginalImagePath(text, out var transformedImagePath) ? transformedImagePath : null;
-            var newText = string.Join("\n", text.Split('\n').SkipWhile((_, index) => index > 1));
+            var newText = string.Join("\n", text.Split('\n').Skip(2));
             return new(path, newText, codelSize, transformedOriginalPath);
         }
     }
@@ -352,33 +352,21 @@ public partial class MethodGenerator : IIncrementalGenerator
         }
         byte[]? codels = null;
         int imageWidth = 0, imageHeight = 0;
-        // codelSizeは今後の属性優先ロジックで上書き可能にする
-        if (string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase))
+        var bytes = ExtractPngBytes(resolvedImageFile.Value);
+        if (bytes is null)
         {
-            var pngBytes = ExtractPngBytes(resolvedImageFile.Value);
-            if (pngBytes is null)
-            {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.InvalidImageFormat,
-                    methodSyntax.Identifier.GetLocation(),
-                    imagePath));
-                return null;
-            }
-            codels = TryDecodePng(pngBytes, out imageWidth, out imageHeight);
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.InvalidImageFormat,
+                methodSyntax.Identifier.GetLocation(),
+                imagePath));
+            return null;
         }
-        else if (string.Equals(extension, ".txt", StringComparison.OrdinalIgnoreCase))
-        {
-            codels = TryDecodeAsciiPiet(resolvedImageFile.Value.Text, out imageWidth, out imageHeight);
-        }
-        else if (string.Equals(extension, ".ppm", StringComparison.OrdinalIgnoreCase))
-        {
-            codels = TryDecodePpm(resolvedImageFile.Value.Text, out imageWidth, out imageHeight);
-        }
-        else if (string.Equals(extension, ".gif", StringComparison.OrdinalIgnoreCase))
-        {
-            var gifBytes = ExtractPngBytes(resolvedImageFile.Value); // GIFもBase64経由
-            codels = TryDecodeGif(gifBytes, out imageWidth, out imageHeight);
-        }
+
+        var program = Parser.PietParser.Parse(bytes, extension, codelSize);
+        codels = [.. program.Codels.Select(b => (byte)b)];
+        imageWidth = program.Width;
+        imageHeight = program.Height;
+
         if (codels is null || imageWidth <= 0 || imageHeight <= 0)
         {
             context.ReportDiagnostic(Diagnostic.Create(

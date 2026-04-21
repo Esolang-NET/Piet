@@ -10,9 +10,27 @@ public static class PpmPietParser
     /// <summary>
     /// Loads a Piet program from a PPM (P3) text file.
     /// </summary>
+    /// <param name="path">The file path to the PPM (P3) file.</param>
+    /// <returns>A PietProgram instance representing the parsed PPM file.</returns>
     public static PietProgram Parse(string path)
     {
-        using var reader = new StreamReader(path);
+        using var stream = File.OpenRead(path);
+        return InternalParse(stream);
+    }
+
+    /// <summary>
+    /// Loads a Piet program from a PPM (P3) text file given as byte array.
+    /// </summary>
+    /// <param name="bytes">The byte array containing the PPM (P3) file data.</param>
+    /// <returns>A PietProgram instance representing the parsed PPM file.</returns>
+    public static PietProgram Parse(byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes);
+        return InternalParse(stream);
+    }
+    static PietProgram InternalParse(Stream stream)
+    {
+        using var reader = new StreamReader(stream);
         string? line;
         // ヘッダ
         do { line = reader.ReadLine(); } while (line != null && string.IsNullOrWhiteSpace(line));

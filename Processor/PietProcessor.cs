@@ -1,14 +1,14 @@
 using Esolang.Piet.Parser;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
 
 namespace Esolang.Piet.Processor;
 
 /// <summary>
 /// Executes parsed Piet programs.
 /// </summary>
-public sealed class PietProcessor
+/// <remarks>
+/// Initializes the processor with a parsed Piet program.
+/// </remarks>
+public sealed class PietProcessor(PietProgram program, TextWriter? output = null, TextReader? input = null)
 {
     static readonly int[] HueTable =
     {
@@ -33,29 +33,19 @@ public sealed class PietProcessor
     };
 
     /// <summary>
-    /// Initializes the processor with a parsed Piet program.
-    /// </summary>
-    public PietProcessor(PietProgram program, TextWriter? output = null, TextReader? input = null)
-    {
-        Program = program;
-        Output = output;
-        Input = input;
-    }
-
-    /// <summary>
     /// The parsed Piet program.
     /// </summary>
-    public PietProgram Program { get; }
+    public PietProgram Program { get; } = program;
 
     /// <summary>
     /// Optional default input source used by <see cref="Run()"/>.
     /// </summary>
-    public TextReader? Input { get; }
+    public TextReader? Input { get; } = input;
 
     /// <summary>
     /// Optional default output destination used by <see cref="Run()"/>.
     /// </summary>
-    public TextWriter? Output { get; }
+    public TextWriter? Output { get; } = output;
 
     /// <summary>
     /// Executes the program.

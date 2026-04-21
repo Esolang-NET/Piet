@@ -30,6 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Parser\Esolang.Piet.Parser.csproj" />
   </ItemGroup>
 
   <ItemGroup>
