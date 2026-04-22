@@ -28,6 +28,11 @@ public partial class MethodGenerator : IIncrementalGenerator
     public const string ClassNamePietAttribution = "GeneratePietMethodAttribute";
 
     /// <summary>
+    /// The generated attribute class name for storing generation metadata.
+    /// </summary>
+    public const string GeneratedPietAttribution = "GeneratedPietInfoAttribute";
+
+    /// <summary>
     /// The source file name used to aggregate generated methods.
     /// </summary>
     public const string GeneratedMethodsFileName = "GeneratePietMethod.g.cs";
@@ -135,6 +140,23 @@ public partial class MethodGenerator : IIncrementalGenerator
                         /// <param name="imagePath">Path to the Piet image file.</param>
                         /// <param name="codelSize">Optional codel size for the Piet image.</param>
                         internal {{ClassNamePietAttribution}}(string imagePath, int codelSize = 0) { }
+                    }
+
+                    /// <summary>
+                    /// An attribute to store information about the generated Piet method, used for testing and diagnostics.
+                    /// </summary>
+                    [Conditional("COMPILE_TIME_ONLY")]
+                    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
+                    internal sealed class {{GeneratedPietAttribution}} : Attribute
+                    {
+                        /// <summary>
+                        /// Creates a new instance of the <c>{{GeneratedPietAttribution}}</c> class.
+                        /// </summary>
+                        /// <param name="path">The path to the Piet image file used for generation.</param>
+                        /// <param name="height">The height of the Piet image in codels.</param>
+                        /// <param name="width">The width of the Piet image in codels.</param>
+                        /// <param name="codelSize">The size of each codel in pixels.</param>
+                        internal {{GeneratedPietAttribution}}(string path, int height, int width, int codelSize) { }
                     }
                 }
                 """));
@@ -309,33 +331,6 @@ public partial class MethodGenerator : IIncrementalGenerator
             _ => "class",
         };
 
-        var containingTypeName = methodSymbol.ContainingType.Name;
-        var staticModifier = methodSymbol.IsStatic ? " static" : string.Empty;
-        var asyncModifier = executionBinding.ReturnKind == ReturnKind.AsyncEnumerableByte ? " async" : string.Empty;
-        var accessibility = GetAccessibility(methodSymbol.DeclaredAccessibility);
-        var parameterList = string.Join(", ", methodSymbol.Parameters.Select(p =>
-        {
-            if (executionBinding.ReturnKind == ReturnKind.AsyncEnumerableByte
-                && executionBinding.CancellationTokenName is not null
-                && string.Equals(p.Name, executionBinding.CancellationTokenName, StringComparison.Ordinal))
-            {
-                return "[global::System.Runtime.CompilerServices.EnumeratorCancellation] " + FormatParameter(p);
-            }
-            return FormatParameter(p);
-        }));
-
-        var code = new StringBuilder();
-        if (ns is not null)
-        {
-            code.Append("namespace ").Append(ns).AppendLine(";");
-            code.AppendLine();
-        }
-
-        code.Append("partial ").Append(typeKeyword).Append(' ').Append(containingTypeName).AppendLine();
-        code.AppendLine("{");
-        var returnType = methodSymbol.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        code.Append("    ").Append(accessibility).Append(staticModifier).Append(asyncModifier).Append(" partial ").Append(returnType).Append(' ')
-            .Append(methodSymbol.Name).Append('(').Append(parameterList).AppendLine(")");
 
         // --- 画像デコード拡張 ---
         var extension = GetExtension(resolvedImageFile.Value.TransformedOriginalPath ?? resolvedImageFile.Value.Path);
@@ -399,6 +394,41 @@ public partial class MethodGenerator : IIncrementalGenerator
                 DiagnosticDescriptors.UnusedInputInterface,
                 methodSyntax.Identifier.GetLocation()));
         }
+
+        var containingTypeName = methodSymbol.ContainingType.Name;
+        var staticModifier = methodSymbol.IsStatic ? " static" : string.Empty;
+        var asyncModifier = executionBinding.ReturnKind == ReturnKind.AsyncEnumerableByte ? " async" : string.Empty;
+        var accessibility = GetAccessibility(methodSymbol.DeclaredAccessibility);
+        var parameterList = string.Join(", ", methodSymbol.Parameters.Select(p =>
+        {
+            if (executionBinding.ReturnKind == ReturnKind.AsyncEnumerableByte
+                && executionBinding.CancellationTokenName is not null
+                && string.Equals(p.Name, executionBinding.CancellationTokenName, StringComparison.Ordinal))
+            {
+                return "[global::System.Runtime.CompilerServices.EnumeratorCancellation] " + FormatParameter(p);
+            }
+            return FormatParameter(p);
+        }));
+
+        var code = new StringBuilder();
+        if (ns is not null)
+        {
+            code.Append("namespace ").Append(ns).AppendLine(" {");
+            code.AppendLine();
+        }
+        
+        code.Append("partial ").Append(typeKeyword).Append(' ').Append(containingTypeName).AppendLine();
+        code.AppendLine("{");
+        // 使用データを表す属性
+        code.Append("    ").Append('[').Append(NameSpaceName).Append('.').Append("GeneratedPietInfo").Append('(')
+            .Append("path: ").Append('"').Append(resolvedImageFile.Value.Path).Append('"').Append(", ")
+            .Append("height: ").Append(program.Height).Append(", ")
+            .Append("width: ").Append(program.Width).Append(", ")
+            .Append("codelSize: ").Append(codelSize)
+        .Append(')').Append(']').AppendLine();
+        var returnType = methodSymbol.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        code.Append("    ").Append(accessibility).Append(staticModifier).Append(asyncModifier).Append(" partial ").Append(returnType).Append(' ')
+            .Append(methodSymbol.Name).Append('(').Append(parameterList).AppendLine(")");
 
         code.AppendLine("    {");
         if (executionBinding.ReturnKind != ReturnKind.Void
@@ -513,6 +543,11 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         code.AppendLine("    }");
         code.AppendLine("}");
+
+        if (ns is not null)
+        {
+            code.AppendLine("}");
+        }
 
         return new EmittedMethod(code.ToString());
     }

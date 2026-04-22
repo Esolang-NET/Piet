@@ -12,8 +12,8 @@ namespace Esolang.Piet.Generator.Tests;
 public class MethodGeneratorTests
 {
     // Minimal 1×1 RGB PNG with LightRed (0xFF,0xC0,0xC0). CRC fields are zeroed (not validated by decoder).
-    static readonly byte[] MinimalLightRedPng = new byte[]
-    {
+    static readonly byte[] MinimalLightRedPng =
+    [
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
         0x00, 0x00, 0x00, 0x0D,                          // IHDR length=13
         0x49, 0x48, 0x44, 0x52,                          // IHDR
@@ -30,12 +30,12 @@ public class MethodGeneratorTests
         0x00, 0x00, 0x00, 0x00,                          // IEND length=0
         0x49, 0x45, 0x4E, 0x44,                          // IEND
         0x00, 0x00, 0x00, 0x00,                          // CRC (placeholder)
-    };
+    ];
 
     // 2×1 RGB PNG: LightRed(0xFF,0xC0,0xC0) → Magenta(0xFF,0x00,0xFF).
     // Transition produces hDiff=5,lDiff=1 → cmd 16 (out number). Used to test PT0007.
-    static readonly byte[] TwoPixelOutputPng = new byte[]
-    {
+    static readonly byte[] TwoPixelOutputPng =
+    [
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
         0x00, 0x00, 0x00, 0x0D,                          // IHDR length=13
         0x49, 0x48, 0x44, 0x52,                          // IHDR
@@ -52,12 +52,12 @@ public class MethodGeneratorTests
         0x00, 0x00, 0x00, 0x00,                          // IEND length=0
         0x49, 0x45, 0x4E, 0x44,                          // IEND
         0x00, 0x00, 0x00, 0x00,                          // CRC (placeholder)
-    };
+    ];
 
     // 2×1 RGB PNG: LightRed(0xFF,0xC0,0xC0) → DarkBlue(0x00,0x00,0xC0).
     // Transition produces hDiff=4,lDiff=2 → cmd 14 (in number). Used to test PT0008.
-    static readonly byte[] TwoPixelInputPng = new byte[]
-    {
+    static readonly byte[] TwoPixelInputPng =
+    [
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
         0x00, 0x00, 0x00, 0x0D,                          // IHDR length=13
         0x49, 0x48, 0x44, 0x52,                          // IHDR
@@ -74,7 +74,7 @@ public class MethodGeneratorTests
         0x00, 0x00, 0x00, 0x00,                          // IEND length=0
         0x49, 0x45, 0x4E, 0x44,                          // IEND
         0x00, 0x00, 0x00, 0x00,                          // CRC (placeholder)
-    };
+    ];
 
     static string MakeTransformedText(string logicalPath, byte[] pngBytes) =>
         $"// PIET_IMAGE_PATH={logicalPath}\n// PIET_CODEL_SIZE=1\n{Convert.ToBase64String(pngBytes)}";
@@ -1022,7 +1022,7 @@ public class MethodGeneratorTests
             string.Join("\n", diagnostics.Select(static x => x.ToString())));
 
         var generatedMethod = runResult.GeneratedTrees
-            .Select(static tree => tree.GetText().ToString())
+            .Select(tree => tree.GetText(CancellationToken).ToString())
             .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
         Assert.IsTrue(generatedMethod.Contains("public static partial"), "Expected static modifier was not found.");
@@ -1212,10 +1212,10 @@ public class MethodGeneratorTests
             }
             """;
 
-        var blackPng = BuildStoredRgbPng(1, 1, new byte[]
-        {
+        var blackPng = BuildStoredRgbPng(1, 1,
+        [
             0x00, 0x00, 0x00, 0x00,
-        });
+        ]);
 
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
@@ -1229,7 +1229,7 @@ public class MethodGeneratorTests
             string.Join("\n", diagnostics.Select(static x => x.ToString())));
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run()")),
+            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
             "Expected generated method implementation was not found.");
 
         var diagnostics_ = outputCompilation.GetDiagnostics(CancellationToken);
@@ -1305,10 +1305,10 @@ public class MethodGeneratorTests
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
-#if NET8_0_OR_GREATER
     [TestMethod]
     public void Generator_WithValueTaskStringReturn_GeneratesMethod()
     {
+#if NET8_0_OR_GREATER
         const string source = """
             namespace Demo;
 
@@ -1331,17 +1331,22 @@ public class MethodGeneratorTests
             string.Join("\n", diagnostics.Select(static x => x.ToString())));
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("new global::System.Threading.Tasks.ValueTask<string>")),
+            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("new global::System.Threading.Tasks.ValueTask<string>")),
             "Expected ValueTask<string> return path was not found.");
 
         Assert.IsFalse(
             outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
             "Compilation contains errors after running generator.");
+#else
+        Assert.Inconclusive("ValueTask return type support requires .NET 8 or later.");
+#endif
     }
 
     [TestMethod]
     public void Generator_WithIAsyncEnumerableByteReturn_GeneratesAsyncMethod()
     {
+
+#if NET8_0_OR_GREATER
         const string source = """
             namespace Demo;
 
@@ -1377,11 +1382,15 @@ public class MethodGeneratorTests
         Assert.IsFalse(
             outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
             "Compilation contains errors after running generator.");
+#else
+        Assert.Inconclusive("ValueTask return type support requires .NET 8 or later.");
+#endif
     }
 
     [TestMethod]
     public void Generator_WithPipeReaderInput_GeneratesMethod()
     {
+#if NET8_0_OR_GREATER
         const string source = """
             namespace Demo;
 
@@ -1415,11 +1424,15 @@ public class MethodGeneratorTests
         Assert.IsFalse(
             pipeReaderErrors.Length > 0,
             "Compilation contains errors after running generator. " + string.Join(" | ", pipeReaderErrors));
+#else
+        Assert.Inconclusive("ValueTask return type support requires .NET 8 or later.");
+#endif
     }
 
     [TestMethod]
     public void Generator_WithPipeWriterOutput_GeneratesMethod()
     {
+#if NET8_0_OR_GREATER
         const string source = """
             namespace Demo;
 
@@ -1453,8 +1466,10 @@ public class MethodGeneratorTests
         Assert.IsFalse(
             pipeWriterErrors.Length > 0,
             "Compilation contains errors after running generator. " + string.Join(" | ", pipeWriterErrors));
-    }
+#else
+        Assert.Inconclusive("ValueTask return type support requires .NET 8 or later.");
 #endif
+    }
 
     GeneratorDriver RunGeneratorsAndUpdateCompilation(
         string source,
@@ -1509,17 +1524,19 @@ public partial class Sample
 }
 """;
         // 追加ファイルにはCodelSize=1を埋め込む
-        var transformed = "// PIET_IMAGE_PATH=program.png\n// PIET_CODEL_SIZE=3\n" + Convert.ToBase64String(MinimalLightRedPng);
+        var transformed = "// PIET_IMAGE_PATH=program.png\n// PIET_CODEL_SIZE=1\n" + Convert.ToBase64String(MinimalLightRedPng);
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/program.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
+        Assert.IsEmpty(runResult.Diagnostics, 
+            string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
         // 生成コードにcodelSize=3が反映されているか（例: 配列長やコメント等で判定）
         var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
         Assert.IsNotNull(generated, "Method not generated");
-        Assert.IsTrue(generated.Contains("codelSize = 3") || generated.Contains("3 /* codelSize */"), "codelSize=3 not reflected in generated code");
+        Assert.IsTrue(generated.Contains("codelSize: 3"), "codelSize=3 not reflected in generated code");
         Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
             string.Join("\n", diagnostics.Select(static x => x.ToString())));
         Assert.IsFalse(
@@ -1548,9 +1565,11 @@ public partial class Sample
             out var diagnostics,
             new TestAdditionalText("obj/program.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
+        Assert.IsEmpty(runResult.Diagnostics,
+            string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
         var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
         Assert.IsNotNull(generated, "Method not generated");
-        Assert.IsTrue(generated.Contains("codelSize = 2") || generated.Contains("2 /* codelSize */"), "codelSize=2 not reflected in generated code");
+        Assert.IsTrue(generated.Contains("codelSize: 2"), "codelSize=2 not reflected in generated code");
         Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
             string.Join("\n", diagnostics.Select(static x => x.ToString())));
         Assert.IsFalse(

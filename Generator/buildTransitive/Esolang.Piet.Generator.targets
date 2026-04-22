@@ -20,10 +20,11 @@
         {
             Directory.CreateDirectory(outputDirectory);
         }
+        var imagePath = LogicalPath;
 
         File.WriteAllText(
           OutputFile,
-          "// PIET_IMAGE_PATH=" + LogicalPath + "\n" +
+          "// PIET_IMAGE_PATH=" + imagePath + "\n" +
           "// PIET_CODEL_SIZE=" + CodelSize + "\n" +
           base64);
       ]]></Code>
