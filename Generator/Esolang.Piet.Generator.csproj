@@ -59,10 +59,4 @@
       DestinationFolder="$(OutputPath)"
       SkipUnchangedFiles="true" />
   </Target>
-
-  <Target Name="DebugImageSharpPath" AfterTargets="Build">
-    <Message Text="PkgSixLabors_ImageSharp path: $(PkgSixLabors_ImageSharp)" Importance="High" />
-    <Message Text="ImageSharp netstandard2.0 DLL: $(PkgSixLabors_ImageSharp)\lib\netstandard2.0\SixLabors.ImageSharp.dll" Importance="High" />
-    <Message Text="OutputPath: $(OutputPath)" Importance="High" />
-  </Target>
 </Project>
