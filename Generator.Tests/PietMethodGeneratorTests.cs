@@ -2,7 +2,6 @@ using Basic.Reference.Assemblies;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
-using System.IO;
 using System.Collections.Immutable;
 using System.Text;
 
@@ -1575,6 +1574,37 @@ public partial class Sample
         var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
         Assert.IsNotNull(generated, "Method not generated");
         Assert.IsTrue(generated.Contains("codelSize: 2"), "codelSize=2 not reflected in generated code");
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        Assert.IsFalse(
+            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator.");
+    }
+
+    [TestMethod]
+    public void Generator_WithInlineAsciiPiet_UsedAttribute()
+    {
+        // 属性でcodelSize指定なし、追加ファイルPIET_CODEL_SIZE=2の場合は2が使われる
+        const string source = 
+"""
+namespace Demo;
+
+public partial class Sample
+{
+    [Esolang.Piet.GeneratePietMethod("data:text/acii-piet;codel-size=1,l_ C")]
+    public static partial void Run();
+}
+""";
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics);
+        var runResult = driver.GetRunResult();
+        Assert.IsEmpty(runResult.Diagnostics,
+            string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
+        var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
+        Assert.IsNotNull(generated, "Method not generated");
+        Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize=1 not reflected in generated code");
         Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
             string.Join("\n", diagnostics.Select(static x => x.ToString())));
         Assert.IsFalse(

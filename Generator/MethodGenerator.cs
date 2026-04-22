@@ -247,18 +247,27 @@ public partial class MethodGenerator : IIncrementalGenerator
                 methodSymbol.Name));
             return null;
         }
+        AdditionalImageFile? resolvedImageFile;
+        try{
+            resolvedImageFile = TryResolveImagePath(imagePath, additionalImageFiles);
+            if (!resolvedImageFile.HasValue)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.ImageFileNotFound,
+                    methodSyntax.Identifier.GetLocation(),
+                    imagePath));
+                return null;
+            }
 
-        var resolvedImageFile = TryResolveImagePath(imagePath, additionalImageFiles);
-        if (!resolvedImageFile.HasValue)
-        {
-            context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.ImageFileNotFound,
-                methodSyntax.Identifier.GetLocation(),
-                imagePath));
-            return null;
-        }
-
-        if (!HasSupportedImageFormat(resolvedImageFile.Value))
+            if (!HasSupportedImageFormat(resolvedImageFile.Value))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.InvalidImageFormat,
+                    methodSyntax.Identifier.GetLocation(),
+                    imagePath));
+                return null;
+            }
+        }catch
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.InvalidImageFormat,
@@ -356,43 +365,53 @@ public partial class MethodGenerator : IIncrementalGenerator
                 imagePath));
             return null;
         }
+        Parser.PietProgram? program;
+        try {
+            program = Parser.PietParser.Parse(bytes, extension, codelSize);
+            codels = [.. program.Codels.Select(b => (byte)b)];
+            imageWidth = program.Width;
+            imageHeight = program.Height;
 
-        var program = Parser.PietParser.Parse(bytes, extension, codelSize);
-        codels = [.. program.Codels.Select(b => (byte)b)];
-        imageWidth = program.Width;
-        imageHeight = program.Height;
+            if (codels is null || imageWidth <= 0 || imageHeight <= 0)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.InvalidImageFormat,
+                    methodSyntax.Identifier.GetLocation(),
+                    imagePath));
+                return null;
+            }
 
-        if (codels is null || imageWidth <= 0 || imageHeight <= 0)
+            var (mightUseOutput, mightUseInput) = ScanPietIoCommands(codels, imageWidth, imageHeight);
+            if (mightUseOutput && !executionBinding.HasExplicitOutput)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.RequiredOutputInterface,
+                    methodSyntax.Identifier.GetLocation()));
+                return null;
+            }
+
+            if (mightUseInput && !executionBinding.HasExplicitInput)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.RequiredInputInterface,
+                    methodSyntax.Identifier.GetLocation()));
+                return null;
+            }
+
+            if (!mightUseInput && executionBinding.HasExplicitInput)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.UnusedInputInterface,
+                    methodSyntax.Identifier.GetLocation()));
+            }
+        }
+        catch
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.InvalidImageFormat,
                 methodSyntax.Identifier.GetLocation(),
                 imagePath));
             return null;
-        }
-
-        var (mightUseOutput, mightUseInput) = ScanPietIoCommands(codels, imageWidth, imageHeight);
-        if (mightUseOutput && !executionBinding.HasExplicitOutput)
-        {
-            context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.RequiredOutputInterface,
-                methodSyntax.Identifier.GetLocation()));
-            return null;
-        }
-
-        if (mightUseInput && !executionBinding.HasExplicitInput)
-        {
-            context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.RequiredInputInterface,
-                methodSyntax.Identifier.GetLocation()));
-            return null;
-        }
-
-        if (!mightUseInput && executionBinding.HasExplicitInput)
-        {
-            context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.UnusedInputInterface,
-                methodSyntax.Identifier.GetLocation()));
         }
 
         var containingTypeName = methodSymbol.ContainingType.Name;
@@ -553,136 +572,6 @@ public partial class MethodGenerator : IIncrementalGenerator
         }
 
         return new EmittedMethod(code.ToString());
-    }
-
-    // --- ascii-piet テキストデコード ---
-    static byte[]? TryDecodeAsciiPiet(string? text, out int width, out int height)
-    {
-        width = 0; height = 0;
-        if (string.IsNullOrWhiteSpace(text)) return null;
-
-        var lines = text!.Replace("\r", "").Split('\n');
-        var filtered = new List<string>();
-        foreach (var line in lines)
-        {
-            var l = line.TrimEnd();
-            if (l.Length == 0) continue;
-            filtered.Add(l);
-        }
-        if (filtered.Count == 0) return null;
-        height = filtered.Count;
-        width = filtered.Max(l => l.Length);
-        var result = new byte[width * height];
-        for (int y = 0; y < height; y++)
-        {
-            var line = filtered[y];
-            for (int x = 0; x < width; x++)
-            {
-                result[y * width + x] = x < line.Length ? AsciiPietCharToCodel(line[x]) : (byte)0;
-            }
-        }
-        return result;
-    }
-
-    // ascii-piet 文字→codel値変換
-    static byte AsciiPietCharToCodel(char c)
-    {
-        return c switch
-        {
-            'W' or 'w' => 1, // White
-            'K' or 'k' => 0, // Black
-            'R' or 'r' => 2,
-            'G' or 'g' => 5,
-            'B' or 'b' => 8,
-            'Y' or 'y' => 11,
-            'M' or 'm' => 14,
-            'C' or 'c' => 17,
-            '.' => 1, // White (dot)
-            _ => 0 // その他はBlack扱い
-        };
-    }
-
-    // --- PPM (P3) デコード ---
-    static byte[]? TryDecodePpm(string? text, out int width, out int height)
-    {
-        width = 0; height = 0;
-        if (string.IsNullOrWhiteSpace(text)) return null;
-        var lines = text!.Replace("\r", "").Split('\n');
-        var tokens = new List<string>();
-        foreach (var line in lines)
-        {
-            var l = line.Trim();
-            if (l.StartsWith("#")) continue;
-            tokens.AddRange(l.Split([' '], StringSplitOptions.RemoveEmptyEntries));
-        }
-        if (tokens.Count < 4 || tokens[0] != "P3") return null;
-        int idx = 1;
-        width = int.Parse(tokens[idx++]);
-        height = int.Parse(tokens[idx++]);
-        int maxval = int.Parse(tokens[idx++]);
-        if (maxval != 255) return null;
-        var result = new byte[width * height];
-        for (int i = 0; i < width * height; i++)
-        {
-            if (idx + 2 >= tokens.Count) return null;
-            int r = int.Parse(tokens[idx++]);
-            int g = int.Parse(tokens[idx++]);
-            int b = int.Parse(tokens[idx++]);
-            result[i] = RgbToCodel(r, g, b);
-        }
-        return result;
-    }
-
-    // --- GIF (静止画) デコード ---
-    static byte[]? TryDecodeGif(byte[]? bytes, out int width, out int height)
-    {
-        width = 0; height = 0;
-        if (bytes == null || bytes.Length < 13) return null;
-        width = bytes[6] | (bytes[7] << 8);
-        height = bytes[8] | (bytes[9] << 8);
-        if (width <= 0 || height <= 0) return null;
-        int gctFlag = (bytes[10] & 0x80) != 0 ? 1 : 0;
-        int gctSize = 2 << (bytes[10] & 0x07);
-        int paletteStart = 13;
-        int paletteBytes = gctFlag != 0 ? 3 * gctSize : 0;
-        if (paletteStart + paletteBytes > bytes.Length) return null;
-        var palette = new List<(int r, int g, int b)>();
-        for (int i = 0; i < gctSize; i++)
-        {
-            int p = paletteStart + 3 * i;
-            if (p + 2 >= bytes.Length) break;
-            palette.Add((bytes[p], bytes[p + 1], bytes[p + 2]));
-        }
-        var result = new byte[width * height];
-        for (int i = 0; i < result.Length; i++) result[i] = RgbToCodel(0, 0, 0);
-        if (palette.Count > 0)
-        {
-            for (int i = 0; i < result.Length && i < palette.Count; i++)
-            {
-                var (r, g, b) = palette[i];
-                result[i] = RgbToCodel(r, g, b);
-            }
-        }
-        return result;
-    }
-
-    // RGB→Piet codel値
-    static byte RgbToCodel(int r, int g, int b)
-    {
-        if (r == 0 && g == 0 && b == 0) return 0; // Black
-        if (r == 255 && g == 255 && b == 255) return 1; // White
-        var table = new (int r, int g, int b, byte code)[] {
-            (255,192,192,2), (255,0,0,3), (192,0,0,4), // Red
-            (255,255,192,5), (255,255,0,6), (192,192,0,7), // Yellow
-            (192,255,192,8), (0,255,0,9), (0,192,0,10), // Green
-            (192,255,255,11), (0,255,255,12), (0,192,192,13), // Cyan
-            (192,192,255,14), (0,0,255,15), (0,0,192,16), // Blue
-            (255,192,255,17), (255,0,255,18), (192,0,192,19) // Magenta
-        };
-        foreach (var t in table)
-            if (Math.Abs(r - t.r) <= 16 && Math.Abs(g - t.g) <= 16 && Math.Abs(b - t.b) <= 16)
-                return t.code;
-        return 0; // fallback Black
     }
 
     static string GetAccessibility(Accessibility accessibility) => accessibility switch
@@ -863,6 +752,59 @@ public partial class MethodGenerator : IIncrementalGenerator
 
     static AdditionalImageFile? TryResolveImagePath(string imagePath, ImmutableArray<AdditionalImageFile> additionalImageFiles)
     {
+        const string dataUrlStarts = "data:";
+        if (imagePath.StartsWith(dataUrlStarts, StringComparison.OrdinalIgnoreCase))
+        {
+            var bodyStartIndex = imagePath.IndexOf(",", dataUrlStarts.Length);
+            if (bodyStartIndex < 0)
+            {
+                return null;
+            }
+            var header = imagePath.Substring(dataUrlStarts.Length, bodyStartIndex - dataUrlStarts.Length);
+            var body = imagePath.Substring(bodyStartIndex + 1);
+            var headers = header.Split(';');
+            var isBase64 = false;
+            var codelSize = 1;
+            string? ext = null;
+            if (headers.Length <= 0)
+                return null;
+            var contentType = headers[0].Trim().ToLowerInvariant();
+            if (contentType == "text/plain")
+                ext = ".txt";
+            else if (contentType == "text/acii-piet")
+                ext = ".txt";
+            else if (contentType == "image/x-portable-pixmap")
+                ext = ".ppm";
+            else
+                throw new Exception($" not support mime-type is {contentType}");
+
+            foreach(var text in headers.Skip(1))
+            {
+                var text_ = text.Trim().ToLowerInvariant();
+                if (text_ == "base64")
+                {
+                    isBase64 = true;
+                    continue;
+                }
+                else if (text_.StartsWith("codel-size="))
+                {
+                    var sizeText = text_.Substring("codel-size=".Length);
+                    if (int.TryParse(sizeText, out var codelSize_))
+                    {
+                        codelSize = codelSize_;
+                    }
+                    continue;
+                }
+            }
+            if (isBase64)
+            {
+                return new AdditionalImageFile(imagePath, text: body, codelSize: codelSize, transformedOriginalPath:ext);
+            }
+
+            // Data URIスキームは直接扱う
+            return new AdditionalImageFile(imagePath, text: Convert.ToBase64String(Encoding.UTF8.GetBytes(body)), codelSize, transformedOriginalPath: ext);
+        }
+        
         if (additionalImageFiles.IsDefaultOrEmpty)
         {
             return null;
@@ -901,7 +843,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
     static bool HasSupportedImageFormat(AdditionalImageFile resolvedImageFile)
     {
-        var extension = GetExtension(resolvedImageFile.Path);
+        var extension = GetExtension(resolvedImageFile.TransformedOriginalPath ?? resolvedImageFile.Path);
         if (string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase))
             return resolvedImageFile.IsReadable;
         if (string.Equals(extension, ".gif", StringComparison.OrdinalIgnoreCase))
@@ -970,42 +912,6 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         transformedImagePath = NormalizePath(originalPath);
         return true;
-    }
-
-    static bool HasBase64Payload(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return false;
-        }
-
-        var nonNullText = text!;
-
-        var firstNewlineIndex = nonNullText.IndexOf('\n');
-        if (firstNewlineIndex < 0)
-        {
-            return false;
-        }
-
-        var payload = nonNullText.Substring(firstNewlineIndex + 1)
-            .Replace("\r", string.Empty)
-            .Replace("\n", string.Empty)
-            .Trim();
-
-        if (string.IsNullOrWhiteSpace(payload))
-        {
-            return false;
-        }
-
-        try
-        {
-            _ = Convert.FromBase64String(payload);
-            return true;
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
     }
 
     static string GetFirstLine(string text)
