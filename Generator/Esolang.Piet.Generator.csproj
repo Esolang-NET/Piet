@@ -36,6 +36,10 @@
   <ItemGroup>
     <PackageReference Include="SixLabors.ImageSharp" GeneratePathProperty="true" PrivateAssets="all" />
   </ItemGroup>
+  
+  <ItemGroup>    
+    <InternalsVisibleTo Include="Esolang.Piet.Generator.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />

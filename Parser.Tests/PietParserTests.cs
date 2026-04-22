@@ -7,9 +7,6 @@ namespace Esolang.Piet.Parser.Tests;
 [TestClass]
 public sealed class PietParserTests
 {
-    static readonly MethodInfo TryDecodePngMethod = typeof(PietParser)
-        .GetMethod("TryDecodePng", BindingFlags.NonPublic | BindingFlags.Static)!;
-
     static readonly MethodInfo ApplyPngFilterMethod = typeof(PietParser)
         .GetMethod("ApplyPngFilter", BindingFlags.NonPublic | BindingFlags.Static)!;
 
@@ -152,8 +149,7 @@ public sealed class PietParserTests
     public void TryDecodePng_ReturnsNullForInvalidSignatureAndUnsupportedColorType()
     {
         var invalidSig = new byte[] { 0x00, 0x11, 0x22 };
-        var args = new object[] { invalidSig, 0, 0 };
-        var decoded = (byte[]?)TryDecodePngMethod.Invoke(null, args);
+        var decoded = PietParser.DecodePng(invalidSig, out _, out _ );
         Assert.IsNull(decoded);
 
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
@@ -167,8 +163,7 @@ public sealed class PietParserTests
 
             var bytes = File.ReadAllBytes(path);
             bytes[25] = 3;
-            args = new object[] { bytes, 0, 0 };
-            decoded = (byte[]?)TryDecodePngMethod.Invoke(null, args);
+            decoded = PietParser.DecodePng(bytes, out _, out _ );
             Assert.IsNull(decoded);
         }
         finally
@@ -184,19 +179,19 @@ public sealed class PietParserTests
         var row = new byte[] { 1, 2, 3, 1, 1, 1 };
         var prev = new byte[] { 1, 1, 1, 1, 1, 1 };
 
-        ApplyPngFilterMethod.Invoke(null, new object[] { 1, row, prev, 3 });
+        PietParser.ApplyPngFilter(1, row, prev, 3);
         CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 2, 3, 4 }, row);
 
         row = new byte[] { 1, 1, 1 };
-        ApplyPngFilterMethod.Invoke(null, new object[] { 2, row, prev, 3 });
+        PietParser.ApplyPngFilter(2, row, prev, 3);
         CollectionAssert.AreEqual(new byte[] { 2, 2, 2 }, row);
 
         row = new byte[] { 2, 2, 2 };
-        ApplyPngFilterMethod.Invoke(null, new object[] { 3, row, prev, 3 });
+        PietParser.ApplyPngFilter(3, row, prev, 3);
         CollectionAssert.AreEqual(new byte[] { 2, 2, 2 }, row);
 
         row = new byte[] { 1, 1, 1 };
-        ApplyPngFilterMethod.Invoke(null, new object[] { 4, row, prev, 3 });
+        PietParser.ApplyPngFilter(4, row, prev, 3);
         CollectionAssert.AreEqual(new byte[] { 2, 2, 2 }, row);
 
         var color = PietParser.MapToPietColor(0x12, 0x34, 0x56);

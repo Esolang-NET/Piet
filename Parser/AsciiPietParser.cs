@@ -68,9 +68,34 @@ public static class AsciiPietParser
         var lines = text.Replace("\r", "").Replace("\n", "");
         return InternalParse(lines);
     }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="bytes"></param>
+    /// <param name="codelSize"></param>
+    /// <param name="program"></param>
+    /// <returns></returns>
+    public static bool TryParse(byte[] bytes, int codelSize, out PietProgram program)
+    {
+        program = default!;
+        if (bytes.Length < 0) return false;
+        if (codelSize < 1) return false;
+        try
+        {
+            program = Parse(bytes, codelSize);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
     
     static PietProgram InternalParse(string lines, int codelSize = 1)
     {
+        if (codelSize < 1)
+            throw new ArgumentOutOfRangeException(nameof(codelSize), "codelSize is support 1 or over.");
         if (lines.Length == 0)
             throw new InvalidDataException("ascii-piet file is empty");
 

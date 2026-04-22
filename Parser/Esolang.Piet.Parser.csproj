@@ -24,6 +24,10 @@
     <PackageReference Include="SixLabors.ImageSharp" GeneratePathProperty="true" />
   </ItemGroup>
 
+  <ItemGroup>    
+    <InternalsVisibleTo Include="Esolang.Piet.Parser.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
     <None Include="../CHANGELOG.md" Pack="true" PackagePath="\" />

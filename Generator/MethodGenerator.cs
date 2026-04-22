@@ -247,27 +247,16 @@ public partial class MethodGenerator : IIncrementalGenerator
                 methodSymbol.Name));
             return null;
         }
-        AdditionalImageFile? resolvedImageFile;
-        try{
-            resolvedImageFile = TryResolveImagePath(imagePath, additionalImageFiles);
-            if (!resolvedImageFile.HasValue)
-            {
+        if (TryResolveImagePath(imagePath, additionalImageFiles) is not {} resolvedImageFile)
+        {
                 context.ReportDiagnostic(Diagnostic.Create(
                     DiagnosticDescriptors.ImageFileNotFound,
                     methodSyntax.Identifier.GetLocation(),
                     imagePath));
                 return null;
-            }
+        }
 
-            if (!HasSupportedImageFormat(resolvedImageFile.Value))
-            {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.InvalidImageFormat,
-                    methodSyntax.Identifier.GetLocation(),
-                    imagePath));
-                return null;
-            }
-        }catch
+        if (!HasSupportedImageFormat(resolvedImageFile))
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.InvalidImageFormat,
@@ -342,9 +331,9 @@ public partial class MethodGenerator : IIncrementalGenerator
 
 
         // --- 画像デコード拡張 ---
-        var extension = GetExtension(resolvedImageFile.Value.TransformedOriginalPath ?? resolvedImageFile.Value.Path);
+        var extension = GetExtension(resolvedImageFile.TransformedOriginalPath ?? resolvedImageFile.Path);
         // 属性でCodelSize指定があればそれを優先、なければ追加ファイルのPIET_CODEL_SIZEコメントを使う
-        int codelSize = resolvedImageFile.Value.CodelSize ?? DefaultCodelSize;
+        int codelSize = resolvedImageFile.CodelSize ?? DefaultCodelSize;
         // 属性引数（2つ目以降）にcodelSizeがあれば上書き
         if (source.Attributes[0].ConstructorArguments.Length > 1)
         {
@@ -356,7 +345,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         }
         byte[]? codels = null;
         int imageWidth = 0, imageHeight = 0;
-        var bytes = ExtractPngBytes(resolvedImageFile.Value);
+        var bytes = ExtractPngBytes(resolvedImageFile);
         if (bytes is null)
         {
             context.ReportDiagnostic(Diagnostic.Create(
@@ -365,47 +354,19 @@ public partial class MethodGenerator : IIncrementalGenerator
                 imagePath));
             return null;
         }
-        Parser.PietProgram? program;
-        try {
-            program = Parser.PietParser.Parse(bytes, extension, codelSize);
-            codels = [.. program.Codels.Select(b => (byte)b)];
-            imageWidth = program.Width;
-            imageHeight = program.Height;
-
-            if (codels is null || imageWidth <= 0 || imageHeight <= 0)
-            {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.InvalidImageFormat,
-                    methodSyntax.Identifier.GetLocation(),
-                    imagePath));
-                return null;
-            }
-
-            var (mightUseOutput, mightUseInput) = ScanPietIoCommands(codels, imageWidth, imageHeight);
-            if (mightUseOutput && !executionBinding.HasExplicitOutput)
-            {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.RequiredOutputInterface,
-                    methodSyntax.Identifier.GetLocation()));
-                return null;
-            }
-
-            if (mightUseInput && !executionBinding.HasExplicitInput)
-            {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.RequiredInputInterface,
-                    methodSyntax.Identifier.GetLocation()));
-                return null;
-            }
-
-            if (!mightUseInput && executionBinding.HasExplicitInput)
-            {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.UnusedInputInterface,
-                    methodSyntax.Identifier.GetLocation()));
-            }
+        if (!Parser.PietParser.TryParse(bytes, extension, codelSize, out var program))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.InvalidImageFormat,
+                methodSyntax.Identifier.GetLocation(),
+                imagePath));
+            return null;
         }
-        catch
+        codels = [.. program.Codels.Select(b => (byte)b)];
+        imageWidth = program.Width;
+        imageHeight = program.Height;
+
+        if (codels is null || imageWidth <= 0 || imageHeight <= 0)
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.InvalidImageFormat,
@@ -414,6 +375,30 @@ public partial class MethodGenerator : IIncrementalGenerator
             return null;
         }
 
+        var (mightUseOutput, mightUseInput) = ScanPietIoCommands(codels, imageWidth, imageHeight);
+        if (mightUseOutput && !executionBinding.HasExplicitOutput)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.RequiredOutputInterface,
+                methodSyntax.Identifier.GetLocation()));
+            return null;
+        }
+
+        if (mightUseInput && !executionBinding.HasExplicitInput)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.RequiredInputInterface,
+                methodSyntax.Identifier.GetLocation()));
+            return null;
+        }
+
+        if (!mightUseInput && executionBinding.HasExplicitInput)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.UnusedInputInterface,
+                methodSyntax.Identifier.GetLocation()));
+        }
+        
         var containingTypeName = methodSymbol.ContainingType.Name;
         var staticModifier = methodSymbol.IsStatic ? " static" : string.Empty;
         var asyncModifier = executionBinding.ReturnKind == ReturnKind.AsyncEnumerableByte ? " async" : string.Empty;
@@ -442,7 +427,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         code.Append("    ").Append('[').Append(NameSpaceName).Append('.').Append("GeneratedPietInfo").Append('(')
             .Append("path: ")
                 .Append(
-                    SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(resolvedImageFile.Value.Path))
+                    SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(resolvedImageFile.Path))
                 ).Append(", ")
             .Append("height: ").Append(program.Height).Append(", ")
             .Append("width: ").Append(program.Width).Append(", ")

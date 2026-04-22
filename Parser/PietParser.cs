@@ -1,6 +1,9 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.IO.Compression;
+#if NETSTANDARD2_1_OR_GREATER
+using System.Diagnostics.CodeAnalysis;
+#endif
 
 namespace Esolang.Piet.Parser;
 
@@ -9,6 +12,33 @@ namespace Esolang.Piet.Parser;
 /// </summary>
 public static class PietParser
 {
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="bytes"></param>
+    /// <param name="ext"></param>
+    /// <param name="codelSize"></param>
+    /// <param name="program"></param>
+    /// <returns></returns>
+    public static bool TryParse(byte[] bytes, string ext, int codelSize, 
+#if NETSTANDARD2_1_OR_GREATER
+    [NotNullWhen(true)]
+#endif
+    out PietProgram program)
+    {
+        program = default!;
+        if (ext == ".txt")
+            return AsciiPietParser.TryParse(bytes, codelSize, out program);
+        if (ext == ".ppm")
+            return PpmPietParser.TryParse(bytes, codelSize, out program);
+        if (ext == ".png")
+            return TryParsePng(bytes, codelSize, out program)
+             || TryParseFallbackPng(bytes, codelSize, out program);
+        if (ext == ".gif")
+            return TryParsePng(bytes, codelSize, out program);
+        return false;
+
+    }
     /// <summary>
     /// Loads a Piet program from raw image bytes with a specified extension.
     /// Supports .txt (ascii-piet), .ppm, and common image formats (PNG, JPEG, etc.).
@@ -59,6 +89,36 @@ public static class PietParser
         throw new ArgumentException($"not supported image format: {ext}");
     }
 
+    static bool TryParsePng(byte[] bytes, int codelSize, 
+    #if NETSTANDARD2_1_OR_GREATER
+    [NotNullWhen(true)]
+    #endif
+    out PietProgram program)
+    {
+        program = default!;
+        if (bytes.Length <= 0) return false;
+        if (codelSize < 1) return false;
+        try {
+            using var image = Image.Load<Rgba32>(bytes);
+            int codelWidth = image.Width / codelSize;
+            int codelHeight = image.Height / codelSize;
+            var colors = new PietColor[codelWidth * codelHeight];
+            for (var y = 0; y < codelHeight; y++)
+            {
+                for (var x = 0; x < codelWidth; x++)
+                {
+                    // 左上ピクセルの色で代表とする（平均化したい場合はここを修正）
+                    colors[(y * codelWidth) + x] = Normalize(image[x * codelSize, y * codelSize]);
+                }
+            }
+            program = new(codelWidth, codelHeight, colors);
+            return true;
+        } catch
+        {
+            return false;
+        }
+    }
+
     /// <summary>
     /// Loads a Piet program from an image file.
     /// Falls back to an internal PNG decoder when strict image decoding fails.
@@ -70,13 +130,30 @@ public static class PietParser
         var ext = Path.GetExtension(path).ToLowerInvariant();
         return Parse(bytes, ext, codelSize);
     }
+    
+    static bool TryParseFallbackPng(byte[] pngBytes, int codelSize, 
+#if NETSTANDARD2_1_OR_GREATER
+    [NotNullWhen(true)]
+#endif
+    out PietProgram program)
+    {
+        program = default!;
+        if (!TryDecodePng(pngBytes: pngBytes, out var width, out var height, out var codels))
+            return false;
+        
+        program = InternalParseWithRawPngFallback(codels, width, height, codelSize);
+        return true;
+    }
 
     static PietProgram ParseWithRawPngFallback(byte[] pngBytes, int codelSize = 1)
     {
-        var codels = TryDecodePng(pngBytes, out var width, out var height);
-        if (codels is null || width <= 0 || height <= 0)
+        if(!TryDecodePng(pngBytes, out var width, out var height, out var codels))
             throw new InvalidImageContentException("Failed to parse Piet PNG image.");
 
+        return InternalParseWithRawPngFallback(codels, width, height, codelSize);
+    }
+    static PietProgram InternalParseWithRawPngFallback(byte[] codels, int width, int height, int codelSize)
+    {
         int codelWidth = width / codelSize;
         int codelHeight = height / codelSize;
         var colors = new PietColor[codelWidth * codelHeight];
@@ -90,18 +167,23 @@ public static class PietParser
         return new PietProgram(codelWidth, codelHeight, colors);
     }
 
-    static byte[]? TryDecodePng(byte[] pngBytes, out int width, out int height)
+    static bool TryDecodePng(byte[] pngBytes, out int width, out int height,
+#if NETSTANDARD2_1_OR_GREATER
+    [NotNullWhen(true)]
+#endif
+    out byte[] bytes)
     {
         width = 0;
         height = 0;
+        bytes = default!;
 
         if (pngBytes.Length < 8)
-            return null;
+            return false;
 
         if (pngBytes[0] != 0x89 || pngBytes[1] != 0x50 || pngBytes[2] != 0x4E ||
             pngBytes[3] != 0x47 || pngBytes[4] != 0x0D || pngBytes[5] != 0x0A ||
             pngBytes[6] != 0x1A || pngBytes[7] != 0x0A)
-            return null;
+            return false;
 
         var pos = 8;
         var colorType = 2;
@@ -127,7 +209,7 @@ public static class PietParser
             if (isIHDR && chunkLength >= 13)
             {
                 if (pos + 13 > pngBytes.Length)
-                    return null;
+                    return false;
 
                 width = ReadInt32BE(pngBytes, pos);
                 height = ReadInt32BE(pngBytes, pos + 4);
@@ -136,7 +218,7 @@ public static class PietParser
             else if (isIDAT)
             {
                 if (pos + chunkLength > pngBytes.Length)
-                    return null;
+                    return false;
 
                 for (var i = 0; i < chunkLength; i++)
                     idatData.Add(pngBytes[pos + i]);
@@ -150,7 +232,7 @@ public static class PietParser
         }
 
         if (width <= 0 || height <= 0)
-            return null;
+            return false;
 
         int bytesPerPixel;
         if (colorType == 2)
@@ -158,10 +240,10 @@ public static class PietParser
         else if (colorType == 6)
             bytesPerPixel = 4;
         else
-            return null;
+            return false;
 
         if (idatData.Count < 3)
-            return null;
+            return false;
 
         byte[] decompressed;
         try
@@ -175,7 +257,7 @@ public static class PietParser
         }
         catch
         {
-            return null;
+            return false;
         }
 
         var stride = width * bytesPerPixel;
@@ -186,11 +268,11 @@ public static class PietParser
         for (var y = 0; y < height; y++)
         {
             if (dataPos >= decompressed.Length)
-                return null;
+                return false;
 
             var filterType = decompressed[dataPos++];
             if (dataPos + stride > decompressed.Length)
-                return null;
+                return false;
 
             var row = new byte[stride];
             Array.Copy(decompressed, dataPos, row, 0, stride);
@@ -203,7 +285,7 @@ public static class PietParser
                 var pp = x * bytesPerPixel;
                 var colorIdx = MapToPietColor(row[pp], row[pp + 1], row[pp + 2]);
                 if (colorIdx < 0)
-                    return null;
+                    return false;
 
                 result[(y * width) + x] = (byte)colorIdx;
             }
@@ -211,13 +293,21 @@ public static class PietParser
             Array.Copy(row, prevRow, stride);
         }
 
-        return result;
+        bytes = result;
+        return true;
+    }
+
+    internal static byte[]? DecodePng(byte[] pngBytes, out int width, out int height)
+    {
+        if (TryDecodePng(pngBytes, out width, out height, out var bytes))
+            return bytes;
+        return null;
     }
 
     static int ReadInt32BE(byte[] data, int pos) =>
         (data[pos] << 24) | (data[pos + 1] << 16) | (data[pos + 2] << 8) | data[pos + 3];
 
-    static void ApplyPngFilter(int filterType, byte[] row, byte[] prevRow, int bpp)
+    internal static void ApplyPngFilter(int filterType, byte[] row, byte[] prevRow, int bpp)
     {
         switch (filterType)
         {

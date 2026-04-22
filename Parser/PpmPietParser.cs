@@ -1,4 +1,7 @@
 using System.Globalization;
+#if NETSTANDARD2_1_OR_GREATER
+using System.Diagnostics.CodeAnalysis;
+#endif
 
 namespace Esolang.Piet.Parser;
 
@@ -30,6 +33,32 @@ public static class PpmPietParser
         return InternalParse(stream, codelSize);
     }
     
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="bytes"></param>
+    /// <param name="codelSize"></param>
+    /// <param name="program"></param>
+    /// <returns></returns>
+    public static bool TryParse(byte[] bytes, int codelSize, 
+#if NETSTANDARD2_1_OR_GREATER
+    [NotNullWhen(true)]
+#endif
+    out PietProgram program)
+    {
+        program = default!;
+        if (codelSize < 1) return false;
+        if (bytes.Length <= 0) return false;
+        try
+        {
+            program = Parse(bytes, codelSize);
+            return true;
+        } catch
+        {
+            return false;
+        }
+    }
+
     static PietProgram InternalParse(Stream stream, int codelSize = 1)
     {
         using var reader = new StreamReader(stream);
