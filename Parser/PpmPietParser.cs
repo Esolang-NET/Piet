@@ -22,14 +22,15 @@ public static class PpmPietParser
     /// Loads a Piet program from a PPM (P3) text file given as byte array.
     /// </summary>
     /// <param name="bytes">The byte array containing the PPM (P3) file data.</param>
+    /// <param name="codelSize">The size of each codel in pixels.</param>
     /// <returns>A PietProgram instance representing the parsed PPM file.</returns>
-    public static PietProgram Parse(byte[] bytes)
+    public static PietProgram Parse(byte[] bytes, int codelSize = 1)
     {
         using var stream = new MemoryStream(bytes);
-        return InternalParse(stream);
+        return InternalParse(stream, codelSize);
     }
     
-    static PietProgram InternalParse(Stream stream)
+    static PietProgram InternalParse(Stream stream, int codelSize = 1)
     {
         using var reader = new StreamReader(stream);
         string? line;
@@ -73,6 +74,20 @@ public static class PpmPietParser
             if (colorIdx < 0) throw new InvalidDataException($"Unsupported color at pixel {i}: {r},{g},{b}");
             codels[i] = (PietColor)colorIdx;
         }
-        return new PietProgram(width, height, codels);
+
+        if (codelSize == 1)
+            return new PietProgram(width, height, codels);
+
+        int codelWidth = width / codelSize;
+        int codelHeight = height / codelSize;
+        var colors = new PietColor[codelWidth * codelHeight];
+        for (var y = 0; y < codelHeight; y++)
+        {
+            for (var x = 0; x < codelWidth; x++)
+            {
+                colors[(y * codelWidth) + x] = (PietColor)codels[y * codelSize * width + (x * codelSize)];
+            }
+        }
+        return new PietProgram(codelWidth, codelHeight, colors);
     }
 }

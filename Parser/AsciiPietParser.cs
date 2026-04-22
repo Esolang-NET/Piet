@@ -60,15 +60,16 @@ public static class AsciiPietParser
     /// The byte array is decoded as UTF-8 text.
     /// </summary>
     /// <param name="bytes"></param>
+    /// <param name="codelSize"></param>
     /// <returns></returns>
-    public static PietProgram Parse(byte[] bytes)
+    public static PietProgram Parse(byte[] bytes, int codelSize = 1)
     {
         var text = Encoding.UTF8.GetString(bytes);
         var lines = text.Replace("\r", "").Replace("\n", "");
         return InternalParse(lines);
     }
     
-    static PietProgram InternalParse(string lines)
+    static PietProgram InternalParse(string lines, int codelSize = 1)
     {
         if (lines.Length == 0)
             throw new InvalidDataException("ascii-piet file is empty");
@@ -96,6 +97,20 @@ public static class AsciiPietParser
         var width = lineList.Max(l => l.Count);
         var height = lineList.Count;
         var codels = lineList.SelectMany(line => line.Concat(Enumerable.Repeat(PietColor.Black, width - line.Count))).ToArray();
-        return new PietProgram(width, height, codels);
+        if (codelSize == 1)
+            return new PietProgram(width, height, codels);
+        {
+            var codelWidth = width / codelSize;
+            var codelHeight = height / codelSize;
+            var colors = new PietColor[codelWidth * codelHeight];
+            for (y = 0; y < codelHeight; y++)
+            {
+                for (x = 0; x < codelWidth; x++)
+                {
+                    colors[(y * codelWidth) + x] = (PietColor)codels[y * codelSize * width + (x * codelSize)];
+                }
+            }
+            return new PietProgram(codelWidth, codelHeight, colors);
+        }
     }
 }

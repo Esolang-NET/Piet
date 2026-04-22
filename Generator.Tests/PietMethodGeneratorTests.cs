@@ -76,6 +76,11 @@ public class MethodGeneratorTests
         0x00, 0x00, 0x00, 0x00,                          // CRC (placeholder)
     ];
 
+    static readonly byte[] MinimalLightRed2x2Png = BuildStoredRgbPng(2, 2, [
+        0x00, 0xFF,0xC0,0xC0, 0xFF,0xC0,0xC0,
+        0x00, 0xFF,0xC0,0xC0, 0xFF,0xC0,0xC0
+    ]);
+
     static string MakeTransformedText(string logicalPath, byte[] pngBytes) =>
         $"// PIET_IMAGE_PATH={logicalPath}\n// PIET_CODEL_SIZE=1\n{Convert.ToBase64String(pngBytes)}";
 
@@ -1519,12 +1524,12 @@ namespace Demo;
 
 public partial class Sample
 {
-    [Esolang.Piet.GeneratePietMethod("program.png", 3)]
+    [Esolang.Piet.GeneratePietMethod("program.png", codelSize: 2)]
     public static partial void Run();
 }
 """;
         // 追加ファイルにはCodelSize=1を埋め込む
-        var transformed = "// PIET_IMAGE_PATH=program.png\n// PIET_CODEL_SIZE=1\n" + Convert.ToBase64String(MinimalLightRedPng);
+        var transformed = "// PIET_IMAGE_PATH=program.png\n// PIET_CODEL_SIZE=1\n" + Convert.ToBase64String(MinimalLightRed2x2Png);
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
             out var outputCompilation,
@@ -1533,10 +1538,10 @@ public partial class Sample
         var runResult = driver.GetRunResult();
         Assert.IsEmpty(runResult.Diagnostics, 
             string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
-        // 生成コードにcodelSize=3が反映されているか（例: 配列長やコメント等で判定）
+        // 生成コードにcodelSize=2が反映されているか（例: 配列長やコメント等で判定）
         var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
         Assert.IsNotNull(generated, "Method not generated");
-        Assert.IsTrue(generated.Contains("codelSize: 3"), "codelSize=3 not reflected in generated code");
+        Assert.IsTrue(generated.Contains("codelSize: 2"), "codelSize=2 not reflected in generated code");
         Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
             string.Join("\n", diagnostics.Select(static x => x.ToString())));
         Assert.IsFalse(
@@ -1558,7 +1563,7 @@ public partial class Sample
     public static partial void Run();
 }
 """;
-        var transformed = "// PIET_IMAGE_PATH=program.png\n// PIET_CODEL_SIZE=2\n" + Convert.ToBase64String(MinimalLightRedPng);
+        var transformed = "// PIET_IMAGE_PATH=program.png\n// PIET_CODEL_SIZE=2\n" + Convert.ToBase64String(MinimalLightRed2x2Png);
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
             out var outputCompilation,

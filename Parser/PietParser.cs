@@ -22,40 +22,41 @@ public static class PietParser
     {
         if (ext == ".txt")
         {
-            if (codelSize != 1) throw new ArgumentException("ascii-piet形式はcodelSize=1のみ対応");
-            return AsciiPietParser.Parse(bytes);
+            return AsciiPietParser.Parse(bytes, codelSize);
         }
 
         if (ext == ".ppm")
         {
-            if (codelSize != 1) throw new ArgumentException("PPM形式はcodelSize=1のみ対応");
-            return PpmPietParser.Parse(bytes);
+            return PpmPietParser.Parse(bytes, codelSize);
         }
         
-        try
-        {
-            using var image = Image.Load<Rgba32>(bytes);
-            int codelWidth = image.Width / codelSize;
-            int codelHeight = image.Height / codelSize;
-            var colors = new PietColor[codelWidth * codelHeight];
-            for (var y = 0; y < codelHeight; y++)
+        if (ext == ".png") {
+            try
             {
-                for (var x = 0; x < codelWidth; x++)
+                using var image = Image.Load<Rgba32>(bytes);
+                int codelWidth = image.Width / codelSize;
+                int codelHeight = image.Height / codelSize;
+                var colors = new PietColor[codelWidth * codelHeight];
+                for (var y = 0; y < codelHeight; y++)
                 {
-                    // 左上ピクセルの色で代表とする（平均化したい場合はここを修正）
-                    colors[(y * codelWidth) + x] = Normalize(image[x * codelSize, y * codelSize]);
+                    for (var x = 0; x < codelWidth; x++)
+                    {
+                        // 左上ピクセルの色で代表とする（平均化したい場合はここを修正）
+                        colors[(y * codelWidth) + x] = Normalize(image[x * codelSize, y * codelSize]);
+                    }
                 }
+                return new PietProgram(codelWidth, codelHeight, colors);
             }
-            return new PietProgram(codelWidth, codelHeight, colors);
+            catch (InvalidImageContentException)
+            {
+                return ParseWithRawPngFallback(bytes, codelSize);
+            }
+            catch (UnknownImageFormatException)
+            {
+                return ParseWithRawPngFallback(bytes, codelSize);
+            }    
         }
-        catch (InvalidImageContentException)
-        {
-            return ParseWithRawPngFallback(bytes, codelSize);
-        }
-        catch (UnknownImageFormatException)
-        {
-            return ParseWithRawPngFallback(bytes, codelSize);
-        }    
+        throw new ArgumentException($"not supported image format: {ext}");
     }
 
     /// <summary>
@@ -83,7 +84,7 @@ public static class PietParser
         {
             for (var x = 0; x < codelWidth; x++)
             {
-                colors[(y * codelWidth) + x] = (PietColor)codels[(y * codelSize) * width + (x * codelSize)];
+                colors[(y * codelWidth) + x] = (PietColor)codels[y * codelSize * width + (x * codelSize)];
             }
         }
         return new PietProgram(codelWidth, codelHeight, colors);
