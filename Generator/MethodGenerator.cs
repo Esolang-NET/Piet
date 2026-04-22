@@ -421,7 +421,10 @@ public partial class MethodGenerator : IIncrementalGenerator
         code.AppendLine("{");
         // 使用データを表す属性
         code.Append("    ").Append('[').Append(NameSpaceName).Append('.').Append("GeneratedPietInfo").Append('(')
-            .Append("path: ").Append('"').Append(resolvedImageFile.Value.Path).Append('"').Append(", ")
+            .Append("path: ")
+                .Append(
+                    SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(resolvedImageFile.Value.Path))
+                ).Append(", ")
             .Append("height: ").Append(program.Height).Append(", ")
             .Append("width: ").Append(program.Width).Append(", ")
             .Append("codelSize: ").Append(codelSize)

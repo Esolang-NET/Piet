@@ -21,6 +21,12 @@
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Analyzer Include="..\..\Generator\bin\Debug\netstandard2.0\Esolang.Piet.Generator.dll" />
+    <Analyzer Include="..\..\Generator\bin\Debug\netstandard2.0\Esolang.Piet.Parser.dll" />
+    <Analyzer Include="..\..\Generator\bin\Debug\netstandard2.0\SixLabors.ImageSharp.dll" />
+  </ItemGroup>
+
   <!-- ProjectReference does not bring buildTransitive targets, so import local targets explicitly. -->
   <Import Project="..\..\Generator\buildTransitive\Esolang.Piet.Generator.targets"
           Condition="Exists('..\..\Generator\buildTransitive\Esolang.Piet.Generator.targets')" />

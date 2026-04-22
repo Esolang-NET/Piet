@@ -58,4 +58,10 @@
       <AdditionalFiles Include="%(_PietGeneratedFile.GeneratedPath)" />
     </ItemGroup>
   </Target>
+
+  <ItemGroup Condition="'$(MSBuildThisPackageRoot)' != ''">
+    <Analyzer Include="$(MSBuildThisPackageRoot)analyzers/dotnet/cs/Esolang.Piet.Generator.dll" />
+    <Analyzer Include="$(MSBuildThisPackageRoot)analyzers/dotnet/cs/Esolang.Piet.Parser.dll" />
+    <Analyzer Include="$(MSBuildThisPackageRoot)analyzers/dotnet/cs/SixLabors.ImageSharp.dll" />
+  </ItemGroup>
 </Project>

@@ -11,11 +11,11 @@
 
     <!-- NuGet配布用の設定 -->
     <IncludeBuildOutput>false</IncludeBuildOutput>
-    <DevelopmentDependency>true</DevelopmentDependency>
     <IncludeSymbols>false</IncludeSymbols>
-    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <Description>Source generator for Piet programs.</Description>
     <PackageId>Esolang.Piet.Generator</PackageId>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <DevelopmentDependency>true</DevelopmentDependency>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,11 +30,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Parser\Esolang.Piet.Parser.csproj" />
+    <ProjectReference Include="..\Parser\Esolang.Piet.Parser.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" GeneratePathProperty="true" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(OutputPath)\Esolang.Piet.Parser.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(PkgSixLabors_ImageSharp)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- See https://github.com/dotnet/roslyn-sdk/blob/0313c80ed950ac4f4eef11bb2e1c6d1009b328c4/samples/CSharp/SourceGenerators/SourceGeneratorSamples/SourceGeneratorSamples.csproj#L13-L30
@@ -43,4 +49,20 @@
       <GetTargetPathDependsOn>$(GetTargetPathDependsOn)</GetTargetPathDependsOn>
     </PropertyGroup>
 
+  <Target Name="CopyAnalyzerDependencies" AfterTargets="Build">
+    <ItemGroup>
+      <AnalyzerDependency Include="@(ReferenceCopyLocalPaths)" />
+    </ItemGroup>
+
+    <Copy
+      SourceFiles="@(AnalyzerDependency)"
+      DestinationFolder="$(OutputPath)"
+      SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="DebugImageSharpPath" AfterTargets="Build">
+    <Message Text="PkgSixLabors_ImageSharp path: $(PkgSixLabors_ImageSharp)" Importance="High" />
+    <Message Text="ImageSharp netstandard2.0 DLL: $(PkgSixLabors_ImageSharp)\lib\netstandard2.0\SixLabors.ImageSharp.dll" Importance="High" />
+    <Message Text="OutputPath: $(OutputPath)" Importance="High" />
+  </Target>
 </Project>
