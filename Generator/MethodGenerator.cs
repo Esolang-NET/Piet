@@ -183,7 +183,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                     : LanguageVersion.Default);
 
         var projectDirrectory = context.AnalyzerConfigOptionsProvider
-            .Select(static (provider, _) => {
+            .Select(static (provider, _) =>
+            {
                 return provider.GlobalOptions.TryGetValue("build_property.MSBuildProjectDirectory", out var projectDirectory)
                 || provider.GlobalOptions.TryGetValue("build_property.ProjectDir", out projectDirectory)
                 ? projectDirectory : null;
@@ -253,13 +254,13 @@ public partial class MethodGenerator : IIncrementalGenerator
                 methodSymbol.Name));
             return null;
         }
-        if (TryResolveImagePath(imagePath, additionalImageFiles) is not {} resolvedImageFile)
+        if (TryResolveImagePath(imagePath, additionalImageFiles) is not { } resolvedImageFile)
         {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.ImageFileNotFound,
-                    methodSyntax.Identifier.GetLocation(),
-                    imagePath));
-                return null;
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.ImageFileNotFound,
+                methodSyntax.Identifier.GetLocation(),
+                imagePath));
+            return null;
         }
 
         if (!HasSupportedImageFormat(resolvedImageFile))
@@ -404,7 +405,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 DiagnosticDescriptors.UnusedInputInterface,
                 methodSyntax.Identifier.GetLocation()));
         }
-        
+
         var containingTypeName = methodSymbol.ContainingType.Name;
         var staticModifier = methodSymbol.IsStatic ? " static" : string.Empty;
         var asyncModifier = executionBinding.ReturnKind == ReturnKind.AsyncEnumerableByte ? " async" : string.Empty;
@@ -426,7 +427,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             code.Append("namespace ").Append(ns).AppendLine(" {");
             code.AppendLine();
         }
-        
+
         code.Append("partial ").Append(typeKeyword).Append(' ').Append(containingTypeName).AppendLine();
         code.AppendLine("{");
         var path_ = string.IsNullOrEmpty(projectDirectory) ? resolvedImageFile.Path : MakeRelativePath(projectDirectory!, resolvedImageFile.Path);
@@ -778,7 +779,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             else
                 throw new Exception($" not support mime-type is {contentType}");
 
-            foreach(var text in headers.Skip(1))
+            foreach (var text in headers.Skip(1))
             {
                 var text_ = text.Trim().ToLowerInvariant();
                 if (text_ == "base64")
@@ -798,13 +799,13 @@ public partial class MethodGenerator : IIncrementalGenerator
             }
             if (isBase64)
             {
-                return new AdditionalImageFile(imagePath, text: body, codelSize: codelSize, transformedOriginalPath:ext);
+                return new AdditionalImageFile(imagePath, text: body, codelSize: codelSize, transformedOriginalPath: ext);
             }
 
             // Data URIスキームは直接扱う
             return new AdditionalImageFile(imagePath, text: Convert.ToBase64String(Encoding.UTF8.GetBytes(body)), codelSize, transformedOriginalPath: ext);
         }
-        
+
         if (additionalImageFiles.IsDefaultOrEmpty)
         {
             return null;
@@ -831,7 +832,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 return additionalImageFile;
             }
 
-            if (!string.IsNullOrEmpty(additionalImageFile.TransformedOriginalPath) && additionalImageFile is { TransformedOriginalPath: { } transformedImagePath } 
+            if (!string.IsNullOrEmpty(additionalImageFile.TransformedOriginalPath) && additionalImageFile is { TransformedOriginalPath: { } transformedImagePath }
                 && IsMatchingPath(normalizedImagePath, transformedImagePath))
             {
                 return additionalImageFile;

@@ -20,7 +20,7 @@ public static class PietParser
     /// <param name="codelSize"></param>
     /// <param name="program"></param>
     /// <returns></returns>
-    public static bool TryParse(byte[] bytes, string ext, int codelSize, 
+    public static bool TryParse(byte[] bytes, string ext, int codelSize,
 #if NETSTANDARD2_1_OR_GREATER
     [NotNullWhen(true)]
 #endif
@@ -59,8 +59,9 @@ public static class PietParser
         {
             return PpmPietParser.Parse(bytes, codelSize);
         }
-        
-        if (ext == ".png") {
+
+        if (ext == ".png")
+        {
             try
             {
                 using var image = Image.Load<Rgba32>(bytes);
@@ -84,7 +85,7 @@ public static class PietParser
             catch (UnknownImageFormatException)
             {
                 return ParseWithRawPngFallback(bytes, codelSize);
-            }    
+            }
         }
         if (ext == ".gif")
         {
@@ -106,7 +107,7 @@ public static class PietParser
         throw new ArgumentException($"not supported image format: {ext}");
     }
 
-    static bool TryParsePng(byte[] bytes, int codelSize, 
+    static bool TryParsePng(byte[] bytes, int codelSize,
 #if NETSTANDARD2_1_OR_GREATER
     [NotNullWhen(true)]
 #endif
@@ -115,7 +116,8 @@ public static class PietParser
         program = default!;
         if (bytes.Length <= 0) return false;
         if (codelSize < 1) return false;
-        try {
+        try
+        {
             using var image = Image.Load<Rgba32>(bytes);
             int codelWidth = image.Width / codelSize;
             int codelHeight = image.Height / codelSize;
@@ -130,7 +132,8 @@ public static class PietParser
             }
             program = new(codelWidth, codelHeight, colors);
             return true;
-        } catch
+        }
+        catch
         {
             return false;
         }
@@ -147,8 +150,8 @@ public static class PietParser
         var ext = Path.GetExtension(path).ToLowerInvariant();
         return Parse(bytes, ext, codelSize);
     }
-    
-    static bool TryParseFallbackPng(byte[] pngBytes, int codelSize, 
+
+    static bool TryParseFallbackPng(byte[] pngBytes, int codelSize,
 #if NETSTANDARD2_1_OR_GREATER
     [NotNullWhen(true)]
 #endif
@@ -157,14 +160,14 @@ public static class PietParser
         program = default!;
         if (!TryDecodePng(pngBytes: pngBytes, out var width, out var height, out var codels))
             return false;
-        
+
         program = InternalParseWithRawPngFallback(codels, width, height, codelSize);
         return true;
     }
 
     static PietProgram ParseWithRawPngFallback(byte[] pngBytes, int codelSize = 1)
     {
-        if(!TryDecodePng(pngBytes, out var width, out var height, out var codels))
+        if (!TryDecodePng(pngBytes, out var width, out var height, out var codels))
             throw new InvalidImageContentException("Failed to parse Piet PNG image.");
 
         return InternalParseWithRawPngFallback(codels, width, height, codelSize);

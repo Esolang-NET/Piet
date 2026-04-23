@@ -149,7 +149,7 @@ public sealed class PietParserTests
     public void TryDecodePng_ReturnsNullForInvalidSignatureAndUnsupportedColorType()
     {
         var invalidSig = new byte[] { 0x00, 0x11, 0x22 };
-        var decoded = PietParser.DecodePng(invalidSig, out _, out _ );
+        var decoded = PietParser.DecodePng(invalidSig, out _, out _);
         Assert.IsNull(decoded);
 
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
@@ -163,7 +163,7 @@ public sealed class PietParserTests
 
             var bytes = File.ReadAllBytes(path);
             bytes[25] = 3;
-            decoded = PietParser.DecodePng(bytes, out _, out _ );
+            decoded = PietParser.DecodePng(bytes, out _, out _);
             Assert.IsNull(decoded);
         }
         finally

@@ -23,13 +23,15 @@ rootCommand.SetAction(parseResult =>
     var program = PietParser.Parse(path!, codelSize);
     var originalOutput = Console.Out;
     var originalInput = Console.In;
-    try {
+    try
+    {
         var output = originalOutput;
         var input = originalInput;
         var processor = new PietProcessor(program, output, input);
         processor.Run();
         return 0;
-    } finally
+    }
+    finally
     {
         Console.SetOut(originalOutput);
         Console.SetIn(originalInput);

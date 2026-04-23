@@ -1517,7 +1517,7 @@ public class MethodGeneratorTests
     public void Generator_WithCodelSizeAttribute_OverridesAdditionalFile()
     {
         // 追加ファイルはPIET_CODEL_SIZE=1だが、属性で3を指定した場合は3が優先される
-        const string source = 
+        const string source =
 """
 namespace Demo;
 
@@ -1535,7 +1535,7 @@ public partial class Sample
             out var diagnostics,
             new TestAdditionalText("obj/program.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
-        Assert.IsEmpty(runResult.Diagnostics, 
+        Assert.IsEmpty(runResult.Diagnostics,
             string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
         // 生成コードにcodelSize=2が反映されているか（例: 配列長やコメント等で判定）
         var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
@@ -1552,7 +1552,7 @@ public partial class Sample
     public void Generator_WithCodelSizeFromAdditionalFile_UsedWhenNoAttribute()
     {
         // 属性でcodelSize指定なし、追加ファイルPIET_CODEL_SIZE=2の場合は2が使われる
-        const string source = 
+        const string source =
 """
 namespace Demo;
 
@@ -1585,7 +1585,7 @@ public partial class Sample
     public void Generator_WithInlineAsciiPiet_UsedAttribute()
     {
         // 属性でcodelSize指定なし、追加ファイルPIET_CODEL_SIZE=2の場合は2が使われる
-        const string source = 
+        const string source =
 """
 namespace Demo;
 

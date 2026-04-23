@@ -32,7 +32,7 @@ public static class PpmPietParser
         using var stream = new MemoryStream(bytes);
         return InternalParse(stream, codelSize);
     }
-    
+
     /// <summary>
     /// 
     /// </summary>
@@ -40,7 +40,7 @@ public static class PpmPietParser
     /// <param name="codelSize"></param>
     /// <param name="program"></param>
     /// <returns></returns>
-    public static bool TryParse(byte[] bytes, int codelSize, 
+    public static bool TryParse(byte[] bytes, int codelSize,
 #if NETSTANDARD2_1_OR_GREATER
     [NotNullWhen(true)]
 #endif
@@ -53,7 +53,8 @@ public static class PpmPietParser
         {
             program = Parse(bytes, codelSize);
             return true;
-        } catch
+        }
+        catch
         {
             return false;
         }

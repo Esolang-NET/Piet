@@ -118,7 +118,7 @@ partial class PietSample
 
     [GeneratePietMethod("dot.gif", codelSize: 1)]
     public static partial void RunDotGif();
-    
+
     [GeneratePietMethod("dot-codel-11.gif", codelSize: 11)]
     public static partial void RunDotCodel11Gif();
 

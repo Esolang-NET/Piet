@@ -91,7 +91,7 @@ public static class AsciiPietParser
             return false;
         }
     }
-    
+
     static PietProgram InternalParse(string lines, int codelSize = 1)
     {
         if (codelSize < 1)
