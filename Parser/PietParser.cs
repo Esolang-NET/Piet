@@ -86,13 +86,30 @@ public static class PietParser
                 return ParseWithRawPngFallback(bytes, codelSize);
             }    
         }
+        if (ext == ".gif")
+        {
+            using var image = Image.Load<Rgba32>(bytes);
+            int codelWidth = image.Width / codelSize;
+            int codelHeight = image.Height / codelSize;
+            var colors = new PietColor[codelWidth * codelHeight];
+            for (var y = 0; y < codelHeight; y++)
+            {
+                for (var x = 0; x < codelWidth; x++)
+                {
+                    // 左上ピクセルの色で代表とする（平均化したい場合はここを修正）
+                    colors[(y * codelWidth) + x] = Normalize(image[x * codelSize, y * codelSize]);
+                }
+            }
+            return new PietProgram(codelWidth, codelHeight, colors);
+        }
+
         throw new ArgumentException($"not supported image format: {ext}");
     }
 
     static bool TryParsePng(byte[] bytes, int codelSize, 
-    #if NETSTANDARD2_1_OR_GREATER
+#if NETSTANDARD2_1_OR_GREATER
     [NotNullWhen(true)]
-    #endif
+#endif
     out PietProgram program)
     {
         program = default!;
