@@ -65,6 +65,11 @@ var textWriterOutput = new StringWriter();
 PietSample.RunWithTextWriter(textWriterOutput);
 Console.WriteLine($"RunWithTextWriter: {textWriterOutput}");
 
+PietSample.RunDotGif();
+PietSample.RunDotCodel11Gif();
+
+Console.WriteLine($"{nameof(PietSample.RunHw111Gif)}:{PietSample.RunHw111Gif(string.Empty)}");
+
 partial class PietSample
 {
     [GeneratePietMethod("ascii-piet-sample.txt")]
