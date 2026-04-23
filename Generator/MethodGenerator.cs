@@ -181,13 +181,18 @@ public partial class MethodGenerator : IIncrementalGenerator
                 parseOptions is CSharpParseOptions csharpParseOptions
                     ? csharpParseOptions.LanguageVersion
                     : LanguageVersion.Default);
-        var generationInputs = generatedTargets.Combine(additionalFiles).Combine(languageVersion);
+
+        var projectDirrectory = context.AnalyzerConfigOptionsProvider
+            .Select(static (provider, _) => {
+                return provider.GlobalOptions.TryGetValue("build_property.MSBuildProjectDirectory", out var projectDirectory)
+                || provider.GlobalOptions.TryGetValue("build_property.ProjectDir", out projectDirectory)
+                ? projectDirectory : null;
+            });
+        var generationInputs = generatedTargets.Combine(additionalFiles).Combine(languageVersion).Combine(projectDirrectory);
 
         context.RegisterSourceOutput(generationInputs, static (context, input) =>
         {
-            var sources = input.Left.Left;
-            var imagePaths = input.Left.Right;
-            var currentLanguageVersion = input.Right;
+            (((ImmutableArray<GeneratorAttributeSyntaxContext> sources, ImmutableArray<AdditionalImageFile> imagePaths), LanguageVersion currentLanguageVersion), string? projectDir) = input;
 
             if (sources.IsDefaultOrEmpty)
             {
@@ -199,7 +204,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
             foreach (var source in sources)
             {
-                var emitted = Emit(context, source, imagePaths, currentLanguageVersion);
+                var emitted = Emit(context, source, imagePaths, currentLanguageVersion, projectDir);
                 if (!emitted.HasValue)
                 {
                     continue;
@@ -223,7 +228,8 @@ public partial class MethodGenerator : IIncrementalGenerator
         SourceProductionContext context,
         GeneratorAttributeSyntaxContext source,
         ImmutableArray<AdditionalImageFile> additionalImageFiles,
-        LanguageVersion currentLanguageVersion)
+        LanguageVersion currentLanguageVersion,
+        string? projectDirectory)
     {
         if (source.TargetSymbol is not IMethodSymbol methodSymbol || source.TargetNode is not MethodDeclarationSyntax methodSyntax)
         {
@@ -423,12 +429,11 @@ public partial class MethodGenerator : IIncrementalGenerator
         
         code.Append("partial ").Append(typeKeyword).Append(' ').Append(containingTypeName).AppendLine();
         code.AppendLine("{");
+        var path_ = string.IsNullOrEmpty(projectDirectory) ? resolvedImageFile.Path : MakeRelativePath(projectDirectory!, resolvedImageFile.Path);
+        var path = SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(path_));
         // 使用データを表す属性
         code.Append("    ").Append('[').Append(NameSpaceName).Append('.').Append("GeneratedPietInfo").Append('(')
-            .Append("path: ")
-                .Append(
-                    SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(resolvedImageFile.Path))
-                ).Append(", ")
+            .Append("path: ").Append(path).Append(", ")
             .Append("height: ").Append(program.Height).Append(", ")
             .Append("width: ").Append(program.Width).Append(", ")
             .Append("codelSize: ").Append(codelSize)
@@ -557,6 +562,16 @@ public partial class MethodGenerator : IIncrementalGenerator
         }
 
         return new EmittedMethod(code.ToString());
+    }
+
+    static string MakeRelativePath(string baseDir, string fullPath)
+    {
+        var baseUri = new Uri(baseDir.EndsWith(Path.DirectorySeparatorChar.ToString())
+            ? baseDir
+            : baseDir + Path.DirectorySeparatorChar);
+
+        var fullUri = new Uri(fullPath);
+        return Uri.UnescapeDataString(baseUri.MakeRelativeUri(fullUri).ToString());
     }
 
     static string GetAccessibility(Accessibility accessibility) => accessibility switch
