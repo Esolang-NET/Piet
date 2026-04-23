@@ -37,6 +37,9 @@
     <PietImage Include="samples\input-output.png" PietLogicalPath="input-output.png" />
     <PietImage Include="samples\ascii-piet-sample.txt" PietLogicalPath="ascii-piet-sample.txt" />
     <PietImage Include="samples\ppm-sample.ppm" PietLogicalPath="ppm-sample.ppm" />
+    <PietImage Include="samples\dot.gif" />
+    <PietImage Include="samples\dot-codel-11.gif" />
+    <PietImage Include="samples\hw1-11.gif" />
   </ItemGroup>
 
 </Project>

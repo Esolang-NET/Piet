@@ -110,4 +110,13 @@ partial class PietSample
 
     [GeneratePietMethod("hello-world.png")]
     public static partial void RunWithTextWriter(TextWriter output);
+
+    [GeneratePietMethod("dot.gif", codelSize: 1)]
+    public static partial void RunDotGif();
+    
+    [GeneratePietMethod("dot-codel-11.gif", codelSize: 11)]
+    public static partial void RunDotCodel11Gif();
+
+    [GeneratePietMethod("hw1-11.gif", codelSize: 11)]
+    public static partial string RunHw111Gif(string input);
 }
