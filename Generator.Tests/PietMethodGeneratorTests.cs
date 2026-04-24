@@ -1611,4 +1611,148 @@ public partial class Sample
             outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
             "Compilation contains errors after running generator.");
     }
+
+    [TestMethod]
+    public void Generator_WithInvalidImagePath_GeneratesThrowingMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("")]
+                public partial void Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(source, out _, out _);
+        var runResult = driver.GetRunResult();
+
+        // PT0001 が出る
+        var generatorDiagnostics = runResult.Results.SelectMany(r => r.Diagnostics).ToImmutableArray();
+        Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0001"));
+
+        // 生成コードに throw が含まれる
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(tree =>
+                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0001")),
+            "Expected throw for PT0001 was not generated.");
+    }
+
+    [TestMethod]
+    public void Generator_WithMissingImageFile_GeneratesThrowingMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("missing.png")]
+                public partial void Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(source, out _, out _);
+        var runResult = driver.GetRunResult();
+
+        var generatorDiagnostics = runResult.Results.SelectMany(r => r.Diagnostics).ToImmutableArray();
+        Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0005"));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(tree =>
+                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0005")),
+            "Expected throw for PT0005 was not generated.");
+    }
+
+    [TestMethod]
+    public void Generator_WithInvalidImageFormat_GeneratesThrowingMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("invalid.png")]
+                public partial void Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("invalid.png", null));
+
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0006"));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(tree =>
+                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0006")),
+            "Expected throw for PT0006 was not generated.");
+    }
+
+    [TestMethod]
+    public void Generator_WithOutputImage_AndNoOutputMechanism_GeneratesThrowingMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("output.png")]
+                public partial void Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/output.png.piet.txt",
+                MakeTransformedText("output.png", TwoPixelOutputPng)));
+
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0007"));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(tree =>
+                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0007")),
+            "Expected throw for PT0007 was not generated.");
+    }
+
+    [TestMethod]
+    public void Generator_WithInputImage_AndNoInputMechanism_GeneratesThrowingMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("input.png")]
+                public partial void Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/input.png.piet.txt",
+                MakeTransformedText("input.png", TwoPixelInputPng)));
+
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0008"));
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(tree =>
+                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0008")),
+            "Expected throw for PT0008 was not generated.");
+    }
 }
