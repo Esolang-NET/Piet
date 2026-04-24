@@ -78,29 +78,29 @@ public sealed class PietProcessor(PietProgram program, TextWriter? output = null
 
         while (true)
         {
-            var blockColor = (byte)codels[(cy * width) + cx];
-            var blockCells = FloodFill(codels, width, height, cx, cy);
+            var blockColor = (byte)Program[cx,cy];
+            var blockCells = FloodFill(Program.Codels, width, height, cx, cy);
             var moved = false;
 
             for (var attempt = 0; attempt < 8; attempt++)
             {
-                var edge = FindEdge(blockCells, dp, cc);
-                var nx = edge.x + DpDx(dp);
-                var ny = edge.y + DpDy(dp);
+                var (x, y) = FindEdge(blockCells, dp, cc);
+                var nx = x + DpDx(dp);
+                var ny = y + DpDy(dp);
 
                 if (nx < 0 || nx >= width || ny < 0 || ny >= height
-                    || (byte)codels[(ny * width) + nx] == black)
+                    || Program[nx, ny] == black)
                 {
                     ApplyRetry(attempt, ref dp, ref cc);
                     continue;
                 }
 
-                var nextColor = (byte)codels[(ny * width) + nx];
+                var nextColor = (byte)Program[nx, ny];
                 if (nextColor == white)
                 {
                     var wx = nx;
                     var wy = ny;
-                    if (SlideWhite(codels, width, height, ref wx, ref wy, dp))
+                    if (SlideWhite(Program.Codels, width, height, ref wx, ref wy, dp))
                     {
                         cx = wx;
                         cy = wy;
