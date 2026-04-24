@@ -458,7 +458,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         var extension = GetExtension(resolvedImageFile.TransformedOriginalPath ?? resolvedImageFile.Path);
         byte[]? codels = null;
         int imageWidth = 0, imageHeight = 0;
-        var bytes = ExtractPngBytes(resolvedImageFile);
+        var bytes = ExtractBytes(resolvedImageFile);
         if (bytes is null)
         {
             context.ReportDiagnostic(Diagnostic.Create(
@@ -718,6 +718,29 @@ public partial class MethodGenerator : IIncrementalGenerator
         }
 
         return (new EmittedMethod(code.ToString()), executionBinding.RuntimeType);
+    }
+
+    static byte[]? ExtractBytes(AdditionalImageFile file)
+    {
+        if (!file.IsReadable || file.Text is null)
+            return null;
+
+        if (string.IsNullOrEmpty(file.TransformedOriginalPath))
+            return null;
+
+        var payload = file.Text!
+            .Replace("\r", string.Empty)
+            .Replace("\n", string.Empty)
+            .Trim();
+
+        try
+        {
+            return Convert.FromBase64String(payload);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 
     static string MakeRelativePath(string baseDir, string fullPath)
