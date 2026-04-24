@@ -588,7 +588,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             code.Append("namespace ").Append(ns).AppendLine(" {");
             code.AppendLine();
         }
-        
+
         code.Append("partial ").Append(typeKeyword).Append(' ').Append(containingTypeName).AppendLine();
         code.AppendLine("{");
         // 使用データを表す属性
@@ -1221,7 +1221,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         if (additionalImageFile is not null || codelSize is not null || program is not null)
         {
-             // 使用データを表す属性
+            // 使用データを表す属性
             sb.Append("    ");
             AddGeneratedPietInfo(additionalImageFile, codelSize, program, projectDirectory, sb);
         }
