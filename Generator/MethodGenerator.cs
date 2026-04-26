@@ -333,26 +333,6 @@ public partial class MethodGenerator : IIncrementalGenerator
             }
         }
 
-        if (!HasSupportedImageFormat(resolvedImageFile))
-        {
-            context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.InvalidImageFormat,
-                methodSyntax.Identifier.GetLocation(),
-                imagePath));
-            return EmitErrorMethod(
-                methodSymbol,
-                methodSyntax,
-                ns,
-                typeKeyword,
-                resolvedImageFile,
-                projectDirectory,
-                codelSize,
-                null,
-                DiagnosticDescriptors.InvalidImageFormat.Id,
-                $"The image file {imagePath} has an unsupported format or is not readable"
-            );
-        }
-
         if (methodSymbol.TypeParameters.Length > 0)
         {
             context.ReportDiagnostic(Diagnostic.Create(
@@ -1019,31 +999,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         return null;
     }
-
-    static bool HasSupportedImageFormat(AdditionalImageFile resolvedImageFile)
-    {
-        var extension = GetExtension(resolvedImageFile.TransformedOriginalPath ?? resolvedImageFile.Path);
-        if (string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase))
-            return resolvedImageFile.IsReadable;
-        if (string.Equals(extension, ".gif", StringComparison.OrdinalIgnoreCase))
-            return resolvedImageFile.IsReadable;
-        if (string.Equals(extension, ".ppm", StringComparison.OrdinalIgnoreCase))
-            return resolvedImageFile.IsReadable;
-        if (string.Equals(extension, ".txt", StringComparison.OrdinalIgnoreCase))
-            return resolvedImageFile.IsReadable && IsAsciiPietText(resolvedImageFile.Text);
-        return false;
-    }
-
-    // ascii-piet 仕様の簡易判定
-    static bool IsAsciiPietText(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return false;
-        const string asciiPietChars = "WKRBGYMCwkrbgyml.\n\r";
-        foreach (var c in text!)
-            if (asciiPietChars.IndexOf(c) >= 0) return true;
-        return false;
-    }
-
+    
     static bool TryGetCodelSize(string text, out int codelSize)
     {
         codelSize = 0;
