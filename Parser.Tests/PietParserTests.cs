@@ -224,7 +224,7 @@ public sealed class PietParserTests
     public void TryParse_PngImageSharp_Works()
     {
         using var img = new Image<Rgba32>(1, 1);
-        img[0,0] = new Rgba32(255,0,0);
+        img[0, 0] = new Rgba32(255, 0, 0);
         using var ms = new MemoryStream();
         img.SaveAsPng(ms);
 
@@ -238,7 +238,7 @@ public sealed class PietParserTests
     public void TryParse_PngFallback_Works()
     {
         using var img = new Image<Rgba32>(1, 1);
-        img[0,0] = new Rgba32(255,255,255);
+        img[0, 0] = new Rgba32(255, 255, 255);
         using var ms = new MemoryStream();
         img.SaveAsPng(ms);
 
@@ -272,7 +272,7 @@ public sealed class PietParserTests
     public void TryParse_UnsupportedColor_ReturnsFalse()
     {
         using var img = new Image<Rgba32>(1, 1);
-        img[0,0] = new Rgba32(0x12,0x34,0x56);
+        img[0, 0] = new Rgba32(0x12, 0x34, 0x56);
         using var ms = new MemoryStream();
         img.SaveAsPng(ms);
 

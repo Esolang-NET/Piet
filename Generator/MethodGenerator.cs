@@ -999,7 +999,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         return null;
     }
-    
+
     static bool TryGetCodelSize(string text, out int codelSize)
     {
         codelSize = 0;

@@ -52,7 +52,8 @@ public static class PietParser
             return AsciiPietParser.Parse(bytes, codelSize);
         if (AsciiPietParser.LooksLikeAsciiPiet(bytes) && AsciiPietParser.TryParse(bytes, codelSize, out var program))
             return program;
-        try {
+        try
+        {
             using var image = Image.Load<Rgba32>(bytes);
             int codelWidth = image.Width / codelSize;
             int codelHeight = image.Height / codelSize;
@@ -66,7 +67,8 @@ public static class PietParser
                 }
             }
             return new PietProgram(codelWidth, codelHeight, colors);
-        } catch (Exception e) when (ext == ".png" && (e is InvalidImageContentException || e is UnknownImageFormatException))
+        }
+        catch (Exception e) when (ext == ".png" && (e is InvalidImageContentException || e is UnknownImageFormatException))
         {
             // PNG形式であっても、ImageSharpが対応していない特殊なPNGの場合があるため、独自のPNGデコードを試みる
             return ParseWithRawPngFallback(bytes, codelSize);

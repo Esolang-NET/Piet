@@ -78,7 +78,7 @@ public sealed class PietProcessor(PietProgram program, TextWriter? output = null
 
         while (true)
         {
-            var blockColor = (byte)Program[cx,cy];
+            var blockColor = (byte)Program[cx, cy];
             var blockCells = FloodFill(Program.Codels, width, height, cx, cy);
             var moved = false;
 

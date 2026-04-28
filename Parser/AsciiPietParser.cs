@@ -85,7 +85,7 @@ public static class AsciiPietParser
     public static PietProgram Parse(byte[] bytes, int codelSize = 1)
     {
         var text = Encoding.ASCII.GetString(bytes);
-            var lines = text.Replace("\r", "").Replace("\n", "");
+        var lines = text.Replace("\r", "").Replace("\n", "");
         if (codelSize < 1)
             throw new ArgumentOutOfRangeException(nameof(codelSize), "codelSize is support 1 or over.");
         if (lines.Length == 0)
