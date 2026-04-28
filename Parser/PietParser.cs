@@ -26,16 +26,14 @@ public static class PietParser
 #endif
     out PietProgram program)
     {
-        program = default!;
-        if (ext == ".txt")
+        if (ext == ".txt" || ext == ".ascii-piet")
             return AsciiPietParser.TryParse(bytes, codelSize, out program);
-        if (ext == ".ppm")
-            return PpmPietParser.TryParse(bytes, codelSize, out program);
-        if (ext == ".png")
-            return TryParsePng(bytes, codelSize, out program)
-             || TryParseFallbackPng(bytes, codelSize, out program);
-        if (ext == ".gif")
-            return TryParsePng(bytes, codelSize, out program);
+        if (AsciiPietParser.LooksLikeAsciiPiet(bytes) && AsciiPietParser.TryParse(bytes, codelSize, out program))
+            return true;
+        if (TryParseInternal(bytes, codelSize, out program))
+            return true;
+        if (ext == ".png" && TryParseFallbackPng(bytes, codelSize, out program))
+            return true;
         return false;
 
     }
@@ -50,45 +48,11 @@ public static class PietParser
     /// <exception cref="ArgumentException"></exception>
     public static PietProgram Parse(byte[] bytes, string ext, int codelSize = 1)
     {
-        if (ext == ".txt")
-        {
+        if (ext == ".txt" || ext == ".ascii-piet")
             return AsciiPietParser.Parse(bytes, codelSize);
-        }
-
-        if (ext == ".ppm")
-        {
-            return PpmPietParser.Parse(bytes, codelSize);
-        }
-
-        if (ext == ".png")
-        {
-            try
-            {
-                using var image = Image.Load<Rgba32>(bytes);
-                int codelWidth = image.Width / codelSize;
-                int codelHeight = image.Height / codelSize;
-                var colors = new PietColor[codelWidth * codelHeight];
-                for (var y = 0; y < codelHeight; y++)
-                {
-                    for (var x = 0; x < codelWidth; x++)
-                    {
-                        // 左上ピクセルの色で代表とする（平均化したい場合はここを修正）
-                        colors[(y * codelWidth) + x] = Normalize(image[x * codelSize, y * codelSize]);
-                    }
-                }
-                return new PietProgram(codelWidth, codelHeight, colors);
-            }
-            catch (InvalidImageContentException)
-            {
-                return ParseWithRawPngFallback(bytes, codelSize);
-            }
-            catch (UnknownImageFormatException)
-            {
-                return ParseWithRawPngFallback(bytes, codelSize);
-            }
-        }
-        if (ext == ".gif")
-        {
+        if (AsciiPietParser.LooksLikeAsciiPiet(bytes) && AsciiPietParser.TryParse(bytes, codelSize, out var program))
+            return program;
+        try {
             using var image = Image.Load<Rgba32>(bytes);
             int codelWidth = image.Width / codelSize;
             int codelHeight = image.Height / codelSize;
@@ -102,12 +66,16 @@ public static class PietParser
                 }
             }
             return new PietProgram(codelWidth, codelHeight, colors);
+        } catch (Exception e) when (ext == ".png" && (e is InvalidImageContentException || e is UnknownImageFormatException))
+        {
+            // PNG形式であっても、ImageSharpが対応していない特殊なPNGの場合があるため、独自のPNGデコードを試みる
+            return ParseWithRawPngFallback(bytes, codelSize);
         }
 
         throw new ArgumentException($"not supported image format: {ext}");
     }
 
-    static bool TryParsePng(byte[] bytes, int codelSize,
+    internal static bool TryParseInternal(byte[] bytes, int codelSize,
 #if NETSTANDARD2_1_OR_GREATER
     [NotNullWhen(true)]
 #endif

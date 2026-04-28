@@ -56,26 +56,47 @@ public static class AsciiPietParser
     };
 
     /// <summary>
-    /// Loads a Piet program from an ascii-piet text file represented as a byte array.
-    /// The byte array is decoded as UTF-8 text.
+    /// A set of characters usable in ASCII-PIET files, based on the official ASCII-PIET specification.
+    /// </summary>
+    static readonly HashSet<byte> AsciiPietAllowed = [.. CharToColor.Keys.Select(c => (byte)c).Concat(new byte[] { (byte)'\t', (byte)'\r', (byte)'\n' })];
+
+    /// <summary>
+    /// Determines whether the given byte array appears to be an ascii-piet text file.
     /// </summary>
     /// <param name="bytes"></param>
-    /// <param name="codelSize"></param>
     /// <returns></returns>
-    public static PietProgram Parse(byte[] bytes, int codelSize = 1)
+    public static bool LooksLikeAsciiPiet(byte[] bytes)
     {
-        var text = Encoding.UTF8.GetString(bytes);
-        var lines = text.Replace("\r", "").Replace("\n", "");
-        return InternalParse(lines);
+        foreach (var b in bytes)
+        {
+            if (!AsciiPietAllowed.Contains(b))
+                return false;
+        }
+        return true;
     }
 
     /// <summary>
-    /// 
+    /// Loads a Piet program from an ascii-piet text file represented as a byte array.
+    /// The byte array is decoded as ASCII text.
     /// </summary>
-    /// <param name="bytes"></param>
-    /// <param name="codelSize"></param>
-    /// <param name="program"></param>
-    /// <returns></returns>
+    /// <param name="bytes">The byte array containing the ASCII-PIET text.</param>
+    /// <param name="codelSize">The size of each codel in pixels.</param>
+    /// <returns>A PietProgram instance representing the parsed ASCII-PIET text.</returns>
+    public static PietProgram Parse(byte[] bytes, int codelSize = 1)
+    {
+        var text = Encoding.ASCII.GetString(bytes);
+            var lines = text.Replace("\r", "").Replace("\n", "");
+        return InternalParse(lines, codelSize);
+    }
+
+    /// <summary>
+    /// Attempts to load a Piet program from an ascii-piet text file represented as a byte array.
+    /// The byte array is decoded as ASCII text.
+    /// </summary>
+    /// <param name="bytes">The byte array containing the ASCII-PIET text.</param>
+    /// <param name="codelSize">The size of each codel in pixels.</param>
+    /// <param name="program">The resulting PietProgram instance if parsing is successful.</param>
+    /// <returns>True if parsing is successful; otherwise, false.</returns>
     public static bool TryParse(byte[] bytes, int codelSize, out PietProgram program)
     {
         program = default!;
@@ -92,6 +113,14 @@ public static class AsciiPietParser
         }
     }
 
+    /// <summary>
+    /// Internal method to parse ascii-piet text into a PietProgram instance.
+    /// </summary>
+    /// <param name="lines">The ASCII-PIET text lines.</param>
+    /// <param name="codelSize">The size of each codel in pixels.</param>
+    /// <returns>A PietProgram instance representing the parsed ASCII-PIET text.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
+    /// <exception cref="InvalidDataException"></exception>
     static PietProgram InternalParse(string lines, int codelSize = 1)
     {
         if (codelSize < 1)

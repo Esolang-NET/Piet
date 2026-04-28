@@ -1,6 +1,7 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Reflection;
+using System.Text;
 
 namespace Esolang.Piet.Parser.Tests;
 
@@ -196,5 +197,96 @@ public sealed class PietParserTests
 
         var color = PietParser.MapToPietColor(0x12, 0x34, 0x56);
         Assert.AreEqual(-1, color);
+    }
+
+    [TestMethod]
+    public void TryParse_AsciiPiet_ByExtension_Works()
+    {
+        var bytes = Encoding.ASCII.GetBytes("l_\n C");
+        var ok = PietParser.TryParse(bytes, ".txt", 1, out var program);
+
+        Assert.IsTrue(ok);
+        Assert.AreEqual(2, program.Width);
+        Assert.AreEqual(2, program.Height);
+    }
+
+    [TestMethod]
+    public void TryParse_AsciiPiet_ByContent_Works()
+    {
+        var bytes = Encoding.ASCII.GetBytes("l_\n C");
+        var ok = PietParser.TryParse(bytes, ".dat", 1, out var program);
+
+        Assert.IsTrue(ok);
+        Assert.AreEqual(2, program.Width);
+    }
+
+    [TestMethod]
+    public void TryParse_PngImageSharp_Works()
+    {
+        using var img = new Image<Rgba32>(1, 1);
+        img[0,0] = new Rgba32(255,0,0);
+        using var ms = new MemoryStream();
+        img.SaveAsPng(ms);
+
+        var ok = PietParser.TryParse(ms.ToArray(), ".png", 1, out var program);
+
+        Assert.IsTrue(ok);
+        Assert.AreEqual(PietColor.Red, program.Codels[0]);
+    }
+
+    [TestMethod]
+    public void TryParse_PngFallback_Works()
+    {
+        using var img = new Image<Rgba32>(1, 1);
+        img[0,0] = new Rgba32(255,255,255);
+        using var ms = new MemoryStream();
+        img.SaveAsPng(ms);
+
+        var bytes = ms.ToArray();
+        bytes[29] = bytes[30] = bytes[31] = bytes[32] = 0x00;
+
+        var ok = PietParser.TryParse(bytes, ".png", 1, out var program);
+
+        Assert.IsTrue(ok);
+        Assert.AreEqual(PietColor.White, program.Codels[0]);
+    }
+
+    [TestMethod]
+    public void TryParse_Ppm_Works()
+    {
+        var text = """
+            P3
+            1 1
+            255
+            255 0 0
+            """;
+        var bytes = Encoding.ASCII.GetBytes(text);
+
+        var ok = PietParser.TryParse(bytes, ".ppm", 1, out var program);
+
+        Assert.IsTrue(ok);
+        Assert.AreEqual(PietColor.Red, program.Codels[0]);
+    }
+
+    [TestMethod]
+    public void TryParse_UnsupportedColor_ReturnsFalse()
+    {
+        using var img = new Image<Rgba32>(1, 1);
+        img[0,0] = new Rgba32(0x12,0x34,0x56);
+        using var ms = new MemoryStream();
+        img.SaveAsPng(ms);
+
+        var ok = PietParser.TryParse(ms.ToArray(), ".png", 1, out _);
+
+        Assert.IsFalse(ok);
+    }
+
+    [TestMethod]
+    public void TryParse_InvalidData_ReturnsFalse()
+    {
+        var bytes = Encoding.ASCII.GetBytes("not an image");
+        var ok = PietParser.TryParse(bytes, ".png", 1, out _);
+
+        Assert.IsFalse(ok);
     }
 }
