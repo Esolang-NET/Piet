@@ -234,14 +234,12 @@ public partial class MethodGenerator : IIncrementalGenerator
             {
                 context.AddSource(GeneratedMethodsFileName, builder.ToString());
             }
-            if (runtimeTypes > 0)
-            {
-                context.AddSource(GeneratePietRuntimeFileName, PietRuntimeSource);
-            }
+            if (TryMakePietRuntimeSource(runtimeTypes, out var runtimeFileName, out var runtimeSource)) 
+                context.AddSource(runtimeFileName, runtimeSource);
         });
     }
 
-    static int DefaultCodelSize = 1;
+    static readonly int DefaultCodelSize = 1;
 
     static (EmittedMethod?, RuntimeType) Emit(
         SourceProductionContext context,
@@ -1229,13 +1227,5 @@ public partial class MethodGenerator : IIncrementalGenerator
             .Append("width: ").Append(program?.Width ?? 0).Append(", ")
             .Append("codelSize: ").Append(codelSize.Value)
         .Append(')').Append(']').AppendLine();
-    }
-    enum RuntimeType
-    {
-        None = 0b0000,
-        Sync = 0b0001,
-        Async = 0b0010,
-        Enumerable = 0b0100,
-        AsyncEnumerable = 0b1000,
     }
 }
