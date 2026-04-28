@@ -86,6 +86,10 @@ public static class AsciiPietParser
     {
         var text = Encoding.ASCII.GetString(bytes);
             var lines = text.Replace("\r", "").Replace("\n", "");
+        if (codelSize < 1)
+            throw new ArgumentOutOfRangeException(nameof(codelSize), "codelSize is support 1 or over.");
+        if (lines.Length == 0)
+            throw new InvalidDataException("ascii-piet file is empty");
         return InternalParse(lines, codelSize);
     }
 
@@ -123,11 +127,6 @@ public static class AsciiPietParser
     /// <exception cref="InvalidDataException"></exception>
     static PietProgram InternalParse(string lines, int codelSize = 1)
     {
-        if (codelSize < 1)
-            throw new ArgumentOutOfRangeException(nameof(codelSize), "codelSize is support 1 or over.");
-        if (lines.Length == 0)
-            throw new InvalidDataException("ascii-piet file is empty");
-
         List<List<PietColor>> lineList = [];
         int x = 0;
         int y = 0;
