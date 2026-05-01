@@ -800,7 +800,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
             case { InputKind: InputKind.PipeReader, RuntimeType: RuntimeType.Async or RuntimeType.AsyncEnumerable }:
                 builder.AppendLine($$"""
-                global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
+                async global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                 {
                     var __result = await {{executionBinding.InputExpression}}.ReadAsync(__ct).ConfigureAwait(false);
                     var __buffer = __result.Buffer;
@@ -810,14 +810,14 @@ public partial class MethodGenerator : IIncrementalGenerator
                         return null;
                     }
 
-                    var __text = global::System.Text.Encoding.UTF8.GetString(__buffer.ToArray());
+                    var __text = global::System.Text.Encoding.UTF8.GetString(global::System.Buffers.BuffersExtensions.ToArray(__buffer));
                     {{executionBinding.InputExpression}}.AdvanceTo(__buffer.End);
 
                     __text = __text.Trim();
                     return int.TryParse(__text, out var __n) ? __n : (int?)null;
                 }
 
-                global::System.Threading.Tasks.ValueTask<int?> __pietReadCharAsync(global::System.Threading.CancellationToken __ct)
+                async global::System.Threading.Tasks.ValueTask<int?> __pietReadCharAsync(global::System.Threading.CancellationToken __ct)
                 {
                     var __result = await {{executionBinding.InputExpression}}.ReadAsync(__ct).ConfigureAwait(false);
                     var __buffer = __result.Buffer;
