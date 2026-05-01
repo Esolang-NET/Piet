@@ -11,7 +11,7 @@ dotnet add package Esolang.Piet.Generator
 
 ## Usage
 
-You can use PNG, ascii-piet text (.txt), or Netpbm PPM (P3, .ppm) as Piet source images.
+You can use PNG, GIF (.gif), ascii-piet text (.txt), or Netpbm PPM (P3, .ppm) as Piet source images.
 
 Use `GeneratePietMethodAttribute` on a `partial` method.
 
@@ -20,25 +20,41 @@ using Esolang.Piet;
 
 partial class PietSample
 {
-        [GeneratePietMethod("program.png")]
-        public static partial void Run();
+    [GeneratePietMethod("hello-world.png")]
+    public static partial string RunToString();
 
-        [GeneratePietMethod("samples/ascii-piet-sample.txt")]
-        public static partial void RunAsciiPiet();
+    [GeneratePietMethod("no-op.png")]
+    public static partial void RunNoOp();
 
-        [GeneratePietMethod("samples/ppm-sample.ppm")]
-        public static partial void RunPpm();
+    [GeneratePietMethod("ascii-piet-sample.txt")]
+    public static partial string RunAsciiPiet();
 
+    [GeneratePietMethod("ppm-sample.ppm")]
+    public static partial string RunPpm();
+
+    // GIF with explicit codel size
+    [GeneratePietMethod("dot.gif", codelSize: 1)]
+    public static partial void RunDotGif();
+
+    [GeneratePietMethod("dot-codel-11.gif", codelSize: 11)]
+    public static partial void RunDotCodel11Gif();
+
+    [GeneratePietMethod("hw1-11.gif", codelSize: 11)]
+    public static partial string RunHw111Gif(string input = "");
 }
 ```
 
-In your project file, specify the image via `PietImage` (PNG, .txt, .ppm all supported):
+In your project file, specify the image via `PietImage` (PNG, .gif, .txt, .ppm all supported):
 
 ```xml
 <ItemGroup>
-    <PietImage Include="Assets\program.png" PietLogicalPath="program.png" />
+    <PietImage Include="samples\hello-world.png" PietLogicalPath="hello-world.png" />
+    <PietImage Include="samples\no-op.png" PietLogicalPath="no-op.png" />
     <PietImage Include="samples\ascii-piet-sample.txt" PietLogicalPath="ascii-piet-sample.txt" />
     <PietImage Include="samples\ppm-sample.ppm" PietLogicalPath="ppm-sample.ppm" />
+    <PietImage Include="samples\dot.gif" PietLogicalPath="dot.gif" />
+    <PietImage Include="samples\dot-codel-11.gif" PietLogicalPath="dot-codel-11.gif" />
+    <PietImage Include="samples\hw1-11.gif" PietLogicalPath="hw1-11.gif" />
 </ItemGroup>
 ```
 
@@ -46,12 +62,11 @@ In your project file, specify the image via `PietImage` (PNG, .txt, .ppm all sup
 ## Supported Piet Image Formats
 
 - PNG (standard)
+- GIF (`.gif`)
 - ascii-piet text format (`.txt`)
 - Netpbm PPM (P3, `.ppm`)
 
-拡張子で自動判別されます。
-
-**Note:** GIF (`.gif`) 形式は現状未サポートです。
+Image format is detected automatically from the file extension.
 
 ## Features
 
@@ -219,6 +234,11 @@ partial class PietSample
 
 Uses `input` as a `StringReader` source.
 
+```csharp
+var withStringInput = PietSample.RunWithStringInput("123");
+Console.WriteLine($"RunWithStringInput: {withStringInput}");
+```
+
 ### 8. Input from `TextReader`
 
 ```csharp
@@ -232,6 +252,11 @@ partial class PietSample
 ```
 
 Uses `input` directly as text input (`null` is treated as `TextReader.Null`).
+
+```csharp
+var withTextReader = PietSample.RunWithTextReader(new StringReader("456\n"));
+Console.WriteLine($"RunWithTextReader: {withTextReader}");
+```
 
 ### 9. Input from `PipeReader`
 
@@ -247,6 +272,14 @@ partial class PietSample
 
 Wraps `PipeReader` as a `StreamReader` for text input.
 
+```csharp
+var inputPipe = new Pipe();
+await inputPipe.Writer.WriteAsync(Encoding.UTF8.GetBytes("789\n"));
+inputPipe.Writer.Complete();
+var withPipeReader = PietSample.RunWithPipeReader(inputPipe.Reader);
+Console.WriteLine($"RunWithPipeReader: {withPipeReader}");
+```
+
 ### 10. Output to `TextWriter`
 
 ```csharp
@@ -261,6 +294,12 @@ partial class PietSample
 
 Uses `output` directly (`null` is treated as `TextWriter.Null`).
 
+```csharp
+var textWriterOutput = new StringWriter();
+PietSample.RunWithTextWriter(textWriterOutput);
+Console.WriteLine($"RunWithTextWriter: {textWriterOutput}");
+```
+
 ### 11. Output to `PipeWriter`
 
 ```csharp
@@ -274,6 +313,42 @@ partial class PietSample
 ```
 
 Wraps `PipeWriter` as an auto-flushing `StreamWriter`.
+
+```csharp
+var outputPipe = new Pipe();
+PietSample.RunWithPipeWriter(outputPipe.Writer);
+outputPipe.Writer.Complete();
+var pipeWriterResult = new StreamReader(outputPipe.Reader.AsStream()).ReadToEnd();
+Console.WriteLine($"RunWithPipeWriter: {pipeWriterResult}");
+```
+
+### 12. GIF with `codelSize`
+
+Specify `codelSize` when the codel size cannot be inferred from the file.
+
+```csharp
+using Esolang.Piet;
+
+partial class PietSample
+{
+    [GeneratePietMethod("dot.gif", codelSize: 1)]
+    public static partial void RunDotGif();
+
+    [GeneratePietMethod("dot-codel-11.gif", codelSize: 11)]
+    public static partial void RunDotCodel11Gif();
+
+    [GeneratePietMethod("hw1-11.gif", codelSize: 11)]
+    public static partial string RunHw111Gif(string input = "");
+}
+```
+
+`codelSize` sets the pixel width/height of each codel.
+
+```csharp
+PietSample.RunDotGif();
+PietSample.RunDotCodel11Gif();
+Console.WriteLine($"RunHw111Gif: {PietSample.RunHw111Gif()}");
+```
 
 ## Combination Rules
 

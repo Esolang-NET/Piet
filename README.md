@@ -37,7 +37,7 @@ For detailed Generator signatures and patterns (`string`, `TextReader`, `PipeRea
 
 For runnable examples including `TextReader`/`PipeReader` input, `TextWriter`/`PipeWriter` output, and multiple return patterns, see:
 
-- [UseConsole sample](./samples/Generator.UseConsole/Esolang.Piet.Generator.UseConsole.cs)
+- [UseConsole sample](./samples/Generator.UseConsole/README.md)
 
 ## Install
 
@@ -71,7 +71,7 @@ dotnet tool install -g dotnet-piet --prerelease
 | Project | Target frameworks |
 | --- | --- |
 | Esolang.Piet.Generator | netstandard2.0 |
-| Esolang.Piet.Parser | net8.0, net9.0, net10.0 |
+| Esolang.Piet.Parser | net8.0, net9.0, net10.0, netstandard2.0, netstandard2.1 |
 | Esolang.Piet.Processor | net8.0, net9.0, net10.0 |
 | dotnet-piet | net8.0, net9.0, net10.0 |
 
@@ -83,4 +83,4 @@ dotnet tool install -g dotnet-piet --prerelease
 
 - Piet language reference: https://www.dangermouse.net/esoteric/piet.html
 
-**Note:** GIF (`.gif`) 形式は現状未サポートです。
+**Note:** GIF (`.gif`) is also supported.
