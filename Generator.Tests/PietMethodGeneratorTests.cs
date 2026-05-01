@@ -216,7 +216,7 @@ public class MethodGeneratorTests
         AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run()")),
+            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
             "Expected generated method implementation was not found.");
 
         AssertNoErrors(outputCompilation);
@@ -316,7 +316,7 @@ public class MethodGeneratorTests
         AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run()")),
+            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
             "Expected generated method implementation was not found.");
 
         Assert.IsFalse(
@@ -349,7 +349,7 @@ public class MethodGeneratorTests
         AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("return")),
+            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("return")),
             "Expected generated string return path was not found.");
 
         Assert.IsFalse(
@@ -383,7 +383,7 @@ public class MethodGeneratorTests
         AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run(global::System.IO.TextReader input, global::System.IO.TextWriter output)")),
+            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run(global::System.IO.TextReader input, global::System.IO.TextWriter output)")),
             "Expected generated method implementation with TextReader/TextWriter parameters was not found.");
 
         Assert.IsFalse(
@@ -802,7 +802,7 @@ public class MethodGeneratorTests
         AssertNoErrors(diagnostics);
 
         var generatedText = runResult.GeneratedTrees
-            .Select(static tree => tree.GetText().ToString())
+            .Select(tree => tree.GetText(CancellationToken).ToString())
             .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
         Assert.IsTrue(generatedText.Contains("new global::System.IO.StringReader(input)"),
@@ -837,7 +837,7 @@ public class MethodGeneratorTests
         AssertNoErrors(diagnostics);
 
         var generatedText = runResult.GeneratedTrees
-            .Select(static tree => tree.GetText().ToString())
+            .Select(tree => tree.GetText(CancellationToken).ToString())
             .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
         Assert.IsTrue(generatedText.Contains("ReadLineAsync(__ct)"),
@@ -872,7 +872,7 @@ public class MethodGeneratorTests
         AssertNoErrors(diagnostics);
 
         var generatedText = runResult.GeneratedTrees
-            .Select(static tree => tree.GetText().ToString())
+            .Select(tree => tree.GetText(CancellationToken).ToString())
             .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
         Assert.IsTrue(generatedText.Contains("ReadAsync(default(global::System.Threading.CancellationToken)).AsTask().GetAwaiter().GetResult();"),
@@ -907,7 +907,7 @@ public class MethodGeneratorTests
         AssertNoErrors(diagnostics);
 
         var generatedText = runResult.GeneratedTrees
-            .Select(static tree => tree.GetText().ToString())
+            .Select(tree => tree.GetText(CancellationToken).ToString())
             .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
         Assert.IsTrue(generatedText.Contains("async global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync"),
@@ -974,7 +974,7 @@ public class MethodGeneratorTests
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run(global::System.IO.Pipelines.PipeReader input)")),
+            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run(global::System.IO.Pipelines.PipeReader input)")),
             "Expected generated method implementation was not found.");
 
         AssertNoErrors(diagnostics);
@@ -1006,7 +1006,7 @@ public class MethodGeneratorTests
         AssertNoErrors(diagnostics);
 
         var generated = runResult.GeneratedTrees
-            .Select(static tree => tree.GetText().ToString())
+            .Select(tree => tree.GetText(CancellationToken).ToString())
             .Single(static text => text.Contains("partial class Sample"));
 
         Assert.Contains("public async partial global::System.Threading.Tasks.Task<string> Run(", generated,
@@ -1042,7 +1042,7 @@ public class MethodGeneratorTests
         AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("yield return")),
+            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("yield return")),
             "Expected yield return byte path was not found.");
 
         AssertNoErrors(outputCompilation);
@@ -1072,7 +1072,7 @@ public class MethodGeneratorTests
         AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("CancellationToken ct")),
+            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("CancellationToken ct")),
             "Expected CancellationToken parameter was not found in generated code.");
 
         AssertNoErrors(outputCompilation);
@@ -1644,7 +1644,7 @@ public class MethodGeneratorTests
         AssertNoErrors(diagnostics);
 
         var generatedText = runResult.GeneratedTrees
-            .Select(static tree => tree.GetText().ToString())
+            .Select(tree => tree.GetText(CancellationToken).ToString())
             .FirstOrDefault(static t => t.Contains("IAsyncEnumerable")) ?? string.Empty;
 
         Assert.IsTrue(generatedText.Contains("public async partial global::System.Collections.Generic.IAsyncEnumerable<byte> Run([global::System.Runtime.CompilerServices.EnumeratorCancellation] global::System.Threading.CancellationToken ct)"), "Expected async modifier in generated code.");
@@ -1710,7 +1710,7 @@ public class MethodGeneratorTests
         AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("global::System.Buffers.BuffersExtensions.Write(output, ")),
+            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("global::System.Buffers.BuffersExtensions.Write(output, ")),
             "Expected PipeWriter.WriteAsync() was not found in generated code.");
 
         var pipeWriterErrors = outputCompilation.GetDiagnostics(CancellationToken)
@@ -1933,7 +1933,7 @@ public partial class Sample
         Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0002"));
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree =>
-                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0002")),
+                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0002")),
             "Expected throw for PT0002 was not generated.");
     }
 
@@ -1960,7 +1960,7 @@ public partial class Sample
         // 生成コードに throw が含まれる
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree =>
-                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0001")),
+                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0001")),
             "Expected throw for PT0001 was not generated.");
     }
 
@@ -1985,7 +1985,7 @@ public partial class Sample
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree =>
-                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0005")),
+                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0005")),
             "Expected throw for PT0005 was not generated.");
     }
 
@@ -2015,7 +2015,7 @@ public partial class Sample
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree =>
-                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0006")),
+                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0006")),
             "Expected throw for PT0006 was not generated.");
     }
 
@@ -2046,7 +2046,7 @@ public partial class Sample
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree =>
-                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0007")),
+                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0007")),
             "Expected throw for PT0007 was not generated.");
     }
 
@@ -2077,7 +2077,7 @@ public partial class Sample
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree =>
-                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0008")),
+                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0008")),
             "Expected throw for PT0008 was not generated.");
     }
 
@@ -2107,8 +2107,8 @@ public partial class Sample
         Assert.IsTrue(generatorDiagnostics.Any(static x => x.Id == "PT0011"));
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree =>
-                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0011")),
+            runResult.GeneratedTrees.Any(tree =>
+                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0011")),
             "Expected throw for PT0011 was not generated.");
     }
 
@@ -2138,8 +2138,8 @@ public partial class Sample
         Assert.IsTrue(generatorDiagnostics.Any(static x => x.Id == "PT0011"));
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree =>
-                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0011")),
+            runResult.GeneratedTrees.Any(tree =>
+                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0011")),
             "Expected throw for PT0011 was not generated.");
     }
 
@@ -2169,8 +2169,8 @@ public partial class Sample
         Assert.IsTrue(generatorDiagnostics.Any(static x => x.Id == "PT0011"));
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree =>
-                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0011")),
+            runResult.GeneratedTrees.Any(tree =>
+                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0011")),
             "Expected throw for PT0011 was not generated.");
     }
 
@@ -2200,8 +2200,8 @@ public partial class Sample
         Assert.IsTrue(generatorDiagnostics.Any(static x => x.Id == "PT0011"));
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree =>
-                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0011")),
+            runResult.GeneratedTrees.Any(tree =>
+                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0011")),
             "Expected throw for PT0011 was not generated.");
     }
 
