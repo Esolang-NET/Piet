@@ -1855,6 +1855,89 @@ public partial class Sample
     }
 
     [TestMethod]
+    public void Generator_WithInlineAsciiPietBase64DataUri_UsedAttribute()
+    {
+        const string source =
+"""
+namespace Demo;
+
+public partial class Sample
+{
+    [Esolang.Piet.GeneratePietMethod("data:text/plain;codel-size=3;base64,bF8gQw==")]
+    public static partial void Run();
+}
+""";
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics);
+        var runResult = driver.GetRunResult();
+        Assert.IsEmpty(runResult.Diagnostics,
+            string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
+
+        var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
+        Assert.IsNotNull(generated, "Method not generated");
+        Assert.IsTrue(generated.Contains("codelSize: 3"), "codelSize=3 not reflected in generated code");
+        AssertNoErrors(diagnostics);
+        AssertNoErrors(outputCompilation);
+    }
+
+    [TestMethod]
+    public void Generator_WithInlineAsciiPietInvalidCodelSize_FallsBackToDefault()
+    {
+        const string source =
+"""
+namespace Demo;
+
+public partial class Sample
+{
+    [Esolang.Piet.GeneratePietMethod("data:text/acii-piet;codel-size=abc,l_ C")]
+    public static partial void Run();
+}
+""";
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics);
+        var runResult = driver.GetRunResult();
+        Assert.IsEmpty(runResult.Diagnostics,
+            string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
+
+        var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
+        Assert.IsNotNull(generated, "Method not generated");
+        Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize fallback to default(1) was not reflected in generated code");
+        AssertNoErrors(diagnostics);
+        AssertNoErrors(outputCompilation);
+    }
+
+    [TestMethod]
+    public void Generator_WithInlineDataUriMissingPayloadSeparator_ReportsImageNotFound()
+    {
+        const string source =
+"""
+namespace Demo;
+
+public partial class Sample
+{
+    [Esolang.Piet.GeneratePietMethod("data:text/acii-piet;codel-size=1")]
+    public static partial void Run();
+}
+""";
+
+        var driver = RunGeneratorsAndUpdateCompilation(source, out _, out _);
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0002"));
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(tree =>
+                tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0002")),
+            "Expected throw for PT0002 was not generated.");
+    }
+
+    [TestMethod]
     public void Generator_WithInvalidImagePath_GeneratesThrowingMethod()
     {
         const string source = """

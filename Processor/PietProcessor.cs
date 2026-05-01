@@ -403,9 +403,11 @@ public sealed class PietProcessor(PietProgram program, TextWriter? output = null
                 case 2:
                     better = bx < bestX || (bx == bestX && (cc == 0 ? by > bestY : by < bestY));
                     break;
-                default:
+                case 3:
                     better = by < bestY || (by == bestY && (cc == 0 ? bx < bestX : bx > bestX));
                     break;
+                default:
+                    throw new InvalidOperationException("Unexpected DP value");
             }
 
             if (better)

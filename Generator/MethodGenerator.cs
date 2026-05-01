@@ -1042,10 +1042,6 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                     break;
                 }
-
-            default:
-                // ここには来ない想定
-                break;
         }
     }
 
