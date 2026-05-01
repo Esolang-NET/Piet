@@ -60,24 +60,59 @@ public partial class MethodGenerator : IIncrementalGenerator
     {
         Void,
         String,
+        Task,
         TaskString,
+        ValueTask,
         ValueTaskString,
         EnumerableByte,
         AsyncEnumerableByte,
         Invalid,
     }
 
-    readonly struct ExecutionBinding(bool isValid, MethodGenerator.ReturnKind returnKind, bool hasExplicitInput, bool hasExplicitOutput, string inputExpression, string outputExpression, string? cancellationTokenName, string? errorId)
+    enum InputKind
+    {
+        None,
+        String,
+        TextReader,
+        PipeReader,
+    }
+
+    enum OutputKind
+    {
+        None,
+        TextWriter,
+        PipeWriter,
+        ReturnString,
+        ReturnEnumerable,
+        ReturnAsyncEnumerable,
+    }
+
+    readonly struct ExecutionBinding(
+        bool isValid,
+        ReturnKind returnKind,
+        InputKind inputKind,
+        OutputKind outputKind,
+        string inputExpression,
+        string outputExpression,
+        string? cancellationTokenName,
+        string? errorId,
+        Location? location = null)
     {
         public bool IsValid { get; } = isValid;
 
         public ReturnKind ReturnKind { get; } = returnKind;
 
+        public InputKind InputKind { get; } = inputKind;
+
+        public OutputKind OutputKind { get; } = outputKind;
+
         public RuntimeType RuntimeType => ReturnKind switch
         {
             ReturnKind.Void => RuntimeType.Sync,
             ReturnKind.String => RuntimeType.Sync,
+            ReturnKind.Task => RuntimeType.Async,
             ReturnKind.TaskString => RuntimeType.Async,
+            ReturnKind.ValueTask => RuntimeType.Async,
             ReturnKind.ValueTaskString => RuntimeType.Async,
             ReturnKind.EnumerableByte => RuntimeType.Enumerable,
             ReturnKind.AsyncEnumerableByte => RuntimeType.AsyncEnumerable,
@@ -87,12 +122,12 @@ public partial class MethodGenerator : IIncrementalGenerator
         /// <summary>
         /// True if the method has an explicit input mechanism (string, TextReader or PipeReader parameter).
         /// </summary>
-        public bool HasExplicitInput { get; } = hasExplicitInput;
+        public bool HasExplicitInput { get; } = inputKind is not InputKind.None;
 
         /// <summary>
         /// True if the method has an explicit output mechanism (non-void return type, TextWriter or PipeWriter parameter).
         /// </summary>
-        public bool HasExplicitOutput { get; } = hasExplicitOutput;
+        public bool HasExplicitOutput { get; } = outputKind is not OutputKind.None;
 
         public string InputExpression { get; } = inputExpression;
 
@@ -104,6 +139,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         public string? CancellationTokenName { get; } = cancellationTokenName;
 
         public string? ErrorId { get; } = errorId;
+        public Location? Location { get; } = location;
     }
 
     readonly struct AdditionalImageFile(string path, string? text, int? codelSize = null, string? transformedOriginalPath = null)
@@ -234,7 +270,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             {
                 context.AddSource(GeneratedMethodsFileName, builder.ToString());
             }
-            if (TryMakePietRuntimeSource(runtimeTypes, out var runtimeFileName, out var runtimeSource)) 
+            if (TryMakePietRuntimeSource(runtimeTypes, out var runtimeFileName, out var runtimeSource))
                 context.AddSource(runtimeFileName, runtimeSource);
         });
     }
@@ -358,7 +394,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             {
                 context.ReportDiagnostic(Diagnostic.Create(
                     DiagnosticDescriptors.InvalidReturnType,
-                    methodSyntax.Identifier.GetLocation(),
+                    executionBinding.Location ?? methodSyntax.Identifier.GetLocation(),
                     methodSymbol.ReturnType.ToDisplayString()));
                 return EmitErrorMethod(
                     methodSymbol,
@@ -378,7 +414,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             {
                 context.ReportDiagnostic(Diagnostic.Create(
                     DiagnosticDescriptors.DuplicateParameter,
-                    methodSyntax.Identifier.GetLocation(),
+                    executionBinding.Location ?? methodSyntax.Identifier.GetLocation(),
                     methodSymbol.Name));
                 return EmitErrorMethod(
                     methodSymbol,
@@ -398,7 +434,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             {
                 context.ReportDiagnostic(Diagnostic.Create(
                     DiagnosticDescriptors.ReturnOutputConflict,
-                    methodSyntax.Identifier.GetLocation(),
+                    executionBinding.Location ?? methodSyntax.Identifier.GetLocation(),
                     methodSymbol.Name));
                 return EmitErrorMethod(
                     methodSymbol,
@@ -416,7 +452,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.InvalidParameter,
-                methodSyntax.Identifier.GetLocation(),
+                executionBinding.Location ?? methodSyntax.Identifier.GetLocation(),
                 methodSymbol.Name));
             return EmitErrorMethod(
                 methodSymbol,
@@ -547,7 +583,11 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         var containingTypeName = methodSymbol.ContainingType.Name;
         var staticModifier = methodSymbol.IsStatic ? " static" : string.Empty;
-        var asyncModifier = executionBinding.ReturnKind == ReturnKind.AsyncEnumerableByte ? " async" : string.Empty;
+        var asyncModifier = executionBinding.ReturnKind switch
+        {
+            ReturnKind.TaskString or ReturnKind.ValueTaskString or ReturnKind.AsyncEnumerableByte => " async",
+            _ => string.Empty,
+        };
         var accessibility = GetAccessibility(methodSymbol.DeclaredAccessibility);
         var parameterList = string.Join(", ", methodSymbol.Parameters.Select(p =>
         {
@@ -577,125 +617,436 @@ public partial class MethodGenerator : IIncrementalGenerator
             .Append(methodSymbol.Name).Append('(').Append(parameterList).AppendLine(")");
 
         code.AppendLine("    {");
-        if (executionBinding.ReturnKind != ReturnKind.Void
-            && executionBinding.ReturnKind != ReturnKind.AsyncEnumerableByte)
-        {
-            code.AppendLine("        var __pietOutput = new global::System.IO.StringWriter(global::System.Globalization.CultureInfo.InvariantCulture);");
-        }
-        if (executionBinding.ReturnKind == ReturnKind.AsyncEnumerableByte)
-        {
-            code.AppendLine("        var __pietPipe = new global::System.IO.Pipelines.Pipe();");
-            code.AppendLine("        var __pietExecutionTask = global::System.Threading.Tasks.Task.Run(() =>");
-            code.AppendLine("        {");
-            code.AppendLine("            try");
-            code.AppendLine("            {");
-            code.AppendLine("                using var __pietWriter = new global::System.IO.StreamWriter(__pietPipe.Writer.AsStream(), new global::System.Text.UTF8Encoding(false), 1024, true) { AutoFlush = true };");
-            code.Append("                global::Esolang.Piet.__Generated.PietRuntime.Execute(");
-            code.Append("new byte[] { ");
-            for (int i = 0; i < codels.Length; i++)
-            {
-                if (i > 0) code.Append(',');
-                code.Append(codels[i]);
-            }
-            code.Append(" }, ");
-            code.Append(imageWidth).Append(", ").Append(imageHeight).Append(", ")
-                .Append(executionBinding.InputExpression).Append(", __pietWriter").AppendLine(");");
-            code.AppendLine("                __pietPipe.Writer.Complete();");
-            code.AppendLine("            }");
-            code.AppendLine("            catch (global::System.Exception ex)");
-            code.AppendLine("            {");
-            code.AppendLine("                __pietPipe.Writer.Complete(ex);");
-            code.AppendLine("            }");
-            code.AppendLine("        });");
-            code.AppendLine("        try");
-            code.AppendLine("        {");
-            if (executionBinding.CancellationTokenName is not null)
-            {
-                code.Append("            var __pietReadCancellationToken = ")
-                    .Append(executionBinding.CancellationTokenName)
-                    .AppendLine(";");
-            }
-            else
-            {
-                code.AppendLine("            var __pietReadCancellationToken = default(global::System.Threading.CancellationToken);");
-            }
-            code.AppendLine("            while (true)");
-            code.AppendLine("            {");
-            if (executionBinding.CancellationTokenName is not null)
-            {
-                code.Append("                ").Append(executionBinding.CancellationTokenName).AppendLine(".ThrowIfCancellationRequested();");
-            }
-            code.AppendLine("                var __pietReadResult = await __pietPipe.Reader.ReadAsync(__pietReadCancellationToken);");
-            code.AppendLine("                var __pietBuffer = __pietReadResult.Buffer;");
-            code.AppendLine("                foreach (var __pietSegment in __pietBuffer)");
-            code.AppendLine("                {");
-            code.AppendLine("                    var __pietChunk = __pietSegment.ToArray();");
-            code.AppendLine("                    for (int __pietIndex = 0; __pietIndex < __pietChunk.Length; __pietIndex++)");
-            code.AppendLine("                    {");
-            if (executionBinding.CancellationTokenName is not null)
-            {
-                code.Append("                        ").Append(executionBinding.CancellationTokenName).AppendLine(".ThrowIfCancellationRequested();");
-            }
-            code.AppendLine("                        yield return __pietChunk[__pietIndex];");
-            code.AppendLine("                    }");
-            code.AppendLine("                }");
-            code.AppendLine("                __pietPipe.Reader.AdvanceTo(__pietBuffer.End);");
-            code.AppendLine("                if (__pietReadResult.IsCompleted)");
-            code.AppendLine("                {");
-            code.AppendLine("                    break;");
-            code.AppendLine("                }");
-            code.AppendLine("            }");
-            code.AppendLine("            await __pietExecutionTask;");
-            code.AppendLine("        }");
-            code.AppendLine("        finally");
-            code.AppendLine("        {");
-            code.AppendLine("            await __pietPipe.Reader.CompleteAsync();");
-            code.AppendLine("        }");
-        }
-        else
-        {
-            code.Append("        global::Esolang.Piet.__Generated.PietRuntime.Execute(");
 
-            code.Append("new byte[] { ");
-            for (int i = 0; i < codels.Length; i++)
-            {
-                if (i > 0) code.Append(',');
-                code.Append(codels[i]);
-            }
-            code.Append(" }, ");
-            code.Append(imageWidth).Append(", ").Append(imageHeight).Append(", ")
-                .Append(executionBinding.InputExpression).Append(", ")
-                .Append(executionBinding.OutputExpression).AppendLine(");");
-        }
-
-        switch (executionBinding.ReturnKind)
-        {
-            case ReturnKind.String:
-                code.AppendLine("        return __pietOutput.ToString();");
-                break;
-            case ReturnKind.TaskString:
-                code.AppendLine("        return global::System.Threading.Tasks.Task.FromResult(__pietOutput.ToString());");
-                break;
-            case ReturnKind.ValueTaskString:
-                code.AppendLine("        return new global::System.Threading.Tasks.ValueTask<string>(__pietOutput.ToString());");
-                break;
-            case ReturnKind.EnumerableByte:
-                code.AppendLine("        foreach (var __pietByte in global::System.Text.Encoding.UTF8.GetBytes(__pietOutput.ToString()))");
-                code.AppendLine("            yield return __pietByte;");
-                break;
-            case ReturnKind.AsyncEnumerableByte:
-                break;
-        }
+        EmitBody(
+            code,
+            executionBinding,
+            $"new byte[] {{ {string.Join(", ", codels)} }}",
+            imageWidth.ToString(),
+            imageHeight.ToString()
+        );
 
         code.AppendLine("    }");
         code.AppendLine("}");
-
         if (ns is not null)
         {
             code.AppendLine("}");
         }
 
         return (new EmittedMethod(code.ToString()), executionBinding.RuntimeType);
+    }
+
+    private static void EmitBody(
+            StringBuilder builder,
+            ExecutionBinding executionBinding,
+            string codelArrayExpression,
+            string widthExpression,
+            string heightExpression
+        )
+    {
+        var ctName = executionBinding.CancellationTokenName ?? "default(global::System.Threading.CancellationToken)";
+
+        // ------------------------------------------------------------
+        // 入力デリゲート生成（Sync / Async）
+        //   - InputKind.None      : すべて null を返す
+        //   - InputKind.String    : StringReader 経由
+        //   - InputKind.TextReader: TextReader 直接利用
+        //   - InputKind.PipeReader: PipeReader から UTF8 で読む
+        // ------------------------------------------------------------
+
+        switch (executionBinding)
+        {
+            case { InputKind: InputKind.None, RuntimeType: RuntimeType.Sync or RuntimeType.Enumerable }:
+                builder.AppendLine("""
+                int? __pietReadNumber() => null;
+                int? __pietReadChar() => null;
+        """);
+                break;
+            case { InputKind: InputKind.None, RuntimeType: RuntimeType.Async or RuntimeType.AsyncEnumerable }:
+                builder.AppendLine("""
+                global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
+                    => new global::System.Threading.Tasks.ValueTask<int?>((int?)null);
+
+                global::System.Threading.Tasks.ValueTask<int?> __pietReadCharAsync(global::System.Threading.CancellationToken __ct)
+                    => new global::System.Threading.Tasks.ValueTask<int?>((int?)null);
+        """);
+                break;
+
+            case { InputKind: InputKind.String, RuntimeType: RuntimeType.Sync or RuntimeType.Enumerable }:
+                builder.AppendLine($$"""
+                var __pietStringReader = new global::System.IO.StringReader({{executionBinding.InputExpression}});
+
+                int? __pietReadNumber()
+                {
+                    var __line = __pietStringReader.ReadLine();
+                    if (__line is null) return null;
+                    return int.TryParse(__line, out var __n) ? __n : (int?)null;
+                }
+
+                int? __pietReadChar()
+                {
+                    var __ch = __pietStringReader.Read();
+                    return __ch < 0 ? (int?)null : __ch;
+                }
+        """);
+                break;
+
+            case { InputKind: InputKind.String, RuntimeType: RuntimeType.Async or RuntimeType.AsyncEnumerable }:
+                builder.AppendLine($$"""
+                var __pietStringReader = new global::System.IO.StringReader({{executionBinding.InputExpression}});
+
+                global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
+                {
+                    var __line = __pietStringReader.ReadLine();
+                    if (__line is null) return new((int?)null);
+                    return new(int.TryParse(__line, out var __n) ? __n : (int?)null);
+                }
+
+                global::System.Threading.Tasks.ValueTask<int?> __pietReadCharAsync(global::System.Threading.CancellationToken __ct)
+                {
+                    var __ch = __pietStringReader.Read();
+                    return new(__ch < 0 ? (int?)null : __ch);
+                }
+        """);
+                break;
+
+            case { InputKind: InputKind.TextReader, RuntimeType: RuntimeType.Sync or RuntimeType.Enumerable }:
+                builder.AppendLine($$"""
+                int? __pietReadNumber()
+                {
+                    var __line = {{executionBinding.InputExpression}}.ReadLine();
+                    if (__line is null) return null;
+                    return int.TryParse(__line, out var __n) ? __n : (int?)null;
+                }
+
+                int? __pietReadChar()
+                {
+                    var __ch = {{executionBinding.InputExpression}}.Read();
+                    return __ch < 0 ? (int?)null : __ch;
+                }
+        """);
+                break;
+
+            case { InputKind: InputKind.TextReader, RuntimeType: RuntimeType.Async or RuntimeType.AsyncEnumerable }:
+                builder.AppendLine($$"""
+                global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
+                {
+                    var __lineTask = {{executionBinding.InputExpression}}.ReadLineAsync(__ct);
+                    if (__lineTask.IsCompletedSuccessfully)
+                    {
+                        var __line = __lineTask.Result;
+                        if (__line is null) return new((int?)null);
+                        return new(int.TryParse(__line, out var __n) ? __n : (int?)null);
+                    }
+                    return __pietReadNumberAsyncAwaited(__ct);
+
+                    async global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsyncAwaited(global::System.Threading.CancellationToken ___ct)
+                    {
+                        var __line = await {{executionBinding.InputExpression}}.ReadLineAsync(___ct).ConfigureAwait(false);
+                        if (__line is null) return null;
+                        return int.TryParse(__line, out var __n) ? __n : (int?)null;
+                    }
+                }
+
+                global::System.Threading.Tasks.ValueTask<int?> __pietReadCharAsync(global::System.Threading.CancellationToken __ct)
+                {
+                    var __ch = {{executionBinding.InputExpression}}.Read();
+                    return new(__ch < 0 ? (int?)null : __ch);
+                }
+        """);
+                break;
+
+            case { InputKind: InputKind.PipeReader, RuntimeType: RuntimeType.Sync or RuntimeType.Enumerable }:
+                builder.AppendLine($$"""
+                int? __pietReadNumber()
+                {
+                    var __result = {{executionBinding.InputExpression}}.ReadAsync({{ctName}}).AsTask().GetAwaiter().GetResult();
+                    var __buffer = __result.Buffer;
+                    if (__buffer.IsEmpty)
+                    {
+                        {{executionBinding.InputExpression}}.AdvanceTo(__buffer.End);
+                        return null;
+                    }
+
+                    var __text = System.Text.Encoding.UTF8.GetString(global::System.Buffers.BuffersExtensions.ToArray(__buffer));
+                    {{executionBinding.InputExpression}}.AdvanceTo(__buffer.End);
+
+                    __text = __text.Trim();
+                    return int.TryParse(__text, out var __n) ? __n : (int?)null;
+                }
+
+                int? __pietReadChar()
+                {
+                    var __result = {{executionBinding.InputExpression}}.ReadAsync({{ctName}}).AsTask().GetAwaiter().GetResult();
+                    var __buffer = __result.Buffer;
+                    if (__buffer.IsEmpty)
+                    {
+                        {{executionBinding.InputExpression}}.AdvanceTo(__buffer.End);
+                        return null;
+                    }
+
+                    var __first = 
+            #if NET5_0_OR_GRATER
+                        __buffer.FirstSpan[0];
+            #else
+                        __buffer.First.Span[0];
+            #endif
+                    var __pos = __buffer.GetPosition(1);
+                    {{executionBinding.InputExpression}}.AdvanceTo(__pos);
+                    return __first;
+                }
+        """);
+                break;
+
+            case { InputKind: InputKind.PipeReader, RuntimeType: RuntimeType.Async or RuntimeType.AsyncEnumerable }:
+                builder.AppendLine($$"""
+                global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
+                {
+                    var __result = await {{executionBinding.InputExpression}}.ReadAsync(__ct).ConfigureAwait(false);
+                    var __buffer = __result.Buffer;
+                    if (__buffer.IsEmpty)
+                    {
+                        {{executionBinding.InputExpression}}.AdvanceTo(__buffer.End);
+                        return null;
+                    }
+
+                    var __text = global::System.Text.Encoding.UTF8.GetString(__buffer.ToArray());
+                    {{executionBinding.InputExpression}}.AdvanceTo(__buffer.End);
+
+                    __text = __text.Trim();
+                    return int.TryParse(__text, out var __n) ? __n : (int?)null;
+                }
+
+                global::System.Threading.Tasks.ValueTask<int?> __pietReadCharAsync(global::System.Threading.CancellationToken __ct)
+                {
+                    var __result = await {{executionBinding.InputExpression}}.ReadAsync(__ct).ConfigureAwait(false);
+                    var __buffer = __result.Buffer;
+                    if (__buffer.IsEmpty)
+                    {
+                        {{executionBinding.InputExpression}}.AdvanceTo(__buffer.End);
+                        return null;
+                    }
+
+                    var __first = __buffer.FirstSpan[0];
+                    var __pos = __buffer.GetPosition(1);
+                    {{executionBinding.InputExpression}}.AdvanceTo(__pos);
+                    return __first;
+                }
+        """);
+                break;
+        }
+
+        switch (executionBinding)
+        {
+            case { RuntimeType: RuntimeType.Async or RuntimeType.Sync, OutputKind: OutputKind.ReturnString }:
+                builder.AppendLine("""
+                var __pietBytes = new global::System.Collections.Generic.List<byte>();
+                void __pietWriteByte(byte b) => __pietBytes.Add(b);
+        """);
+                break;
+            case { RuntimeType: RuntimeType.Async or RuntimeType.Sync, OutputKind: OutputKind.TextWriter }:
+                builder.AppendLine($$"""
+                void __pietWriteByte(byte b) => {{executionBinding.OutputExpression}}.Write((char)b);
+        """);
+                break;
+            case { RuntimeType: RuntimeType.Async or RuntimeType.Sync, OutputKind: OutputKind.PipeWriter }:
+                builder.AppendLine($$"""
+                void __pietWriteByte(byte b) => global::System.Buffers.BuffersExtensions.Write({{executionBinding.OutputExpression}}, [ b ]);
+        """);
+                break;
+            case { RuntimeType: RuntimeType.Async or RuntimeType.Sync }:
+                builder.AppendLine("""
+                void __pietWriteByte(byte b) { }
+        """);
+                break;
+        }
+
+        // ------------------------------------------------------------
+        // 戻り値モードごとの本体
+        // ------------------------------------------------------------
+
+        switch (executionBinding)
+        {
+            case { ReturnKind: ReturnKind.Void }:
+                {
+                    builder.AppendLine($$"""
+                {
+                    global::Esolang.Piet.__Generated.PietRuntime.Execute(
+                        {{codelArrayExpression}},
+                        {{widthExpression}},
+                        {{heightExpression}},
+                        __pietReadNumber,
+                        __pietReadChar,
+                        __pietWriteByte,
+                        {{ctName}}
+                    );
+                }
+        """);
+                    break;
+                }
+            case { ReturnKind: ReturnKind.Task }:
+                {
+                    builder.AppendLine($$"""
+                {
+                    await global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsync(
+                        {{codelArrayExpression}},
+                        {{widthExpression}},
+                        {{heightExpression}},
+                        __pietReadNumberAsync,
+                        __pietReadCharAsync,
+                        __pietWriteByte,
+                        {{ctName}}
+                    ).ConfigureAwait(false);
+                }
+        """);
+                    break;
+                }
+            case { ReturnKind: ReturnKind.ValueTask }:
+                {
+                    builder.AppendLine($$"""
+                {
+                    await global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsync(
+                        {{codelArrayExpression}},
+                        {{widthExpression}},
+                        {{heightExpression}},
+                        __pietReadNumberAsync,
+                        __pietReadCharAsync,
+                        __pietWriteByte,
+                        {{ctName}}
+                    ).ConfigureAwait(false);
+                }
+        """);
+                    break;
+                }
+
+            case { ReturnKind: ReturnKind.String }:
+                {
+                    builder.AppendLine($$"""
+                {
+                    global::Esolang.Piet.__Generated.PietRuntime.Execute(
+                        {{codelArrayExpression}},
+                        {{widthExpression}},
+                        {{heightExpression}},
+                        __pietReadNumber,
+                        __pietReadChar,
+                        __pietWriteByte,
+                        {{ctName}}
+                    );
+                    var __pietString = global::System.Text.Encoding.UTF8.GetString(
+        #if NET5_0_OR_GREATER
+                        global::System.Runtime.InteropServices.CollectionsMarshal.AsSpan(
+        #else
+                        global::System.Linq.Enumerable.ToArray(
+        #endif
+                            __pietBytes
+                        )
+                    );
+                    return __pietString;
+                }
+        """);
+                    break;
+                }
+
+            // 2. Async: Task<string> / ValueTask<string>
+            case { ReturnKind: ReturnKind.TaskString }:
+                {
+                    builder.AppendLine($$"""
+                {
+                    await global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsync(
+                        {{codelArrayExpression}},
+                        {{widthExpression}},
+                        {{heightExpression}},
+                        __pietReadNumberAsync,
+                        __pietReadCharAsync,
+                        __pietWriteByte,
+                        {{ctName}}
+                    ).ConfigureAwait(false);
+
+
+                    var __pietString = global::System.Text.Encoding.UTF8.GetString(
+        #if NET5_0_OR_GREATER
+                        global::System.Runtime.InteropServices.CollectionsMarshal.AsSpan(
+        #else
+                        global::System.Linq.Enumerable.ToArray(
+        #endif
+                            __pietBytes
+                        )
+                    );
+                    return __pietString;
+                }
+        """);
+                    break;
+                }
+
+            case { ReturnKind: ReturnKind.ValueTaskString }:
+                {
+                    builder.AppendLine($$"""
+                {
+                    await global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsync(
+                        {{codelArrayExpression}},
+                        {{widthExpression}},
+                        {{heightExpression}},
+                        __pietReadNumberAsync,
+                        __pietReadCharAsync,
+                        __pietWriteByte,
+                        {{ctName}}
+                    ).ConfigureAwait(false);
+
+                    var __pietString = global::System.Text.Encoding.UTF8.GetString(
+        #if NET5_0_OR_GREATER
+                            global::System.Runtime.InteropServices.CollectionsMarshal.AsSpan(
+        #else
+                            global::System.Linq.Enumerable.ToArray(
+        #endif
+                            __pietBytes
+                            )
+                        );
+                    return __pietString;
+                }
+        """);
+                    break;
+                }
+
+            // 3. Enumerable<byte>
+            case { ReturnKind: ReturnKind.EnumerableByte }:
+                {
+                    builder.AppendLine($$"""
+                foreach (var __pietByte in global::Esolang.Piet.__Generated.PietRuntime.ExecuteEnumerable(
+                    {{codelArrayExpression}},
+                    {{widthExpression}},
+                    {{heightExpression}},
+                    __pietReadNumber,
+                    __pietReadChar,
+                    {{ctName}}))
+                {
+                    yield return __pietByte;
+                }
+        """);
+                    break;
+                }
+
+            // 4. AsyncEnumerable<byte>
+            case { ReturnKind: ReturnKind.AsyncEnumerableByte }:
+                {
+                    builder.AppendLine($$"""
+                await foreach (var __pietByte in global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsyncEnumerable(
+                    {{codelArrayExpression}},
+                    {{widthExpression}},
+                    {{heightExpression}},
+                    __pietReadNumberAsync,
+                    __pietReadCharAsync,
+                    {{ctName}}))
+                {
+                    yield return __pietByte;
+                }
+        """);
+                    break;
+                }
+
+            default:
+                // ここには来ない想定
+                break;
+        }
     }
 
     static byte[]? ExtractBytes(AdditionalImageFile file)
@@ -757,25 +1108,6 @@ public partial class MethodGenerator : IIncrementalGenerator
         return $"{paramsPrefix}{modifier}{typeName} {parameter.Name}";
     }
 
-    static ReturnKind GetReturnKind(IMethodSymbol methodSymbol)
-    {
-        if (methodSymbol.ReturnsVoid)
-            return ReturnKind.Void;
-
-        if (methodSymbol.ReturnType.SpecialType == SpecialType.System_String)
-            return ReturnKind.String;
-
-        var returnTypeName = methodSymbol.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        return returnTypeName switch
-        {
-            "global::System.Threading.Tasks.Task<string>" => ReturnKind.TaskString,
-            "global::System.Threading.Tasks.ValueTask<string>" => ReturnKind.ValueTaskString,
-            "global::System.Collections.Generic.IEnumerable<byte>" => ReturnKind.EnumerableByte,
-            "global::System.Collections.Generic.IAsyncEnumerable<byte>" => ReturnKind.AsyncEnumerableByte,
-            _ => ReturnKind.Invalid,
-        };
-    }
-
     static bool IsLanguageVersionAtLeastCSharp8(LanguageVersion languageVersion)
         => languageVersion switch
         {
@@ -786,126 +1118,155 @@ public partial class MethodGenerator : IIncrementalGenerator
             _ => languageVersion >= LanguageVersion.CSharp8,
         };
 
-    static ExecutionBinding BindExecutionSignature(IMethodSymbol methodSymbol)
+    private static ExecutionBinding BindExecutionSignature(IMethodSymbol method)
     {
-        var returnKind = GetReturnKind(methodSymbol);
+        ReturnKind returnKind = method.ReturnType switch
+        {
+            { SpecialType: SpecialType.System_Void } => ReturnKind.Void,
+            { Name: "String", ContainingNamespace.Name: "System" } => ReturnKind.String,
+
+            INamedTypeSymbol t when t.Name == "Task" && t.TypeArguments.Length == 0
+                => ReturnKind.Task,
+            INamedTypeSymbol t when t.Name == "Task" && t.TypeArguments.Length == 1 &&
+                                   t.TypeArguments[0].SpecialType == SpecialType.System_String
+                => ReturnKind.TaskString,
+
+            INamedTypeSymbol t when t.Name == "ValueTask" && t.TypeArguments.Length == 0
+                => ReturnKind.ValueTask,
+            INamedTypeSymbol t when t.Name == "ValueTask" && t.TypeArguments.Length == 1 &&
+                                   t.TypeArguments[0].SpecialType == SpecialType.System_String
+                => ReturnKind.ValueTaskString,
+            INamedTypeSymbol t when t.Name == "IEnumerable" &&
+                                   t.TypeArguments.Length == 1 &&
+                                   t.TypeArguments[0].SpecialType == SpecialType.System_Byte
+                => ReturnKind.EnumerableByte,
+            INamedTypeSymbol t when t.Name == "IAsyncEnumerable" &&
+                                   t.TypeArguments.Length == 1 &&
+                                   t.TypeArguments[0].SpecialType == SpecialType.System_Byte
+                => ReturnKind.AsyncEnumerableByte,
+            _ => ReturnKind.Invalid
+        };
 
         if (returnKind == ReturnKind.Invalid)
-        {
-            return new ExecutionBinding(false, ReturnKind.Invalid, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.InvalidReturnType.Id);
-        }
+            return new(false, returnKind, InputKind.None, OutputKind.None, "", "", null,
+                DiagnosticDescriptors.InvalidReturnType.Id);
 
-        string? inputExpression = null;
-        string? outputExpression = null;
+        OutputKind outputKind = returnKind switch
+        {
+            ReturnKind.Void => OutputKind.None,
+            ReturnKind.String or ReturnKind.TaskString or ReturnKind.ValueTaskString => OutputKind.ReturnString,
+            ReturnKind.EnumerableByte => OutputKind.ReturnEnumerable,
+            ReturnKind.AsyncEnumerableByte => OutputKind.ReturnAsyncEnumerable,
+            _ => OutputKind.None
+        };
+
+        InputKind inputKind = InputKind.None;
+        bool hasCancellationToken = false;
         string? cancellationTokenName = null;
-        var hasInput = false;
-        var hasOutput = false;
+        string inputExpr = "";
+        string outputExpr = "";
 
-        foreach (var parameter in methodSymbol.Parameters)
+        foreach (var p in method.Parameters)
         {
-            if (parameter.RefKind != RefKind.None)
+            if (p.RefKind is not RefKind.None)
             {
-                return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.InvalidParameter.Id);
+                return new(false, returnKind, inputKind, outputKind, "", "", null,
+                    DiagnosticDescriptors.InvalidParameter.Id, p.Locations.ElementAt(0));
             }
 
-            var typeName = parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-
-            if (string.Equals(typeName, "global::System.Threading.CancellationToken", StringComparison.Ordinal))
+            if (p.Type.SpecialType == SpecialType.System_String)
             {
-                if (cancellationTokenName is not null)
-                {
-                    return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.DuplicateParameter.Id);
-                }
+                if (inputKind is not InputKind.None)
+                    return new(false, returnKind, inputKind, outputKind, "", "", null,
+                        DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
 
-                cancellationTokenName = parameter.Name;
+                inputKind = InputKind.String;
+                inputExpr = p.Name;
                 continue;
             }
 
-            if (parameter.Type.SpecialType == SpecialType.System_String)
+            if (p.Type.ToDisplayString() == "System.IO.TextReader")
             {
-                if (hasInput)
-                {
-                    return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.DuplicateParameter.Id);
-                }
+                if (inputKind is not InputKind.None)
+                    return new(false, returnKind, inputKind, outputKind, "", "", null,
+                        DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
 
-                hasInput = true;
-                inputExpression = $"new global::System.IO.StringReader({parameter.Name} ?? string.Empty)";
+                inputKind = InputKind.TextReader;
+                inputExpr = p.Name;
                 continue;
             }
 
-            if (string.Equals(typeName, "global::System.IO.TextReader", StringComparison.Ordinal))
+            if (p.Type.ToDisplayString() == "System.IO.Pipelines.PipeReader")
             {
-                if (hasInput)
-                {
-                    return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.DuplicateParameter.Id);
-                }
+                if (inputKind is not InputKind.None)
+                    return new(false, returnKind, inputKind, outputKind, "", "", null,
+                        DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
 
-                hasInput = true;
-                inputExpression = $"{parameter.Name} ?? global::System.IO.TextReader.Null";
+                inputKind = InputKind.PipeReader;
+                inputExpr = p.Name;
                 continue;
             }
 
-            if (string.Equals(typeName, "global::System.IO.Pipelines.PipeReader", StringComparison.Ordinal))
+            if (p.Type.ToDisplayString() == "System.IO.TextWriter")
             {
-                if (hasInput)
+                if (returnKind is not ReturnKind.Void)
                 {
-                    return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.DuplicateParameter.Id);
+                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName,
+                        DiagnosticDescriptors.ReturnOutputConflict.Id, p.Locations.ElementAt(0));
                 }
 
-                hasInput = true;
-                inputExpression = $"new global::System.IO.StreamReader({parameter.Name}.AsStream())";
+                if (outputKind is not OutputKind.None)
+                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName,
+                        DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
+
+                outputExpr = p.Name;
+                outputKind = OutputKind.TextWriter;
                 continue;
             }
 
-            if (string.Equals(typeName, "global::System.IO.Pipelines.PipeWriter", StringComparison.Ordinal))
+            if (p.Type.ToDisplayString() == "System.IO.Pipelines.PipeWriter")
             {
-                if (hasOutput)
+                if (returnKind is not ReturnKind.Void)
                 {
-                    return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.DuplicateParameter.Id);
+                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName,
+                        DiagnosticDescriptors.ReturnOutputConflict.Id);
                 }
 
-                hasOutput = true;
-                outputExpression = $"new global::System.IO.StreamWriter({parameter.Name}.AsStream()) {{ AutoFlush = true }}";
+                if (outputKind is not OutputKind.None)
+                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName,
+                        DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
+
+                outputExpr = p.Name;
+                outputKind = OutputKind.PipeWriter;
                 continue;
             }
 
-            if (string.Equals(typeName, "global::System.IO.TextWriter", StringComparison.Ordinal))
+            if (p.Type.ToDisplayString() == "System.Threading.CancellationToken")
             {
-                if (hasOutput)
-                {
-                    return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.DuplicateParameter.Id);
-                }
+                if (hasCancellationToken)
+                    return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName,
+                        DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
 
-                hasOutput = true;
-                outputExpression = $"{parameter.Name} ?? global::System.IO.TextWriter.Null";
+                hasCancellationToken = true;
+                cancellationTokenName = p.Name;
                 continue;
             }
 
-            return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.InvalidParameter.Id);
+            // ❌ Unsupported parameter → PT0003
+            return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName,
+                DiagnosticDescriptors.InvalidParameter.Id);
         }
 
-        // Can't have both a non-void return type and a PipeWriter output parameter
-        if (returnKind != ReturnKind.Void && hasOutput)
+        // Return + output parameter conflict
+        if (returnKind is not ReturnKind.Void && outputKind is OutputKind.TextWriter or OutputKind.PipeWriter)
         {
-            return new ExecutionBinding(false, returnKind, false, false, string.Empty, string.Empty, null, DiagnosticDescriptors.ReturnOutputConflict.Id);
+            return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName,
+                DiagnosticDescriptors.ReturnOutputConflict.Id);
         }
 
-        var returnsOutput = returnKind != ReturnKind.Void;
-
-        if (inputExpression is null)
-        {
-            inputExpression = "global::System.IO.TextReader.Null";
-        }
-
-        if (outputExpression is null)
-        {
-            outputExpression = returnsOutput
-                ? "__pietOutput"
-                : "global::System.IO.TextWriter.Null";
-        }
-
-        return new ExecutionBinding(true, returnKind, hasInput, hasOutput || returnsOutput, inputExpression, outputExpression, cancellationTokenName, null);
+        return new(true, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName, null);
     }
+
 
     static AdditionalImageFile? TryResolveImagePath(string imagePath, ImmutableArray<AdditionalImageFile> additionalImageFiles)
     {

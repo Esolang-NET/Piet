@@ -2,6 +2,9 @@
 using Esolang.Piet;
 using System.IO.Pipelines;
 using System.Text;
+#if NET481 
+using System.Threading.Tasks;
+#endif
 
 // ascii-piet (.txt) 画像の出力例
 var asciiPiet = PietSample.RunAsciiPiet();

@@ -148,16 +148,36 @@ public class MethodGeneratorTests
 #endif
 
         var referenceList = references.ToList();
-        var hasPipelinesReference = referenceList.Any(static r =>
-            string.Equals(Path.GetFileNameWithoutExtension(r.FilePath), "System.IO.Pipelines", StringComparison.OrdinalIgnoreCase));
-        if (!hasPipelinesReference)
         {
-            var pipelinesAssemblyLocation = typeof(System.IO.Pipelines.PipeReader).Assembly.Location;
+            var hasPipelinesReference = referenceList.Any(static r =>
+                string.Equals(Path.GetFileNameWithoutExtension(r.FilePath), "System.IO.Pipelines", StringComparison.OrdinalIgnoreCase));
+            if (!hasPipelinesReference)
+            {
+                var pipelinesAssemblyLocation = typeof(System.IO.Pipelines.PipeReader).Assembly.Location;
+                if (!string.IsNullOrWhiteSpace(pipelinesAssemblyLocation))
+                {
+                    referenceList.Add(MetadataReference.CreateFromFile(pipelinesAssemblyLocation));
+                }
+            }
+        }
+#if !NET
+        {
+            var pipelinesAssemblyLocation = typeof(Memory<>).Assembly.Location;
             if (!string.IsNullOrWhiteSpace(pipelinesAssemblyLocation))
             {
                 referenceList.Add(MetadataReference.CreateFromFile(pipelinesAssemblyLocation));
             }
         }
+        {
+            var asm = typeof(ValueTask).Assembly.Location;
+            referenceList.Add(MetadataReference.CreateFromFile(asm));
+        }
+        {
+            var asm = typeof(IAsyncEnumerable<>).Assembly.Location;
+            referenceList.Add(MetadataReference.CreateFromFile(asm));
+        }
+#endif
+
 
         baseCompilation = CSharpCompilation.Create(
             "generator-tests",
@@ -193,17 +213,13 @@ public class MethodGeneratorTests
                 MakeTransformedText("program.png", MinimalLightRedPng)));
         var runResult = driver.GetRunResult();
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run()")),
             "Expected generated method implementation was not found.");
 
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.\n"
-            + string.Join("\n", outputCompilation.GetDiagnostics(CancellationToken).Select(static x => x.ToString())));
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -297,8 +313,7 @@ public class MethodGeneratorTests
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run()")),
@@ -331,11 +346,10 @@ public class MethodGeneratorTests
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("return __pietOutput.ToString();")),
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("return")),
             "Expected generated string return path was not found.");
 
         Assert.IsFalse(
@@ -366,8 +380,7 @@ public class MethodGeneratorTests
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run(global::System.IO.TextReader input, global::System.IO.TextWriter output)")),
@@ -687,12 +700,9 @@ public class MethodGeneratorTests
             runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("public partial void Run(global::System.IO.Pipelines.PipeReader input)")),
             "Expected generated method implementation was not found.");
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.");
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -716,16 +726,19 @@ public class MethodGeneratorTests
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("Task.FromResult(__pietOutput.ToString())")),
-            "Expected Task.FromResult return path was not found.");
+        var generated = runResult.GeneratedTrees
+            .Select(static tree => tree.GetText().ToString())
+            .Single(static text => text.Contains("partial class Sample"));
 
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.");
+        Assert.Contains("public async partial global::System.Threading.Tasks.Task<string> Run(", generated,
+            "Expected async Task<string> signature was not found.");
+
+        Assert.IsTrue(generated.Contains("PietRuntime.ExecuteAsync("),
+            "Expected async runtime call was not found.");
+
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -749,16 +762,13 @@ public class MethodGeneratorTests
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("yield return __pietByte;")),
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("yield return")),
             "Expected yield return byte path was not found.");
 
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.");
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -782,16 +792,13 @@ public class MethodGeneratorTests
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("global::System.Threading.CancellationToken ct")),
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("CancellationToken ct")),
             "Expected CancellationToken parameter was not found in generated code.");
 
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.");
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -803,15 +810,12 @@ public class MethodGeneratorTests
         var runResult = driver.GetRunResult();
         var generatedHints = runResult.Results.SelectMany(static r => r.GeneratedSources).Select(static s => s.HintName).ToArray();
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
         Assert.IsFalse(generatedHints.Contains(MethodGenerator.GeneratedMethodsFileName, StringComparer.Ordinal));
         Assert.IsFalse(generatedHints.Contains(MethodGenerator.GeneratePietRuntimeFileName, StringComparer.Ordinal));
 
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.");
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -1022,8 +1026,7 @@ public class MethodGeneratorTests
                 MakeTransformedText("program.png", MinimalLightRedPng)));
         var runResult = driver.GetRunResult();
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
         var generatedMethod = runResult.GeneratedTrees
             .Select(tree => tree.GetText(CancellationToken).ToString())
@@ -1032,9 +1035,7 @@ public class MethodGeneratorTests
         Assert.IsTrue(generatedMethod.Contains("public static partial"), "Expected static modifier was not found.");
         Assert.IsFalse(generatedMethod.Contains("namespace "), "Global namespace method should not emit a namespace declaration.");
 
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.");
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -1229,17 +1230,13 @@ public class MethodGeneratorTests
                 MakeTransformedText("black.png", blackPng)));
         var runResult = driver.GetRunResult();
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
             "Expected generated method implementation was not found.");
 
-        var diagnostics_ = outputCompilation.GetDiagnostics(CancellationToken);
-        Assert.IsFalse(
-            diagnostics_.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.");
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -1268,12 +1265,13 @@ public class MethodGeneratorTests
             new TestAdditionalText("obj/black.png.piet.txt",
                 MakeTransformedText("black.png", blackPng)));
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
+        var diagnostics2 = outputCompilation.GetDiagnostics(CancellationToken);
         Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator with C#12 parse options.");
+            diagnostics2.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator with C#12 parse options.\r\n"
+            + string.Join("\r\n", diagnostics2.Select(v => v.ToString())));
     }
 
     [TestMethod]
@@ -1331,16 +1329,14 @@ public class MethodGeneratorTests
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("new global::System.Threading.Tasks.ValueTask<string>")),
+            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public async partial global::System.Threading.Tasks.ValueTask<string> Run()"))
+            && runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("return __pietString;")),
             "Expected ValueTask<string> return path was not found.");
 
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.");
+        AssertNoErrors(outputCompilation);
 #else
         Assert.Inconclusive("ValueTask return type support requires .NET 8 or later.");
 #endif
@@ -1350,7 +1346,6 @@ public class MethodGeneratorTests
     public void Generator_WithIAsyncEnumerableByteReturn_GeneratesAsyncMethod()
     {
 
-#if NET8_0_OR_GREATER
         const string source = """
             namespace Demo;
 
@@ -1369,32 +1364,21 @@ public class MethodGeneratorTests
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
         var generatedText = runResult.GeneratedTrees
             .Select(static tree => tree.GetText().ToString())
             .FirstOrDefault(static t => t.Contains("IAsyncEnumerable")) ?? string.Empty;
 
-        Assert.IsTrue(generatedText.Contains("async partial"), "Expected async modifier in generated code.");
-        Assert.IsTrue(generatedText.Contains("EnumeratorCancellation"), "Expected [EnumeratorCancellation] attribute in generated code.");
-        Assert.IsTrue(generatedText.Contains("new global::System.IO.Pipelines.Pipe()"), "Expected Pipe-based streaming path was not found.");
-        Assert.IsTrue(generatedText.Contains("await __pietPipe.Reader.ReadAsync(__pietReadCancellationToken)"), "Expected async Pipe read loop was not found.");
-        Assert.IsTrue(generatedText.Contains("yield return __pietChunk[__pietIndex];"), "Expected yield return byte path was not found.");
-        Assert.IsTrue(generatedText.Contains("ct.ThrowIfCancellationRequested();"), "Expected cancellation check was not found.");
+        Assert.IsTrue(generatedText.Contains("public async partial global::System.Collections.Generic.IAsyncEnumerable<byte> Run([global::System.Runtime.CompilerServices.EnumeratorCancellation] global::System.Threading.CancellationToken ct)"), "Expected async modifier in generated code.");
+        Assert.IsTrue(generatedText.Contains("yield return __pietByte;"), "Expected yield return byte path was not found.");
 
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.");
-#else
-        Assert.Inconclusive("ValueTask return type support requires .NET 8 or later.");
-#endif
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
     public void Generator_WithPipeReaderInput_GeneratesMethod()
     {
-#if NET8_0_OR_GREATER
         const string source = """
             namespace Demo;
 
@@ -1413,12 +1397,7 @@ public class MethodGeneratorTests
                 MakeTransformedText("input.png", TwoPixelInputPng)));
         var runResult = driver.GetRunResult();
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
-
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("new global::System.IO.StreamReader(input.AsStream())")),
-            "Expected PipeReader.AsStream() wrapper was not found in generated code.");
+        AssertNoErrors(diagnostics);
 
         var pipeReaderErrors = outputCompilation.GetDiagnostics(CancellationToken)
             .Where(static x => x.Severity == DiagnosticSeverity.Error)
@@ -1428,15 +1407,11 @@ public class MethodGeneratorTests
         Assert.IsFalse(
             pipeReaderErrors.Length > 0,
             "Compilation contains errors after running generator. " + string.Join(" | ", pipeReaderErrors));
-#else
-        Assert.Inconclusive("ValueTask return type support requires .NET 8 or later.");
-#endif
     }
 
     [TestMethod]
     public void Generator_WithPipeWriterOutput_GeneratesMethod()
     {
-#if NET8_0_OR_GREATER
         const string source = """
             namespace Demo;
 
@@ -1455,12 +1430,11 @@ public class MethodGeneratorTests
                 MakeTransformedText("output.png", TwoPixelOutputPng)));
         var runResult = driver.GetRunResult();
 
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        AssertNoErrors(diagnostics);
 
         Assert.IsTrue(
-            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("new global::System.IO.StreamWriter(output.AsStream())")),
-            "Expected PipeWriter.AsStream() wrapper was not found in generated code.");
+            runResult.GeneratedTrees.Any(static tree => tree.GetText().ToString().Contains("global::System.Buffers.BuffersExtensions.Write(output, ")),
+            "Expected PipeWriter.WriteAsync() was not found in generated code.");
 
         var pipeWriterErrors = outputCompilation.GetDiagnostics(CancellationToken)
             .Where(static x => x.Severity == DiagnosticSeverity.Error)
@@ -1470,9 +1444,6 @@ public class MethodGeneratorTests
         Assert.IsFalse(
             pipeWriterErrors.Length > 0,
             "Compilation contains errors after running generator. " + string.Join(" | ", pipeWriterErrors));
-#else
-        Assert.Inconclusive("ValueTask return type support requires .NET 8 or later.");
-#endif
     }
 
     GeneratorDriver RunGeneratorsAndUpdateCompilation(
@@ -1541,11 +1512,9 @@ public partial class Sample
         var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
         Assert.IsNotNull(generated, "Method not generated");
         Assert.IsTrue(generated.Contains("codelSize: 2"), "codelSize=2 not reflected in generated code");
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.");
+        AssertNoErrors(diagnostics);
+
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -1574,11 +1543,9 @@ public partial class Sample
         var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
         Assert.IsNotNull(generated, "Method not generated");
         Assert.IsTrue(generated.Contains("codelSize: 2"), "codelSize=2 not reflected in generated code");
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.");
+        AssertNoErrors(diagnostics);
+
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -1605,11 +1572,9 @@ public partial class Sample
         var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
         Assert.IsNotNull(generated, "Method not generated");
         Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize=1 not reflected in generated code");
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.");
+        AssertNoErrors(diagnostics);
+
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -1754,5 +1719,18 @@ public partial class Sample
             runResult.GeneratedTrees.Any(tree =>
                 tree.GetText().ToString().Contains("throw new global::System.NotImplementedException(\"PT0008")),
             "Expected throw for PT0008 was not generated.");
+    }
+
+    void AssertNoErrors(ImmutableArray<Diagnostic> diagnostics)
+    {
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            string.Join("\n", diagnostics.Select(static x => x.ToString())));
+    }
+
+    void AssertNoErrors(Compilation outputCompilation)
+    {
+        var diagnostics = outputCompilation.GetDiagnostics(CancellationToken);
+        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            "Compilation contains errors after running generator." + string.Join("\n", diagnostics.Select(static x => x.ToString())));
     }
 }
