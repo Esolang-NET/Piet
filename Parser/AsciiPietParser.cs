@@ -9,7 +9,7 @@ namespace Esolang.Piet.Parser;
 public static class AsciiPietParser
 {
     /// <summary>
-    /// ascii-piet 公式仕様に基づく文字→PietColor 対応表（通常用・行末用どちらも同じ色にマッピング）
+    /// Character-to-PietColor mapping based on the official ascii-piet specification (both regular and end-of-line markers map to the same color).
     /// </summary>
     private static readonly Dictionary<char, (PietColor Color, bool IsEndOfLine)> CharToColor = new()
     {

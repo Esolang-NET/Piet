@@ -342,7 +342,7 @@ public static class PietParser
     }
 
     /// <summary>
-    /// RGB値をPietColorインデックスに変換します。対応しない色は-1を返します。
+    /// Converts an RGB value to a PietColor index. Returns -1 for unsupported colors.
     /// </summary>
     public static int MapToPietColor(byte r, byte g, byte b)
     {
