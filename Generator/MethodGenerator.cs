@@ -46,11 +46,9 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         """;
 
-    readonly struct EmittedMethod
+    readonly struct EmittedMethod(string source)
     {
-        public EmittedMethod(string source) => Source = source;
-
-        public string Source { get; }
+        public string Source { get; } = source;
     }
 
     enum ReturnKind
