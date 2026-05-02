@@ -20,6 +20,10 @@
     <PackageReference Update="Basic.Reference.Assemblies.Net90" Version="1.8.5" />
   </ItemGroup>
 
+  <Target Name="TestResultCleaning" AfterTargets="Clean" Condition="'$(IsTestProject)' == 'true'">
+    <RemoveDir Directories="$(TestResultsFolderPath)" Condition="Exists('$(TestResultsFolderPath)')" />
+  </Target>
+
   <PropertyGroup Condition="'$(IsTestProject)' == 'true' and '$(TargetFrameworkIdentifier)' != '.NETFramework'">
     <RunSettingsFilePath>$(MSBuildProjectDirectory)\..\coverlet.collect.runsettings</RunSettingsFilePath>
   </PropertyGroup>
