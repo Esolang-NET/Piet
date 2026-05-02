@@ -48,10 +48,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
     readonly struct EmittedMethod
     {
-        public EmittedMethod(string source)
-        {
-            Source = source;
-        }
+        public EmittedMethod(string source) => Source = source;
 
         public string Source { get; }
     }
@@ -231,17 +228,14 @@ public partial class MethodGenerator : IIncrementalGenerator
                     : LanguageVersion.Default);
 
         var projectDirrectory = context.AnalyzerConfigOptionsProvider
-            .Select(static (provider, _) =>
-            {
-                return provider.GlobalOptions.TryGetValue("build_property.MSBuildProjectDirectory", out var projectDirectory)
+            .Select(static (provider, _) => provider.GlobalOptions.TryGetValue("build_property.MSBuildProjectDirectory", out var projectDirectory)
                 || provider.GlobalOptions.TryGetValue("build_property.ProjectDir", out projectDirectory)
-                ? projectDirectory : null;
-            });
+                ? projectDirectory : null);
         var generationInputs = generatedTargets.Combine(additionalFiles).Combine(languageVersion).Combine(projectDirrectory);
 
         context.RegisterSourceOutput(generationInputs, static (context, input) =>
         {
-            (((ImmutableArray<GeneratorAttributeSyntaxContext> sources, ImmutableArray<AdditionalImageFile> imagePaths), LanguageVersion currentLanguageVersion), string? projectDir) = input;
+            (((var sources, var imagePaths), var currentLanguageVersion), var projectDir) = input;
 
             if (sources.IsDefaultOrEmpty)
             {
@@ -356,7 +350,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         }
 
         // 属性でCodelSize指定があればそれを優先、なければ追加ファイルのPIET_CODEL_SIZEコメントを使う
-        int codelSize = resolvedImageFile.CodelSize ?? DefaultCodelSize;
+        var codelSize = resolvedImageFile.CodelSize ?? DefaultCodelSize;
         // 属性引数（2つ目以降）にcodelSizeがあれば上書き
         if (source.Attributes[0].ConstructorArguments.Length > 1)
         {
@@ -1132,7 +1126,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
     private static ExecutionBinding BindExecutionSignature(IMethodSymbol method)
     {
-        ReturnKind returnKind = method.ReturnType switch
+        var returnKind = method.ReturnType switch
         {
             { SpecialType: SpecialType.System_Void } => ReturnKind.Void,
             { Name: "String", ContainingNamespace.Name: "System" } => ReturnKind.String,
@@ -1163,7 +1157,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             return new(false, returnKind, InputKind.None, OutputKind.None, "", "", null,
                 DiagnosticDescriptors.InvalidReturnType.Id);
 
-        OutputKind outputKind = returnKind switch
+        var outputKind = returnKind switch
         {
             ReturnKind.Void => OutputKind.None,
             ReturnKind.String or ReturnKind.TaskString or ReturnKind.ValueTaskString => OutputKind.ReturnString,
@@ -1172,11 +1166,11 @@ public partial class MethodGenerator : IIncrementalGenerator
             _ => OutputKind.None
         };
 
-        InputKind inputKind = InputKind.None;
-        bool hasCancellationToken = false;
+        var inputKind = InputKind.None;
+        var hasCancellationToken = false;
         string? cancellationTokenName = null;
-        string inputExpr = "";
-        string outputExpr = "";
+        var inputExpr = "";
+        var outputExpr = "";
 
         foreach (var p in method.Parameters)
         {
@@ -1500,39 +1494,39 @@ public partial class MethodGenerator : IIncrementalGenerator
         int[] sHue = [-1, -1, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5];
         int[] sLight = [-1, -1, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2];
 
-        bool mightUseOutput = false;
-        bool mightUseInput = false;
+        var mightUseOutput = false;
+        var mightUseInput = false;
 
-        for (int y = 0; y < height && !(mightUseOutput && mightUseInput); y++)
+        for (var y = 0; y < height && !(mightUseOutput && mightUseInput); y++)
         {
-            for (int x = 0; x < width && !(mightUseOutput && mightUseInput); x++)
+            for (var x = 0; x < width && !(mightUseOutput && mightUseInput); x++)
             {
-                byte c = codels[y * width + x];
+                var c = codels[(y * width) + x];
                 if (c < 2) continue;
 
                 // Check right neighbor
                 if (x + 1 < width)
                 {
-                    byte nc = codels[y * width + (x + 1)];
+                    var nc = codels[(y * width) + x + 1];
                     if (nc >= 2 && nc != c)
                     {
-                        int cmd = (((sHue[nc] - sHue[c]) % 6 + 6) % 6) * 3
-                                + (((sLight[nc] - sLight[c]) % 3 + 3) % 3);
-                        if (cmd == 14 || cmd == 15) mightUseInput = true;
-                        if (cmd == 16 || cmd == 17) mightUseOutput = true;
+                        var cmd = ((((sHue[nc] - sHue[c]) % 6) + 6) % 6 * 3)
+                                + ((((sLight[nc] - sLight[c]) % 3) + 3) % 3);
+                        if (cmd is 14 or 15) mightUseInput = true;
+                        if (cmd is 16 or 17) mightUseOutput = true;
                     }
                 }
 
                 // Check bottom neighbor
                 if (y + 1 < height)
                 {
-                    byte nc = codels[(y + 1) * width + x];
+                    var nc = codels[((y + 1) * width) + x];
                     if (nc >= 2 && nc != c)
                     {
-                        int cmd = (((sHue[nc] - sHue[c]) % 6 + 6) % 6) * 3
-                                + (((sLight[nc] - sLight[c]) % 3 + 3) % 3);
-                        if (cmd == 14 || cmd == 15) mightUseInput = true;
-                        if (cmd == 16 || cmd == 17) mightUseOutput = true;
+                        var cmd = ((((sHue[nc] - sHue[c]) % 6) + 6) % 6 * 3)
+                                + ((((sLight[nc] - sLight[c]) % 3) + 3) % 3);
+                        if (cmd is 14 or 15) mightUseInput = true;
+                        if (cmd is 16 or 17) mightUseOutput = true;
                     }
                 }
             }
