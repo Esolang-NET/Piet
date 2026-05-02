@@ -1,41 +1,23 @@
-using Esolang.Piet.Parser;
-using Esolang.Piet.Processor;
-using System.CommandLine;
+using Esolang.Piet.Interpreter;
 
-var inputArgument = new Argument<string>("path")
+namespace Esolang.Piet.Interpreter
 {
-    Description = "Path to a Piet image file.",
-};
-var codelSizeOption = new Option<int>("--codel-size", "-cs")
-{
-    DefaultValueFactory = _ => 1,
-    Description = "Codel size to use when parsing the image.",
-};
-var rootCommand = new RootCommand("Run Piet programs from image files.")
-{
-    inputArgument,
-    codelSizeOption,
-};
-rootCommand.SetAction(parseResult =>
-{
-    var path = parseResult.GetValue(inputArgument);
-    var codelSize = parseResult.GetValue(codelSizeOption);
-    var program = PietParser.Parse(path!, codelSize);
-    var originalOutput = Console.Out;
-    var originalInput = Console.In;
-    try
+    /// <summary>
+    /// Entry point for the dotnet-piet command-line tool.
+    /// </summary>
+    public static class Program
     {
-        var output = originalOutput;
-        var input = originalInput;
-        var processor = new PietProcessor(program, output, input);
-        processor.Run();
-        return 0;
-    }
-    finally
-    {
-        Console.SetOut(originalOutput);
-        Console.SetIn(originalInput);
-    }
-});
+        /// <summary>
+        /// Runs the command-line pipeline and returns the process exit code.
+        /// </summary>
+        public static async Task<int> RunAsync(string[] args)
+        {
+            var rootCommand = PietInterpreterExtensions.BuildRootCommand();
+            return await rootCommand.Parse(args).InvokeAsync();
+        }
 
-return await rootCommand.Parse(args).InvokeAsync();
+        /// <summary>Application entry point.</summary>
+        public static async Task<int> Main(string[] args)
+            => await RunAsync(args);
+    }
+}

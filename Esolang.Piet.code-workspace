@@ -21,6 +21,10 @@
 			"path": "Interpreter"
 		},
 		{
+			"name": "Esolang.Piet.Interpreter.Tests",
+			"path": "Interpreter.Tests"
+		},
+		{
 			"name": "Esolang.Piet.Parser",
 			"path": "Parser"
 		},

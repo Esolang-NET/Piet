@@ -12,4 +12,5 @@
   <Project Path="Generator.Tests/Esolang.Piet.Generator.Tests.csproj" />
   <Project Path="samples/Generator.UseConsole/Esolang.Piet.Generator.UseConsole.csproj" />
   <Project Path="Interpreter/Esolang.Piet.Interpreter.csproj" />
+  <Project Path="Interpreter.Tests/Esolang.Piet.Interpreter.Tests.csproj" />
 </Solution>
