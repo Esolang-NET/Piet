@@ -731,6 +731,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 builder.AppendLine($$"""
                 global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                 {
+            #if NET7_0_OR_GREATER
                     var __lineTask = {{executionBinding.InputExpression}}.ReadLineAsync(__ct);
                     if (__lineTask.IsCompletedSuccessfully)
                     {
@@ -746,6 +747,16 @@ public partial class MethodGenerator : IIncrementalGenerator
                         if (__line is null) return null;
                         return int.TryParse(__line, out var __n) ? __n : (int?)null;
                     }
+            #else
+                    return __pietReadNumberAsyncAwaited();
+
+                    async global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsyncAwaited()
+                    {
+                        var __line = await {{executionBinding.InputExpression}}.ReadLineAsync().ConfigureAwait(false);
+                        if (__line is null) return null;
+                        return int.TryParse(__line, out var __n) ? __n : (int?)null;
+                    }
+            #endif
                 }
 
                 global::System.Threading.Tasks.ValueTask<int?> __pietReadCharAsync(global::System.Threading.CancellationToken __ct)
@@ -786,7 +797,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                     }
 
                     var __first = 
-            #if NET5_0_OR_GRATER
+            #if NET5_0_OR_GREATER
                         __buffer.FirstSpan[0];
             #else
                         __buffer.First.Span[0];
@@ -827,7 +838,12 @@ public partial class MethodGenerator : IIncrementalGenerator
                         return null;
                     }
 
-                    var __first = __buffer.FirstSpan[0];
+                    var __first = 
+            #if NET5_0_OR_GREATER
+                        __buffer.FirstSpan[0];
+            #else
+                        __buffer.First.Span[0];
+            #endif
                     var __pos = __buffer.GetPosition(1);
                     {{executionBinding.InputExpression}}.AdvanceTo(__pos);
                     return __first;

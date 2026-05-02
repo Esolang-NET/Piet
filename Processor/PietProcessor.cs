@@ -50,10 +50,7 @@ public sealed class PietProcessor(PietProgram program, TextWriter? output = null
     /// <summary>
     /// Executes the program.
     /// </summary>
-    public void Run()
-    {
-        Run(Input, Output);
-    }
+    public void Run() => Run(Input, Output);
 
     /// <summary>
     /// Executes the program with explicit I/O.
@@ -116,8 +113,8 @@ public sealed class PietProcessor(PietProgram program, TextWriter? output = null
 
                 if (blockColor >= 2 && nextColor >= 2)
                 {
-                    var hDiff = ((HueTable[nextColor] - HueTable[blockColor]) % 6 + 6) % 6;
-                    var lDiff = ((LightnessTable[nextColor] - LightnessTable[blockColor]) % 3 + 3) % 3;
+                    var hDiff = (((HueTable[nextColor] - HueTable[blockColor]) % 6) + 6) % 6;
+                    var lDiff = (((LightnessTable[nextColor] - LightnessTable[blockColor]) % 3) + 3) % 3;
                     ExecuteCommand(hDiff, lDiff, blockCells.Count, stack, ref dp, ref cc, reader, writer);
                 }
 
@@ -228,7 +225,7 @@ public sealed class PietProcessor(PietProgram program, TextWriter? output = null
                 if (stack.Count >= 1)
                 {
                     var a = Pop(stack);
-                    dp = ((dp + a) % 4 + 4) % 4;
+                    dp = (((dp + a) % 4) + 4) % 4;
                 }
                 break;
             case 11:
@@ -241,7 +238,7 @@ public sealed class PietProcessor(PietProgram program, TextWriter? output = null
                 break;
             case 12:
                 if (stack.Count >= 1)
-                    stack.Add(stack[stack.Count - 1]);
+                    stack.Add(stack[^1]);
                 break;
             case 13:
                 if (stack.Count >= 2)
@@ -323,7 +320,7 @@ public sealed class PietProcessor(PietProgram program, TextWriter? output = null
         rolls = ((rolls % depth) + depth) % depth;
         for (var i = 0; i < rolls; i++)
         {
-            var top = stack[stack.Count - 1];
+            var top = stack[^1];
             stack.RemoveAt(stack.Count - 1);
             stack.Insert(stack.Count - depth + 1, top);
         }
@@ -390,25 +387,14 @@ public sealed class PietProcessor(PietProgram program, TextWriter? output = null
         {
             var bx = block[i].x;
             var by = block[i].y;
-            bool better;
-
-            switch (dp)
+            var better = dp switch
             {
-                case 0:
-                    better = bx > bestX || (bx == bestX && (cc == 0 ? by < bestY : by > bestY));
-                    break;
-                case 1:
-                    better = by > bestY || (by == bestY && (cc == 0 ? bx > bestX : bx < bestX));
-                    break;
-                case 2:
-                    better = bx < bestX || (bx == bestX && (cc == 0 ? by > bestY : by < bestY));
-                    break;
-                case 3:
-                    better = by < bestY || (by == bestY && (cc == 0 ? bx < bestX : bx > bestX));
-                    break;
-                default:
-                    throw new InvalidOperationException("Unexpected DP value");
-            }
+                0 => bx > bestX || (bx == bestX && (cc == 0 ? by < bestY : by > bestY)),
+                1 => by > bestY || (by == bestY && (cc == 0 ? bx > bestX : bx < bestX)),
+                2 => bx < bestX || (bx == bestX && (cc == 0 ? by > bestY : by < bestY)),
+                3 => by < bestY || (by == bestY && (cc == 0 ? bx < bestX : bx > bestX)),
+                _ => throw new InvalidOperationException("Unexpected DP value"),
+            };
 
             if (better)
             {
@@ -420,7 +406,7 @@ public sealed class PietProcessor(PietProgram program, TextWriter? output = null
         return (bestX, bestY);
     }
 
-    static int DpDx(int dp) => dp == 0 ? 1 : (dp == 2 ? -1 : 0);
+    static int DpDx(int dp) => dp switch { 0 => 1, 2 => -1, _ => 0 };
 
-    static int DpDy(int dp) => dp == 1 ? 1 : (dp == 3 ? -1 : 0);
+    static int DpDy(int dp) => dp switch { 1 => 1, 3 => -1, _ => 0 };
 }

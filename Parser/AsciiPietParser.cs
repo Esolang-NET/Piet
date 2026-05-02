@@ -128,8 +128,8 @@ public static class AsciiPietParser
     static PietProgram InternalParse(string lines, int codelSize = 1)
     {
         List<List<PietColor>> lineList = [];
-        int x = 0;
-        int y = 0;
+        var x = 0;
+        var y = 0;
         List<PietColor>? currentLine = null;
         foreach (var ch in lines)
         {
@@ -160,7 +160,7 @@ public static class AsciiPietParser
             {
                 for (x = 0; x < codelWidth; x++)
                 {
-                    colors[(y * codelWidth) + x] = (PietColor)codels[y * codelSize * width + (x * codelSize)];
+                    colors[(y * codelWidth) + x] = (PietColor)codels[(y * codelSize * width) + (x * codelSize)];
                 }
             }
             return new PietProgram(codelWidth, codelHeight, colors);

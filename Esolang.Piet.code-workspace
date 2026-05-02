@@ -51,19 +51,20 @@
 			"**/.hg": true,
 			"**/.DS_Store": true,
 			"**/Thumbs.db": true,
+			"Generator": true,
+			"Generator.Tests": true,
+			"Interpreter": true,
+			"Interpreter.Tests": true,
+			"Parser": true,
+			"Parser.Tests": true,
+			"Processor": true,
+			"Processor.Tests": true,
 			"samples": true,
-			"**/Interpreter": true,
-			"**/Parser": true,
-			"**/Processor": true,
-			"**/Generator": true,
-			"**/Parser.Tests": true,
-			"**/Processor.Tests": true,
-			"**/Generator.Tests": true
+			"Generator.UseConsole": true
 		}
 	},
 	"extensions": {
 		"recommendations": [
-			"ms-vscode.powershell",
 			"ms-dotnettools.csdevkit"
 		]
 	}

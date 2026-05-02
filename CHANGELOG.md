@@ -23,6 +23,8 @@ The format is based on Keep a Changelog.
 - Standardized generator behavior to emit throwing method bodies even when diagnostics such as `PT0001` are reported.
 - Refactored runtime DP branch logic into explicit branches and removed unreachable default paths.
 - Translated documentation comments to English and filled missing XML comments on public APIs.
+- Build/package baseline: incremented `AssemblyVersion` / `FileVersion` to `1.0.0.2`.
+- `dotnet-piet`: enabled trimming/AOT analyzer-related properties and marked tool package as AOT-compatible for `net8.0+`.
 
 ### Fixed
 

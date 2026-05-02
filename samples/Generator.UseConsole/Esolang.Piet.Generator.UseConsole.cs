@@ -90,10 +90,7 @@ partial class PietSample
     /// <summary>
     /// Runs the hello-world sample and writes its output to <see cref="Console.Out"/>.
     /// </summary>
-    public static void RunToConsole()
-    {
-        RunWithTextWriter(Console.Out);
-    }
+    public static void RunToConsole() => RunWithTextWriter(Console.Out);
 
     /// <summary>
     /// Executes the no-op sample program.

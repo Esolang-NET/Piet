@@ -26,7 +26,7 @@ public static class PietParser
 #endif
     out PietProgram program)
     {
-        if (ext == ".txt" || ext == ".ascii-piet")
+        if (ext is ".txt" or ".ascii-piet")
             return AsciiPietParser.TryParse(bytes, codelSize, out program);
         if (AsciiPietParser.LooksLikeAsciiPiet(bytes) && AsciiPietParser.TryParse(bytes, codelSize, out program))
             return true;
@@ -48,15 +48,15 @@ public static class PietParser
     /// <exception cref="ArgumentException"></exception>
     public static PietProgram Parse(byte[] bytes, string ext, int codelSize = 1)
     {
-        if (ext == ".txt" || ext == ".ascii-piet")
+        if (ext is ".txt" or ".ascii-piet")
             return AsciiPietParser.Parse(bytes, codelSize);
         if (AsciiPietParser.LooksLikeAsciiPiet(bytes) && AsciiPietParser.TryParse(bytes, codelSize, out var program))
             return program;
         try
         {
             using var image = Image.Load<Rgba32>(bytes);
-            int codelWidth = image.Width / codelSize;
-            int codelHeight = image.Height / codelSize;
+            var codelWidth = image.Width / codelSize;
+            var codelHeight = image.Height / codelSize;
             var colors = new PietColor[codelWidth * codelHeight];
             for (var y = 0; y < codelHeight; y++)
             {
@@ -68,7 +68,7 @@ public static class PietParser
             }
             return new PietProgram(codelWidth, codelHeight, colors);
         }
-        catch (Exception e) when (ext == ".png" && (e is InvalidImageContentException || e is UnknownImageFormatException))
+        catch (Exception e) when (ext == ".png" && e is InvalidImageContentException or UnknownImageFormatException)
         {
             // PNG形式であっても、ImageSharpが対応していない特殊なPNGの場合があるため、独自のPNGデコードを試みる
             return ParseWithRawPngFallback(bytes, codelSize);
@@ -89,8 +89,8 @@ public static class PietParser
         try
         {
             using var image = Image.Load<Rgba32>(bytes);
-            int codelWidth = image.Width / codelSize;
-            int codelHeight = image.Height / codelSize;
+            var codelWidth = image.Width / codelSize;
+            var codelHeight = image.Height / codelSize;
             var colors = new PietColor[codelWidth * codelHeight];
             for (var y = 0; y < codelHeight; y++)
             {
@@ -144,14 +144,14 @@ public static class PietParser
     }
     static PietProgram InternalParseWithRawPngFallback(byte[] codels, int width, int height, int codelSize)
     {
-        int codelWidth = width / codelSize;
-        int codelHeight = height / codelSize;
+        var codelWidth = width / codelSize;
+        var codelHeight = height / codelSize;
         var colors = new PietColor[codelWidth * codelHeight];
         for (var y = 0; y < codelHeight; y++)
         {
             for (var x = 0; x < codelWidth; x++)
             {
-                colors[(y * codelWidth) + x] = (PietColor)codels[y * codelSize * width + (x * codelSize)];
+                colors[(y * codelWidth) + x] = (PietColor)codels[(y * codelSize * width) + (x * codelSize)];
             }
         }
         return new PietProgram(codelWidth, codelHeight, colors);

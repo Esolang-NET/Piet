@@ -387,7 +387,7 @@ public class MethodGeneratorTests
             "Expected generated method implementation with TextReader/TextWriter parameters was not found.");
 
         Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0007" || x.Id == "PT0008"),
+            generatorDiagnostics.Any(static x => x.Id is "PT0007" or "PT0008"),
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
 
         Assert.IsFalse(
@@ -2205,11 +2205,9 @@ public partial class Sample
             "Expected throw for PT0011 was not generated.");
     }
 
-    void AssertNoErrors(ImmutableArray<Diagnostic> diagnostics)
-    {
+    void AssertNoErrors(ImmutableArray<Diagnostic> diagnostics) =>
         Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
             string.Join("\n", diagnostics.Select(static x => x.ToString())));
-    }
 
     void AssertNoErrors(Compilation outputCompilation)
     {
