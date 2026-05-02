@@ -1863,7 +1863,7 @@ namespace Demo;
 
 public partial class Sample
 {
-    [Esolang.Piet.GeneratePietMethod("data:text/plain;codel-size=3;base64,bF8gQw==")]
+    [Esolang.Piet.GeneratePietMethod("data:text/acii-piet;codel-size=1;base64,bF8gQw==")]
     public static partial void Run();
 }
 """;
@@ -1878,7 +1878,7 @@ public partial class Sample
 
         var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
         Assert.IsNotNull(generated, "Method not generated");
-        Assert.IsTrue(generated.Contains("codelSize: 3"), "codelSize=3 not reflected in generated code");
+        Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize=1 not reflected in generated code");
         AssertNoErrors(diagnostics);
         AssertNoErrors(outputCompilation);
     }
@@ -1930,11 +1930,11 @@ public partial class Sample
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0002"));
+        Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0005"));
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree =>
-                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0002")),
-            "Expected throw for PT0002 was not generated.");
+                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0005")),
+            "Expected throw for PT0005 was not generated.");
     }
 
     [TestMethod]
