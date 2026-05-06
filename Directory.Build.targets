@@ -6,9 +6,11 @@
     <PackageReference Update="MSTest.TestAdapter" Version="4.2.1" />
     <PackageReference Update="MSTest.TestFramework" Version="4.2.1" />
     <PackageReference Update="System.CommandLine" Version="2.0.6" />
-    <PackageReference Update="System.Collections.Immutable" Version="10.0.6" />
-    <PackageReference Update="System.IO.Pipelines" Version="10.0.6" />
-    <PackageReference Update="SixLabors.ImageSharp" Version="3.1.11" />
+    <PackageReference Update="System.Collections.Immutable" Version="10.0.7" />
+    <PackageReference Update="System.IO.Pipelines" Version="10.0.7" />
+    <PackageReference Update="System.Linq.AsyncEnumerable" Version="10.0.7" />
+    <PackageReference Update="System.Threading.Tasks.Extensions" Version="4.6.3" />
+    <PackageReference Update="SixLabors.ImageSharp" Version="2.1.13" />
     <PackageReference Update="coverlet.collector" Version="8.0.1" />
     <PackageReference Update="Basic.Reference.Assemblies.Net100" Version="1.8.5" />
     <PackageReference Update="Basic.Reference.Assemblies.Net472" Version="1.8.5" />
@@ -17,4 +19,8 @@
     <PackageReference Update="Basic.Reference.Assemblies.Net80" Version="1.8.5" />
     <PackageReference Update="Basic.Reference.Assemblies.Net90" Version="1.8.5" />
   </ItemGroup>
+
+  <Target Name="TestResultCleaning" AfterTargets="Clean" Condition="'$(IsTestProject)' == 'true'">
+    <RemoveDir Directories="$(TestResultsFolderPath)" Condition="Exists('$(TestResultsFolderPath)')" />
+  </Target>
 </Project>

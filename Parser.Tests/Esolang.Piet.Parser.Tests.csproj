@@ -4,7 +4,7 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <IsPublishable>false</IsPublishable>
-    <AssemblyName>Piet.Parser.Tests</AssemblyName>
+    <AssemblyName>Esolang.Piet.Parser.Tests</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>

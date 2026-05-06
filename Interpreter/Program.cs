@@ -1,22 +1,22 @@
-using Esolang.Piet.Parser;
-using Esolang.Piet.Processor;
-using System.CommandLine;
+using Esolang.Piet.Interpreter;
 
-var inputArgument = new Argument<string>("path")
-{
-    Description = "Path to a Piet image file.",
-};
-var rootCommand = new RootCommand("Run Piet programs from image files.")
-{
-    inputArgument,
-};
-rootCommand.SetAction(parseResult =>
-{
-    var path = parseResult.GetValue(inputArgument);
-    var program = PietParser.Parse(path!);
-    var processor = new PietProcessor(program, Console.Out, Console.In);
-    processor.Run();
-    return 0;
-});
+namespace Esolang.Piet.Interpreter;
 
-return await rootCommand.Parse(args).InvokeAsync();
+/// <summary>
+/// Entry point for the dotnet-piet command-line tool.
+/// </summary>
+public static class Program
+{
+    /// <summary>
+    /// Runs the command-line pipeline and returns the process exit code.
+    /// </summary>
+    public static async Task<int> RunAsync(string[] args)
+    {
+        var rootCommand = PietInterpreterExtensions.BuildRootCommand();
+        return await rootCommand.Parse(args).InvokeAsync();
+    }
+
+    /// <summary>Application entry point.</summary>
+    public static async Task<int> Main(string[] args)
+        => await RunAsync(args);
+}

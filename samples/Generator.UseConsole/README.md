@@ -9,27 +9,43 @@ This sample demonstrates how to use Esolang.Piet.Generator with the main method 
 
 ## Sample images
 
-This sample uses three images:
 
-- `samples/no-op.png` (no input, no output)
-- `samples/hello-world.png` (output)
-- `samples/input-output.png` (input + output)
+This sample uses multiple image formats:
+
+- `samples/no-op.png` (PNG, no input, no output)
+- `samples/hello-world.png` (PNG, output)
+- `samples/input-output.png` (PNG, input + output)
+- `samples/ascii-piet-sample.txt` (ascii-piet text, output)
+- `samples/ppm-sample.ppm` (PPM, output)
+- `samples/dot.gif` (GIF, output)
+- `samples/dot-codel-11.gif` (GIF, output, codel size 11)
+- `samples/hw1-11.gif` (GIF, input + output, codel size 11)
+
 
 Preview:
 
 ![no-op.png](samples/no-op.png)
 ![hello-world.png](samples/hello-world.png)
 ![input-output.png](samples/input-output.png)
+ascii-piet: `samples/ascii-piet-sample.txt`
+ppm: `samples/ppm-sample.ppm`
+gif: `samples/dot.gif`, `samples/dot-codel-11.gif`, `samples/hw1-11.gif`
 
 ## Config in csproj
 
-Images are connected through `PietImage` items:
+
+Images are connected through `PietImage` items (PNG, .gif, .txt, .ppm all supported):
 
 ```xml
 <ItemGroup>
   <PietImage Include="samples\no-op.png" PietLogicalPath="no-op.png" />
   <PietImage Include="samples\hello-world.png" PietLogicalPath="hello-world.png" />
   <PietImage Include="samples\input-output.png" PietLogicalPath="input-output.png" />
+  <PietImage Include="samples\ascii-piet-sample.txt" PietLogicalPath="ascii-piet-sample.txt" />
+  <PietImage Include="samples\ppm-sample.ppm" PietLogicalPath="ppm-sample.ppm" />
+  <PietImage Include="samples\dot.gif" />
+  <PietImage Include="samples\dot-codel-11.gif" />
+  <PietImage Include="samples\hw1-11.gif" />
 </ItemGroup>
 ```
 
@@ -53,6 +69,7 @@ RunWithTextReader:
 RunWithPipeReader:
 RunWithPipeWriter: Hello, world!
 RunWithTextWriter: Hello, world!
+RunHw111Gif:Hello, world!
 ```
 
 ## Signature patterns shown in this sample
@@ -82,8 +99,20 @@ RunWithTextWriter: Hello, world!
 - `RunWithPipeReader` -> `input-output.png`
 - `RunWithPipeWriter` -> `hello-world.png`
 - `RunWithTextWriter` -> `hello-world.png`
+- `RunDotGif` -> `dot.gif`
+- `RunDotCodel11Gif` -> `dot-codel-11.gif` (codel size 11)
+- `RunHw111Gif` -> `hw1-11.gif` (codel size 11)
 
 `RunToConsole` is a handwritten wrapper that forwards to `RunWithTextWriter(Console.Out)`.
+
+## Supported Piet Image Formats
+
+- PNG (standard)
+- GIF (static, `.gif`)
+- ascii-piet text format (`.txt`)
+- Netpbm PPM (P3, `.ppm`)
+
+Image format is detected automatically from the file extension.
 
 ## See also
 

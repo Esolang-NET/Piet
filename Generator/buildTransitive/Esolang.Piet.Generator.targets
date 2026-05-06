@@ -6,6 +6,7 @@
       <InputFile Required="true" ParameterType="System.String" />
       <OutputFile Required="true" ParameterType="System.String" />
       <LogicalPath Required="true" ParameterType="System.String" />
+      <CodelSize Required="false" ParameterType="System.String" />
     </ParameterGroup>
     <Task>
       <Using Namespace="System" />
@@ -19,10 +20,13 @@
         {
             Directory.CreateDirectory(outputDirectory);
         }
+        var imagePath = LogicalPath;
 
         File.WriteAllText(
-            OutputFile,
-            "// PIET_IMAGE_PATH=" + LogicalPath + Environment.NewLine + base64);
+          OutputFile,
+          "// PIET_IMAGE_PATH=" + imagePath + "\n" +
+          "// PIET_CODEL_SIZE=" + CodelSize + "\n" +
+          base64);
       ]]></Code>
     </Task>
   </UsingTask>
@@ -39,16 +43,25 @@
         <GeneratedPath>$(IntermediateOutputPath)PietGenerated\%(Filename)%(Extension).piet.txt</GeneratedPath>
         <LogicalPath Condition="'%(PietImage.PietLogicalPath)' == ''">%(Filename)%(Extension)</LogicalPath>
         <LogicalPath Condition="'%(PietImage.PietLogicalPath)' != ''">%(PietImage.PietLogicalPath)</LogicalPath>
+        <CodelSize Condition="'%(PietImage.CodelSize)' == ''">1</CodelSize>
+        <CodelSize Condition="'%(PietImage.CodelSize)' != ''">%(PietImage.CodelSize)</CodelSize>
       </_PietGeneratedFile>
     </ItemGroup>
 
     <PietConvertImageToAdditionalText
       InputFile="%(_PietGeneratedFile.FullPath)"
       OutputFile="%(_PietGeneratedFile.GeneratedPath)"
-      LogicalPath="%(_PietGeneratedFile.LogicalPath)" />
+      LogicalPath="%(_PietGeneratedFile.LogicalPath)"
+      CodelSize="%(_PietGeneratedFile.CodelSize)" />
 
     <ItemGroup>
       <AdditionalFiles Include="%(_PietGeneratedFile.GeneratedPath)" />
     </ItemGroup>
   </Target>
+
+  <ItemGroup Condition="'$(MSBuildThisPackageRoot)' != ''">
+    <Analyzer Include="$(MSBuildThisPackageRoot)analyzers/dotnet/cs/Esolang.Piet.Generator.dll" />
+    <Analyzer Include="$(MSBuildThisPackageRoot)analyzers/dotnet/cs/Esolang.Piet.Parser.dll" />
+    <Analyzer Include="$(MSBuildThisPackageRoot)analyzers/dotnet/cs/SixLabors.ImageSharp.dll" />
+  </ItemGroup>
 </Project>

@@ -1,14 +1,14 @@
 using Esolang.Piet.Parser;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
 
 namespace Esolang.Piet.Processor;
 
 /// <summary>
 /// Executes parsed Piet programs.
 /// </summary>
-public sealed class PietProcessor
+/// <remarks>
+/// Initializes the processor with a parsed Piet program.
+/// </remarks>
+public sealed class PietProcessor(PietProgram program, TextWriter? output = null, TextReader? input = null)
 {
     static readonly int[] HueTable =
     {
@@ -33,37 +33,24 @@ public sealed class PietProcessor
     };
 
     /// <summary>
-    /// Initializes the processor with a parsed Piet program.
-    /// </summary>
-    public PietProcessor(PietProgram program, TextWriter? output = null, TextReader? input = null)
-    {
-        Program = program;
-        Output = output;
-        Input = input;
-    }
-
-    /// <summary>
     /// The parsed Piet program.
     /// </summary>
-    public PietProgram Program { get; }
+    public PietProgram Program { get; } = program;
 
     /// <summary>
     /// Optional default input source used by <see cref="Run()"/>.
     /// </summary>
-    public TextReader? Input { get; }
+    public TextReader? Input { get; } = input;
 
     /// <summary>
     /// Optional default output destination used by <see cref="Run()"/>.
     /// </summary>
-    public TextWriter? Output { get; }
+    public TextWriter? Output { get; } = output;
 
     /// <summary>
     /// Executes the program.
     /// </summary>
-    public void Run()
-    {
-        Run(Input, Output);
-    }
+    public void Run() => Run(Input, Output);
 
     /// <summary>
     /// Executes the program with explicit I/O.
@@ -88,29 +75,29 @@ public sealed class PietProcessor
 
         while (true)
         {
-            var blockColor = (byte)codels[(cy * width) + cx];
-            var blockCells = FloodFill(codels, width, height, cx, cy);
+            var blockColor = (byte)Program[cx, cy];
+            var blockCells = FloodFill(Program.Codels, width, height, cx, cy);
             var moved = false;
 
             for (var attempt = 0; attempt < 8; attempt++)
             {
-                var edge = FindEdge(blockCells, dp, cc);
-                var nx = edge.x + DpDx(dp);
-                var ny = edge.y + DpDy(dp);
+                var (x, y) = FindEdge(blockCells, dp, cc);
+                var nx = x + DpDx(dp);
+                var ny = y + DpDy(dp);
 
                 if (nx < 0 || nx >= width || ny < 0 || ny >= height
-                    || (byte)codels[(ny * width) + nx] == black)
+                    || Program[nx, ny] == black)
                 {
                     ApplyRetry(attempt, ref dp, ref cc);
                     continue;
                 }
 
-                var nextColor = (byte)codels[(ny * width) + nx];
+                var nextColor = (byte)Program[nx, ny];
                 if (nextColor == white)
                 {
                     var wx = nx;
                     var wy = ny;
-                    if (SlideWhite(codels, width, height, ref wx, ref wy, dp))
+                    if (SlideWhite(Program.Codels, width, height, ref wx, ref wy, dp))
                     {
                         cx = wx;
                         cy = wy;
@@ -126,8 +113,8 @@ public sealed class PietProcessor
 
                 if (blockColor >= 2 && nextColor >= 2)
                 {
-                    var hDiff = ((HueTable[nextColor] - HueTable[blockColor]) % 6 + 6) % 6;
-                    var lDiff = ((LightnessTable[nextColor] - LightnessTable[blockColor]) % 3 + 3) % 3;
+                    var hDiff = (((HueTable[nextColor] - HueTable[blockColor]) % 6) + 6) % 6;
+                    var lDiff = (((LightnessTable[nextColor] - LightnessTable[blockColor]) % 3) + 3) % 3;
                     ExecuteCommand(hDiff, lDiff, blockCells.Count, stack, ref dp, ref cc, reader, writer);
                 }
 
@@ -238,7 +225,7 @@ public sealed class PietProcessor
                 if (stack.Count >= 1)
                 {
                     var a = Pop(stack);
-                    dp = ((dp + a) % 4 + 4) % 4;
+                    dp = (((dp + a) % 4) + 4) % 4;
                 }
                 break;
             case 11:
@@ -251,7 +238,7 @@ public sealed class PietProcessor
                 break;
             case 12:
                 if (stack.Count >= 1)
-                    stack.Add(stack[stack.Count - 1]);
+                    stack.Add(stack[^1]);
                 break;
             case 13:
                 if (stack.Count >= 2)
@@ -333,7 +320,7 @@ public sealed class PietProcessor
         rolls = ((rolls % depth) + depth) % depth;
         for (var i = 0; i < rolls; i++)
         {
-            var top = stack[stack.Count - 1];
+            var top = stack[^1];
             stack.RemoveAt(stack.Count - 1);
             stack.Insert(stack.Count - depth + 1, top);
         }
@@ -400,23 +387,14 @@ public sealed class PietProcessor
         {
             var bx = block[i].x;
             var by = block[i].y;
-            bool better;
-
-            switch (dp)
+            var better = dp switch
             {
-                case 0:
-                    better = bx > bestX || (bx == bestX && (cc == 0 ? by < bestY : by > bestY));
-                    break;
-                case 1:
-                    better = by > bestY || (by == bestY && (cc == 0 ? bx > bestX : bx < bestX));
-                    break;
-                case 2:
-                    better = bx < bestX || (bx == bestX && (cc == 0 ? by > bestY : by < bestY));
-                    break;
-                default:
-                    better = by < bestY || (by == bestY && (cc == 0 ? bx < bestX : bx > bestX));
-                    break;
-            }
+                0 => bx > bestX || (bx == bestX && (cc == 0 ? by < bestY : by > bestY)),
+                1 => by > bestY || (by == bestY && (cc == 0 ? bx > bestX : bx < bestX)),
+                2 => bx < bestX || (bx == bestX && (cc == 0 ? by > bestY : by < bestY)),
+                3 => by < bestY || (by == bestY && (cc == 0 ? bx < bestX : bx > bestX)),
+                _ => throw new InvalidOperationException("Unexpected DP value"),
+            };
 
             if (better)
             {
@@ -428,7 +406,7 @@ public sealed class PietProcessor
         return (bestX, bestY);
     }
 
-    static int DpDx(int dp) => dp == 0 ? 1 : (dp == 2 ? -1 : 0);
+    static int DpDx(int dp) => dp switch { 0 => 1, 2 => -1, _ => 0 };
 
-    static int DpDy(int dp) => dp == 1 ? 1 : (dp == 3 ? -1 : 0);
+    static int DpDy(int dp) => dp switch { 1 => 1, 3 => -1, _ => 0 };
 }
