@@ -18,7 +18,6 @@
     <PackageReference Include="MSTest.TestFramework" />
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="System.IO.Pipelines" />
-    <PackageReference Include="System.Threading.Tasks.Extensions" />
     <PackageReference Include="System.Linq.AsyncEnumerable" />
     <PackageReference Include="Basic.Reference.Assemblies.Net100" />
     <PackageReference Include="Basic.Reference.Assemblies.Net472" />
