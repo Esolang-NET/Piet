@@ -45,7 +45,7 @@ For runnable examples including `TextReader`/`PipeReader` input, `TextWriter`/`P
 dotnet add package Esolang.Piet.Generator
 dotnet add package Esolang.Piet.Parser
 dotnet add package Esolang.Piet.Processor
-dotnet tool install -g dotnet-piet --prerelease
+dotnet tool install -g dotnet-piet
 ```
 
 ## Choose Package

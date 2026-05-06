@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Esolang.Piet.Generator" Version="0.1.0-preview-1" PrivateAssets="all" />
+    <PackageReference Include="Esolang.Piet.Generator" Version="1.0.0" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

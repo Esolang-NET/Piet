@@ -4,8 +4,7 @@ All notable changes to this repository are documented in this file.
 
 The format is based on Keep a Changelog.
 
-## [Unreleased]
-
+## [1.0.0] - 2026-05-06
 
 ### Added
 
