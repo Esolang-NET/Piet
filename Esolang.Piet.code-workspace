@@ -61,6 +61,12 @@
 			"Processor.Tests": true,
 			"samples": true,
 			"Generator.UseConsole": true
+		},
+		"chat.tools.terminal.autoApprove": {
+			"/^Set-Location \"c:\\\\Users\\\\juner\\\\sources\\\\repos\\\\Esolang\\.Piet\"; git add -A; git commit -m \"fix: resolve duplicate analyzer loading in UseConsole sample\n\n- Remove duplicate Esolang\\.Piet\\.Generator\\.dll Analyzer Include from samples/Generator\\.UseConsole\\.csproj\n- Keep generator ProjectReference as the single source\n- Restore only dependency DLLs \\(Parser, ImageSharp\\) as Analyzer entries to support local development\n- Aligns local build with package behavior: generator loaded once with its dependencies\n\nFixes: dotnet test -c Release failure due to duplicate generated attributes and partial methods\"$/": {
+				"approve": true,
+				"matchCommandLine": true
+			}
 		}
 	},
 	"extensions": {
