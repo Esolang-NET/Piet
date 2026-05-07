@@ -8,7 +8,7 @@ The format is based on Keep a Changelog.
 
 ### Added
 
-- `Esolang.Piet.Processor/Processor/IProcessor.cs`: provisional execution abstractions under `Esolang.Processor` (`IProcessor<TProgram>`, `ITextProcessor<TProgram>`, `IPipeProcessor<TProgram>`) for later extraction to a shared package.
+- `Esolang.Processor.Abstractions` (`Esolang.Processor` namespace): shared execution abstractions package (`IProcessor<TProgram>`, `ITextProcessor<TProgram>`, `IPipeProcessor<TProgram>`).
 - `Esolang.Piet.Processor.Tests`: coverage for `RunToEnd(...)` and `RunToEndAsync(...)` on `PietProcessor`.
 - `Esolang.Piet.Parser`: Added `AsciiPietFormatter` to convert `PietProgram` instances to ascii-piet text format without trailing newlines.
 - `dotnet-piet`: Added `parse` subcommand to parse image files and output ascii-piet text format.
@@ -17,6 +17,7 @@ The format is based on Keep a Changelog.
 ### Changed
 
 - `Esolang.Piet.Processor`: `PietProcessor` now implements `ITextProcessor<PietProgram>` and exposes `RunToEnd(...)` / `RunToEndAsync(...)` with integer exit codes.
+- `Esolang.Piet.Processor`: switched abstraction source from local `Processor/IProcessor.cs` to `Esolang.Processor.Abstractions` package.
 - `dotnet-piet` (`Esolang.Piet.Interpreter`): command execution path now calls `RunToEnd(...)`.
 - `Esolang.Piet.Generator/README.md` and `samples/Generator.UseConsole`: documented and added a sample for inline ascii-piet data URI usage via `GeneratePietMethod("data:text/ascii-piet;codel-size=1,l_ C")`.
 - `Esolang.Piet.Generator`: added return-type support for `int`, `Task<int>`, and `ValueTask<int>` (returns `0` on normal completion).
