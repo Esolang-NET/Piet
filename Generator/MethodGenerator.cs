@@ -1293,7 +1293,8 @@ public partial class MethodGenerator : IIncrementalGenerator
             var contentType = headers[0].Trim().ToLowerInvariant();
             if (contentType == "text/plain")
                 ext = ".txt";
-            else if (contentType == "text/acii-piet")
+            // Keep legacy typo support for backward compatibility.
+            else if (contentType == "text/ascii-piet" || contentType == "text/acii-piet")
                 ext = ".txt";
             else if (contentType == "image/x-portable-pixmap")
                 ext = ".ppm";

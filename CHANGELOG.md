@@ -18,6 +18,11 @@ The format is based on Keep a Changelog.
 
 - `Esolang.Piet.Processor`: `PietProcessor` now implements `ITextProcessor<PietProgram>` and exposes `RunToEnd(...)` / `RunToEndAsync(...)` with integer exit codes.
 - `dotnet-piet` (`Esolang.Piet.Interpreter`): command execution path now calls `RunToEnd(...)`.
+- `Esolang.Piet.Generator/README.md` and `samples/Generator.UseConsole`: documented and added a sample for inline ascii-piet data URI usage via `GeneratePietMethod("data:text/ascii-piet;codel-size=1,l_ C")`.
+
+### Fixed
+
+- `Esolang.Piet.Generator`: fixed inline data URI MIME handling to accept `text/ascii-piet` (while keeping backward compatibility for legacy `text/acii-piet`).
 
 ## [1.0.0] - 2026-05-06
 

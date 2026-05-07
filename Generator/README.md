@@ -23,6 +23,9 @@ partial class PietSample
     [GeneratePietMethod("hello-world.png")]
     public static partial string RunToString();
 
+    [GeneratePietMethod("data:text/ascii-piet;codel-size=1,l_ C")]
+    public static partial string RunInlineAsciiPiet();
+
     [GeneratePietMethod("no-op.png")]
     public static partial void RunNoOp();
 
@@ -43,6 +46,8 @@ partial class PietSample
     public static partial string RunHw111Gif(string input = "");
 }
 ```
+
+You can also embed small Piet programs inline using a data URI (`data:text/ascii-piet,...`) instead of a `PietImage` item.
 
 In your project file, specify the image via `PietImage` (PNG, .gif, .txt, .ppm all supported):
 

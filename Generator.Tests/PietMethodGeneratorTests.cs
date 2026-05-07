@@ -1835,7 +1835,7 @@ namespace Demo;
 
 public partial class Sample
 {
-    [Esolang.Piet.GeneratePietMethod("data:text/acii-piet;codel-size=1,l_ C")]
+    [Esolang.Piet.GeneratePietMethod("data:text/ascii-piet;codel-size=1,l_ C")]
     public static partial void Run();
 }
 """;
@@ -1863,7 +1863,7 @@ namespace Demo;
 
 public partial class Sample
 {
-    [Esolang.Piet.GeneratePietMethod("data:text/acii-piet;codel-size=1;base64,bF8gQw==")]
+    [Esolang.Piet.GeneratePietMethod("data:text/ascii-piet;codel-size=1;base64,bF8gQw==")]
     public static partial void Run();
 }
 """;
@@ -1892,7 +1892,7 @@ namespace Demo;
 
 public partial class Sample
 {
-    [Esolang.Piet.GeneratePietMethod("data:text/acii-piet;codel-size=abc,l_ C")]
+    [Esolang.Piet.GeneratePietMethod("data:text/ascii-piet;codel-size=abc,l_ C")]
     public static partial void Run();
 }
 """;
@@ -1921,7 +1921,7 @@ namespace Demo;
 
 public partial class Sample
 {
-    [Esolang.Piet.GeneratePietMethod("data:text/acii-piet;codel-size=1")]
+    [Esolang.Piet.GeneratePietMethod("data:text/ascii-piet;codel-size=1")]
     public static partial void Run();
 }
 """;
