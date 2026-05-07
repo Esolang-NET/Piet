@@ -4,6 +4,18 @@ All notable changes to this repository are documented in this file.
 
 The format is based on Keep a Changelog.
 
+## [Unreleased]
+
+### Added
+
+- `Esolang.Piet.Processor/Processor/IProcessor.cs`: provisional execution abstractions under `Esolang.Processor` (`IProcessor<TProgram>`, `ITextProcessor<TProgram>`, `IPipeProcessor<TProgram>`) for later extraction to a shared package.
+- `Esolang.Piet.Processor.Tests`: coverage for `RunToEnd(...)` and `RunToEndAsync(...)` on `PietProcessor`.
+
+### Changed
+
+- `Esolang.Piet.Processor`: `PietProcessor` now implements `ITextProcessor<PietProgram>` and exposes `RunToEnd(...)` / `RunToEndAsync(...)` with integer exit codes.
+- `dotnet-piet` (`Esolang.Piet.Interpreter`): command execution path now calls `RunToEnd(...)`.
+
 ## [1.0.0] - 2026-05-06
 
 ### Added

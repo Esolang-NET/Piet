@@ -1,4 +1,5 @@
 using Esolang.Piet.Parser;
+using Esolang.Processor;
 
 namespace Esolang.Piet.Processor;
 
@@ -8,7 +9,8 @@ namespace Esolang.Piet.Processor;
 /// <remarks>
 /// Initializes the processor with a parsed Piet program.
 /// </remarks>
-public sealed class PietProcessor(PietProgram program, TextWriter? output = null, TextReader? input = null)
+public sealed partial class PietProcessor(PietProgram program, TextWriter? output = null, TextReader? input = null)
+    : ITextProcessor<PietProgram>
 {
     static readonly int[] HueTable =
     {
@@ -139,6 +141,17 @@ public sealed class PietProcessor(PietProgram program, TextWriter? output = null
         var result = writer.ToString().TrimEnd('\0', '\r', '\n');
         return result.Length == 0 ? null : result;
     }
+
+    /// <inheritdoc/>
+    public int RunToEnd(TextReader? input = null, TextWriter? output = null, CancellationToken cancellationToken = default)
+    {
+        Run(input ?? Input, output ?? Output);
+        return 0;
+    }
+
+    /// <inheritdoc/>
+    public ValueTask<int> RunToEndAsync(TextReader? input = null, TextWriter? output = null, CancellationToken cancellationToken = default)
+        => ValueTask.FromResult(RunToEnd(input, output, cancellationToken));
 
     static void ExecuteCommand(int hDiff, int lDiff, int blockSize,
         List<int> stack, ref int dp, ref int cc, TextReader input, TextWriter output)

@@ -28,7 +28,7 @@ public static class PietInterpreterExtensions
             inputArgument,
             codelSizeOption,
         };
-        rootCommand.SetAction(parseResult =>
+        rootCommand.SetAction((parseResult, cancellationToken) =>
         {
             var path = parseResult.GetValue(inputArgument);
             var codelSize = parseResult.GetValue(codelSizeOption);
@@ -40,8 +40,7 @@ public static class PietInterpreterExtensions
                 var output = originalOutput;
                 var input = originalInput;
                 var processor = new PietProcessor(program, output, input);
-                processor.Run();
-                return 0;
+                return Task.FromResult(processor.RunToEnd(cancellationToken: cancellationToken));
             }
             finally
             {
