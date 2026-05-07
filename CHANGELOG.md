@@ -10,6 +10,9 @@ The format is based on Keep a Changelog.
 
 - `Esolang.Piet.Processor/Processor/IProcessor.cs`: provisional execution abstractions under `Esolang.Processor` (`IProcessor<TProgram>`, `ITextProcessor<TProgram>`, `IPipeProcessor<TProgram>`) for later extraction to a shared package.
 - `Esolang.Piet.Processor.Tests`: coverage for `RunToEnd(...)` and `RunToEndAsync(...)` on `PietProcessor`.
+- `Esolang.Piet.Parser`: Added `AsciiPietFormatter` to convert `PietProgram` instances to ascii-piet text format without trailing newlines.
+- `dotnet-piet`: Added `parse` subcommand to parse image files and output ascii-piet text format.
+- `dotnet-piet`: Added `--ascii-piet` option to output parsed program as ascii-piet text instead of executing it.
 
 ### Changed
 
