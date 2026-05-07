@@ -1104,7 +1104,7 @@ public class MethodGeneratorTests
             public partial class Sample
             {
                 [Esolang.Piet.GeneratePietMethod("program.png")]
-                public partial int Run();
+                public partial double Run();
             }
             """;
 
@@ -1120,6 +1120,73 @@ public class MethodGeneratorTests
         Assert.IsTrue(
             generatorDiagnostics.Any(static x => x.Id == "PT0002"),
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithIntReturn_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public partial int Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/program.png.piet.txt",
+                MakeTransformedText("program.png", MinimalLightRedPng)));
+        var runResult = driver.GetRunResult();
+
+        AssertNoErrors(diagnostics);
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial int Run()")),
+            "Expected generated int return method implementation was not found.");
+
+        AssertNoErrors(outputCompilation);
+    }
+
+    [TestMethod]
+    public void Generator_WithIntExitCodePatterns_ReturnsZero()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public static partial int RunInt();
+
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public static partial System.Threading.Tasks.Task<int> RunTaskInt();
+
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public static partial System.Threading.Tasks.ValueTask<int> RunValueTaskInt();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/program.png.piet.txt",
+                MakeTransformedText("program.png", MinimalLightRedPng)));
+        var runResult = driver.GetRunResult();
+
+        AssertNoErrors(diagnostics);
+        AssertNoErrors(outputCompilation);
+
+        var generatedText = string.Join("\n", runResult.GeneratedTrees.Select(tree => tree.GetText(CancellationToken).ToString()));
+        Assert.IsTrue(generatedText.Contains("RunInt("), "Expected RunInt method was not found.");
+        Assert.IsTrue(generatedText.Contains("RunTaskInt("), "Expected RunTaskInt method was not found.");
+        Assert.IsTrue(generatedText.Contains("RunValueTaskInt("), "Expected RunValueTaskInt method was not found.");
+        Assert.IsTrue(generatedText.Contains("return 0;"), "Expected exit-code return statement was not found.");
     }
 
     [TestMethod]

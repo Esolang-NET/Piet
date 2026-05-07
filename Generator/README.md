@@ -83,12 +83,14 @@ Image format is detected automatically from the file extension.
 
 | Category | Supported types |
 | --- | --- |
-| Return type | `void`, `string`, `System.Threading.Tasks.Task<string>`, `System.Threading.Tasks.ValueTask<string>`, `System.Collections.Generic.IEnumerable<byte>`, `System.Collections.Generic.IAsyncEnumerable<byte>` |
+| Return type | `void`, `int`, `System.Threading.Tasks.Task<int>`, `System.Threading.Tasks.ValueTask<int>`, `string`, `System.Threading.Tasks.Task<string>`, `System.Threading.Tasks.ValueTask<string>`, `System.Collections.Generic.IEnumerable<byte>`, `System.Collections.Generic.IAsyncEnumerable<byte>` |
 | Input parameter | `string`, `System.IO.TextReader`, `System.IO.Pipelines.PipeReader` |
 | Output parameter | `System.IO.TextWriter`, `System.IO.Pipelines.PipeWriter` |
 | Other parameter | `System.Threading.CancellationToken` |
 
 ## Required I/O Diagnostics
+
+Exit-code signatures (`int` / `Task<int>` / `ValueTask<int>`) are supported and currently return `0` for normal Piet completion.
 
 When the analyzed Piet program requires I/O, the method signature must expose a compatible mechanism.
 
