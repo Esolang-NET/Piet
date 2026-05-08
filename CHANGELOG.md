@@ -10,7 +10,7 @@ The format is based on Keep a Changelog.
 
 - `dotnet-piet` (`Esolang.Piet.Interpreter`): added `--ascii-piet-text` option to execute inline ascii-piet text directly without requiring a file path.
 - `Esolang.Piet.Interpreter.Tests`: added CLI tests for inline ascii-piet input mode and argument-validation paths (missing input source / conflicting path+inline input).
-- `Esolang.Piet.Interpreter.Tests`: added sample-based conformance vectors (hello-world, no-op, ascii-piet text, PPM, GIF) for execution exit-code checks and representative output checks.
+- `Esolang.Piet.Interpreter.Tests`: added hybrid conformance vectors combining inline ascii-piet checks and sample-file checks (hello-world, ascii-piet text, PPM, GIF) for execution exit-code and representative output verification.
 - `Esolang.Piet.Generator.Tests`: added sample-based conformance vectors using real sample assets to verify generation succeeds without diagnostics.
 
 ### Changed

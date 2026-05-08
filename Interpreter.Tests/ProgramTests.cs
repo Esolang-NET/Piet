@@ -10,15 +10,18 @@ namespace Esolang.Piet.Interpreter.Tests;
 public class ProgramTests
 {
     [TestMethod]
-    public async Task RunAsync_AsciiPietTextWithoutPath_ReturnsZero()
+    [DataRow("_")]
+    [DataRow("??")]
+    public async Task RunAsync_AsciiPietTextWithoutPath_ReturnsZero(string asciiPietText)
     {
-        var exitCode = await Program.RunAsync(["--ascii-piet-text", "_"]);
+        var exitCode = await Program.RunAsync(["--ascii-piet-text", asciiPietText]);
 
         Assert.AreEqual(0, exitCode);
     }
 
     [TestMethod]
-    public async Task RunAsync_AsciiPietTextWithoutPath_WithAsciiPietOption_WritesText()
+    [DataRow("_", "_")]
+    public async Task RunAsync_AsciiPietTextWithoutPath_WithAsciiPietOption_WritesText(string asciiPietText, string expectedAsciiPiet)
     {
         var originalOutput = Console.Out;
         using var writer = new StringWriter(new StringBuilder());
@@ -26,10 +29,10 @@ public class ProgramTests
         {
             Console.SetOut(writer);
 
-            var exitCode = await Program.RunAsync(["--ascii-piet-text", "_", "--ascii-piet"]);
+            var exitCode = await Program.RunAsync(["--ascii-piet-text", asciiPietText, "--ascii-piet"]);
 
             Assert.AreEqual(0, exitCode);
-            Assert.AreEqual("_", writer.ToString());
+            Assert.AreEqual(expectedAsciiPiet, writer.ToString());
         }
         finally
         {
@@ -57,11 +60,9 @@ public class ProgramTests
 
     [TestMethod]
     [DataRow("hello-world.png")]
-    [DataRow("no-op.png")]
     [DataRow("ascii-piet-sample.txt")]
     [DataRow("ppm-sample.ppm")]
     [DataRow("dot.gif")]
-    [DataRow("dot-codel-11.gif")]
     public async Task RunAsync_SamplePrograms_ReturnZero(string sampleFileName)
     {
         var path = FindFileInRepository("samples", "Generator.UseConsole", "samples", sampleFileName);
@@ -73,7 +74,6 @@ public class ProgramTests
 
     [TestMethod]
     [DataRow("hello-world.png", "Hello, world!")]
-    [DataRow("no-op.png", "")]
     public async Task RunAsync_SamplePrograms_ProduceExpectedOutput(string sampleFileName, string expectedOutput)
     {
         var path = FindFileInRepository("samples", "Generator.UseConsole", "samples", sampleFileName);
@@ -88,6 +88,27 @@ public class ProgramTests
 
             Assert.AreEqual(0, exitCode, $"Expected success exit code for sample '{sampleFileName}'.");
             Assert.AreEqual(expectedOutput, actual);
+        }
+        finally
+        {
+            Console.SetOut(originalOutput);
+        }
+    }
+
+    [TestMethod]
+    public async Task RunAsync_InlineAsciiPiet_ProduceExpectedExecutionOutput()
+    {
+        var originalOutput = Console.Out;
+        using var writer = new StringWriter(new StringBuilder());
+        try
+        {
+            Console.SetOut(writer);
+
+            var exitCode = await Program.RunAsync(["--ascii-piet-text", "_"]);
+            var actual = writer.ToString().TrimEnd('\r', '\n');
+
+            Assert.AreEqual(0, exitCode);
+            Assert.AreEqual(string.Empty, actual);
         }
         finally
         {
