@@ -191,5 +191,5 @@ partial class PietSample
     /// </summary>
     /// <param name="input">Optional input text for the sample program.</param>
     [GeneratePietMethod("hw1-11.gif", codelSize: 11)]
-    public static partial string RunHw111Gif(string input = "");
+    public static partial string RunHw111Gif();
 }

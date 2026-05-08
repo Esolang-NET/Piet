@@ -539,18 +539,6 @@ public partial class MethodGenerator : IIncrementalGenerator
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.RequiredOutputInterface,
                 methodSyntax.Identifier.GetLocation()));
-            return EmitErrorMethod(
-                methodSymbol,
-                methodSyntax,
-                ns,
-                typeKeyword,
-                resolvedImageFile,
-                projectDirectory,
-                codelSize,
-                program,
-                DiagnosticDescriptors.RequiredOutputInterface.Id,
-                $"The method {methodSymbol.Name} requires an output interface"
-            );
         }
 
         if (mightUseInput && !executionBinding.HasExplicitInput)
@@ -558,18 +546,6 @@ public partial class MethodGenerator : IIncrementalGenerator
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.RequiredInputInterface,
                 methodSyntax.Identifier.GetLocation()));
-            return EmitErrorMethod(
-                methodSymbol,
-                methodSyntax,
-                ns,
-                typeKeyword,
-                resolvedImageFile,
-                projectDirectory,
-                codelSize,
-                program,
-                DiagnosticDescriptors.RequiredInputInterface.Id,
-                $"The method {methodSymbol.Name} requires an input interface"
-            );
         }
 
         if (!mightUseInput && executionBinding.HasExplicitInput)
@@ -621,7 +597,9 @@ public partial class MethodGenerator : IIncrementalGenerator
             executionBinding,
             $"new byte[] {{ {string.Join(", ", codels)} }}",
             imageWidth.ToString(),
-            imageHeight.ToString()
+            imageHeight.ToString(),
+            mightUseOutput,
+            mightUseInput
         );
 
         code.AppendLine("    }");
@@ -639,7 +617,9 @@ public partial class MethodGenerator : IIncrementalGenerator
             ExecutionBinding executionBinding,
             string codelArrayExpression,
             string widthExpression,
-            string heightExpression
+            string heightExpression,
+            bool mightUseOutput,
+            bool mightUseInput
         )
     {
         var ctName = executionBinding.CancellationTokenName ?? "default(global::System.Threading.CancellationToken)";
@@ -654,10 +634,27 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         switch (executionBinding)
         {
+            case { InputKind: InputKind.None, RuntimeType: RuntimeType.Sync or RuntimeType.Enumerable, HasExplicitInput: false } when mightUseInput:
+                builder.AppendLine("""
+                int? __pietReadNumber()
+                    => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
+                int? __pietReadChar()
+                    => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
+        """);
+                break;
             case { InputKind: InputKind.None, RuntimeType: RuntimeType.Sync or RuntimeType.Enumerable }:
                 builder.AppendLine("""
-                int? __pietReadNumber() => null;
-                int? __pietReadChar() => null;
+                int? __pietReadNumber() => (int?)null;
+                int? __pietReadChar() => (int?)null;
+        """);
+                break;
+            case { InputKind: InputKind.None, RuntimeType: RuntimeType.Async or RuntimeType.AsyncEnumerable, HasExplicitInput: false } when mightUseInput:
+                builder.AppendLine("""
+                global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
+                    => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
+
+                global::System.Threading.Tasks.ValueTask<int?> __pietReadCharAsync(global::System.Threading.CancellationToken __ct)
+                    => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
         """);
                 break;
             case { InputKind: InputKind.None, RuntimeType: RuntimeType.Async or RuntimeType.AsyncEnumerable }:
@@ -669,7 +666,6 @@ public partial class MethodGenerator : IIncrementalGenerator
                     => new global::System.Threading.Tasks.ValueTask<int?>((int?)null);
         """);
                 break;
-
             case { InputKind: InputKind.String, RuntimeType: RuntimeType.Sync or RuntimeType.Enumerable }:
                 builder.AppendLine($$"""
                 var __pietStringReader = new global::System.IO.StringReader({{executionBinding.InputExpression}});
@@ -866,6 +862,11 @@ public partial class MethodGenerator : IIncrementalGenerator
             case { RuntimeType: RuntimeType.Async or RuntimeType.Sync, OutputKind: OutputKind.PipeWriter }:
                 builder.AppendLine($$"""
                 void __pietWriteByte(byte b) => global::System.Buffers.BuffersExtensions.Write({{executionBinding.OutputExpression}}, [ b ]);
+        """);
+                break;
+            case { RuntimeType: RuntimeType.Async or RuntimeType.Sync, HasExplicitOutput: false } when mightUseOutput:
+                builder.AppendLine("""
+                void __pietWriteByte(byte b) => throw new global::System.InvalidOperationException("PT0007: Required output interface not provided");
         """);
                 break;
             case { RuntimeType: RuntimeType.Async or RuntimeType.Sync }:

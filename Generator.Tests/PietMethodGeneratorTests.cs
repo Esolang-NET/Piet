@@ -2263,7 +2263,7 @@ public partial class Sample
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree =>
-                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0007")),
+                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.InvalidOperationException(\"PT0007")),
             "Expected throw for PT0007 was not generated.");
     }
 
@@ -2294,7 +2294,7 @@ public partial class Sample
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree =>
-                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0008")),
+                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.InvalidOperationException(\"PT0008")),
             "Expected throw for PT0008 was not generated.");
     }
 

@@ -345,7 +345,7 @@ partial class PietSample
     public static partial void RunDotCodel11Gif();
 
     [GeneratePietMethod("hw1-11.gif", codelSize: 11)]
-    public static partial string RunHw111Gif(string input = "");
+    public static partial string RunHw111Gif();
 }
 ```
 

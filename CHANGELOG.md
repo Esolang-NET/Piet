@@ -12,6 +12,7 @@ The format is based on Keep a Changelog.
 - `Esolang.Piet.Interpreter.Tests`: added CLI tests for inline ascii-piet input mode and argument-validation paths (missing input source / conflicting path+inline input).
 - `Esolang.Piet.Interpreter.Tests`: added hybrid conformance vectors combining inline ascii-piet checks and sample-file checks (hello-world, ascii-piet text, PPM, GIF) for execution exit-code and representative output verification.
 - `Esolang.Piet.Generator.Tests`: added sample-based conformance vectors using real sample assets to verify generation succeeds without diagnostics.
+- `Esolang.Piet.Generator`: `PT0008` / `PT0007` Severity `Error`→ `Hidden`
 
 ### Changed
 

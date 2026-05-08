@@ -83,7 +83,7 @@ public static class DiagnosticDescriptors
         title: "Required output interface not provided",
         messageFormat: "The Piet program requires output, but the method does not provide an output mechanism",
         category: Category,
-        defaultSeverity: DiagnosticSeverity.Error,
+        defaultSeverity: DiagnosticSeverity.Hidden,
         isEnabledByDefault: true);
 
     /// <summary>
@@ -94,7 +94,7 @@ public static class DiagnosticDescriptors
         title: "Required input interface not provided",
         messageFormat: "The Piet program requires input, but the method does not provide an input mechanism",
         category: Category,
-        defaultSeverity: DiagnosticSeverity.Error,
+        defaultSeverity: DiagnosticSeverity.Hidden,
         isEnabledByDefault: true);
 
     /// <summary>
