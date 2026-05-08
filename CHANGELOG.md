@@ -6,6 +6,8 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-08
+
 ### Added
 
 - `Esolang.Processor.Abstractions` (`Esolang.Processor` namespace): shared execution abstractions package (`IProcessor<TProgram>`, `ITextProcessor<TProgram>`, `IPipeProcessor<TProgram>`).
@@ -22,6 +24,7 @@ The format is based on Keep a Changelog.
 - `Esolang.Piet.Generator/README.md` and `samples/Generator.UseConsole`: documented and added a sample for inline ascii-piet data URI usage via `GeneratePietMethod("data:text/ascii-piet;codel-size=1,l_ C")`.
 - `Esolang.Piet.Generator`: added return-type support for `int`, `Task<int>`, and `ValueTask<int>` (returns `0` on normal completion).
 - `Esolang.Piet.Generator`: generated runtime internal class and internal entry methods are now annotated with `[EditorBrowsable(EditorBrowsableState.Never)]`.
+- Build/package baseline: incremented `AssemblyVersion` / `FileVersion` to `1.1.0.3`.
 
 ### Fixed
 
