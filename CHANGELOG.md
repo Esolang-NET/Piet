@@ -21,6 +21,7 @@ The format is based on Keep a Changelog.
 - `dotnet-piet` (`Esolang.Piet.Interpreter`): command execution path now calls `RunToEnd(...)`.
 - `Esolang.Piet.Generator/README.md` and `samples/Generator.UseConsole`: documented and added a sample for inline ascii-piet data URI usage via `GeneratePietMethod("data:text/ascii-piet;codel-size=1,l_ C")`.
 - `Esolang.Piet.Generator`: added return-type support for `int`, `Task<int>`, and `ValueTask<int>` (returns `0` on normal completion).
+- `Esolang.Piet.Generator`: generated runtime internal class and internal entry methods are now annotated with `[EditorBrowsable(EditorBrowsableState.Never)]`.
 
 ### Fixed
 

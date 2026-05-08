@@ -43,11 +43,13 @@ partial class MethodGenerator
         #nullable enable
         #pragma warning disable CS1591
         using System;
+        using System.ComponentModel;
         using System.Collections.Generic;
         using System.Threading;
 
         namespace Esolang.Piet.__Generated
         {
+            [EditorBrowsable(EditorBrowsableState.Never)]
             internal static class PietRuntime
             {
                 private static readonly int[] s_hue = new int[]
@@ -388,6 +390,7 @@ partial class MethodGenerator
                 // 1. Sync: 全出力を byte[] として返す
                 // ============================================================
 
+                [EditorBrowsable(EditorBrowsableState.Never)]
                 internal static void Execute(
                     byte[] codels, int width, int height,
                     Func<int?> readNumber,
@@ -486,6 +489,7 @@ partial class MethodGenerator
                 // 2. Async: 全出力を Task<byte[]> として返す
                 // ============================================================
 
+                [EditorBrowsable(EditorBrowsableState.Never)]
                 internal static async global::System.Threading.Tasks.Task ExecuteAsync(
                     byte[] codels, int width, int height,
                     Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readNumberAsync,
@@ -587,6 +591,7 @@ partial class MethodGenerator
                 // 3. Enumerable: 実行しながら逐次 byte を返す
                 // ============================================================
 
+                [EditorBrowsable(EditorBrowsableState.Never)]
                 internal static IEnumerable<byte> ExecuteEnumerable(
                     byte[] codels, int width, int height,
                     Func<int?> readNumber,
@@ -700,6 +705,7 @@ partial class MethodGenerator
                 // 4. AsyncEnumerable: 非同期で逐次 byte を返す
                 // ============================================================
 
+                [EditorBrowsable(EditorBrowsableState.Never)]
                 internal static async IAsyncEnumerable<byte> ExecuteAsyncEnumerable(
                     byte[] codels, int width, int height,
                     Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readNumberAsync,
