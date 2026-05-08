@@ -4,6 +4,32 @@ All notable changes to this repository are documented in this file.
 
 The format is based on Keep a Changelog.
 
+## [Unreleased]
+
+## [1.1.0] - 2026-05-08
+
+### Added
+
+- `Esolang.Processor.Abstractions` (`Esolang.Processor` namespace): shared execution abstractions package (`IProcessor<TProgram>`, `ITextProcessor<TProgram>`, `IPipeProcessor<TProgram>`).
+- `Esolang.Piet.Processor.Tests`: coverage for `RunToEnd(...)` and `RunToEndAsync(...)` on `PietProcessor`.
+- `Esolang.Piet.Parser`: Added `AsciiPietFormatter` to convert `PietProgram` instances to ascii-piet text format without trailing newlines.
+- `dotnet-piet`: Added `parse` subcommand to parse image files and output ascii-piet text format.
+- `dotnet-piet`: Added `--ascii-piet` option to output parsed program as ascii-piet text instead of executing it.
+
+### Changed
+
+- `Esolang.Piet.Processor`: `PietProcessor` now implements `ITextProcessor<PietProgram>` and exposes `RunToEnd(...)` / `RunToEndAsync(...)` with integer exit codes.
+- `Esolang.Piet.Processor`: switched abstraction source from local `Processor/IProcessor.cs` to `Esolang.Processor.Abstractions` package.
+- `dotnet-piet` (`Esolang.Piet.Interpreter`): command execution path now calls `RunToEnd(...)`.
+- `Esolang.Piet.Generator/README.md` and `samples/Generator.UseConsole`: documented and added a sample for inline ascii-piet data URI usage via `GeneratePietMethod("data:text/ascii-piet;codel-size=1,l_ C")`.
+- `Esolang.Piet.Generator`: added return-type support for `int`, `Task<int>`, and `ValueTask<int>` (returns `0` on normal completion).
+- `Esolang.Piet.Generator`: generated runtime internal class and internal entry methods are now annotated with `[EditorBrowsable(EditorBrowsableState.Never)]`.
+- Build/package baseline: incremented `AssemblyVersion` / `FileVersion` to `1.1.0.3`.
+
+### Fixed
+
+- `Esolang.Piet.Generator`: fixed inline data URI MIME handling to accept `text/ascii-piet` (while keeping backward compatibility for legacy `text/acii-piet`).
+
 ## [1.0.0] - 2026-05-06
 
 ### Added

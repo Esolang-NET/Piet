@@ -54,10 +54,13 @@ public partial class MethodGenerator : IIncrementalGenerator
     enum ReturnKind
     {
         Void,
+        Int,
         String,
         Task,
+        TaskInt,
         TaskString,
         ValueTask,
+        ValueTaskInt,
         ValueTaskString,
         EnumerableByte,
         AsyncEnumerableByte,
@@ -104,10 +107,13 @@ public partial class MethodGenerator : IIncrementalGenerator
         public RuntimeType RuntimeType => ReturnKind switch
         {
             ReturnKind.Void => RuntimeType.Sync,
+            ReturnKind.Int => RuntimeType.Sync,
             ReturnKind.String => RuntimeType.Sync,
             ReturnKind.Task => RuntimeType.Async,
+            ReturnKind.TaskInt => RuntimeType.Async,
             ReturnKind.TaskString => RuntimeType.Async,
             ReturnKind.ValueTask => RuntimeType.Async,
+            ReturnKind.ValueTaskInt => RuntimeType.Async,
             ReturnKind.ValueTaskString => RuntimeType.Async,
             ReturnKind.EnumerableByte => RuntimeType.Enumerable,
             ReturnKind.AsyncEnumerableByte => RuntimeType.AsyncEnumerable,
@@ -577,7 +583,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         var staticModifier = methodSymbol.IsStatic ? " static" : string.Empty;
         var asyncModifier = executionBinding.ReturnKind switch
         {
-            ReturnKind.TaskString or ReturnKind.ValueTaskString or ReturnKind.AsyncEnumerableByte => " async",
+            ReturnKind.TaskInt or ReturnKind.TaskString or ReturnKind.ValueTaskInt or ReturnKind.ValueTaskString or ReturnKind.AsyncEnumerableByte => " async",
             _ => string.Empty,
         };
         var accessibility = GetAccessibility(methodSymbol.DeclaredAccessibility);
@@ -875,6 +881,24 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         switch (executionBinding)
         {
+            case { ReturnKind: ReturnKind.Int }:
+                {
+                    builder.AppendLine($$"""
+                {
+                    global::Esolang.Piet.__Generated.PietRuntime.Execute(
+                        {{codelArrayExpression}},
+                        {{widthExpression}},
+                        {{heightExpression}},
+                        __pietReadNumber,
+                        __pietReadChar,
+                        __pietWriteByte,
+                        {{ctName}}
+                    );
+                    return 0;
+                }
+        """);
+                    break;
+                }
             case { ReturnKind: ReturnKind.Void }:
                 {
                     builder.AppendLine($$"""
@@ -909,6 +933,24 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                     break;
                 }
+            case { ReturnKind: ReturnKind.TaskInt }:
+                {
+                    builder.AppendLine($$"""
+                {
+                    await global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsync(
+                        {{codelArrayExpression}},
+                        {{widthExpression}},
+                        {{heightExpression}},
+                        __pietReadNumberAsync,
+                        __pietReadCharAsync,
+                        __pietWriteByte,
+                        {{ctName}}
+                    ).ConfigureAwait(false);
+                    return 0;
+                }
+        """);
+                    break;
+                }
             case { ReturnKind: ReturnKind.ValueTask }:
                 {
                     builder.AppendLine($$"""
@@ -922,6 +964,24 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietWriteByte,
                         {{ctName}}
                     ).ConfigureAwait(false);
+                }
+        """);
+                    break;
+                }
+            case { ReturnKind: ReturnKind.ValueTaskInt }:
+                {
+                    builder.AppendLine($$"""
+                {
+                    await global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsync(
+                        {{codelArrayExpression}},
+                        {{widthExpression}},
+                        {{heightExpression}},
+                        __pietReadNumberAsync,
+                        __pietReadCharAsync,
+                        __pietWriteByte,
+                        {{ctName}}
+                    ).ConfigureAwait(false);
+                    return 0;
                 }
         """);
                     break;
@@ -1127,16 +1187,23 @@ public partial class MethodGenerator : IIncrementalGenerator
         var returnKind = method.ReturnType switch
         {
             { SpecialType: SpecialType.System_Void } => ReturnKind.Void,
+            { SpecialType: SpecialType.System_Int32 } => ReturnKind.Int,
             { Name: "String", ContainingNamespace.Name: "System" } => ReturnKind.String,
 
             INamedTypeSymbol t when t.Name == "Task" && t.TypeArguments.Length == 0
                 => ReturnKind.Task,
+            INamedTypeSymbol t when t.Name == "Task" && t.TypeArguments.Length == 1 &&
+                                   t.TypeArguments[0].SpecialType == SpecialType.System_Int32
+                => ReturnKind.TaskInt,
             INamedTypeSymbol t when t.Name == "Task" && t.TypeArguments.Length == 1 &&
                                    t.TypeArguments[0].SpecialType == SpecialType.System_String
                 => ReturnKind.TaskString,
 
             INamedTypeSymbol t when t.Name == "ValueTask" && t.TypeArguments.Length == 0
                 => ReturnKind.ValueTask,
+            INamedTypeSymbol t when t.Name == "ValueTask" && t.TypeArguments.Length == 1 &&
+                                   t.TypeArguments[0].SpecialType == SpecialType.System_Int32
+                => ReturnKind.ValueTaskInt,
             INamedTypeSymbol t when t.Name == "ValueTask" && t.TypeArguments.Length == 1 &&
                                    t.TypeArguments[0].SpecialType == SpecialType.System_String
                 => ReturnKind.ValueTaskString,
@@ -1293,7 +1360,8 @@ public partial class MethodGenerator : IIncrementalGenerator
             var contentType = headers[0].Trim().ToLowerInvariant();
             if (contentType == "text/plain")
                 ext = ".txt";
-            else if (contentType == "text/acii-piet")
+            // Keep legacy typo support for backward compatibility.
+            else if (contentType is "text/ascii-piet" or "text/acii-piet")
                 ext = ".txt";
             else if (contentType == "image/x-portable-pixmap")
                 ext = ".ppm";

@@ -8,6 +8,8 @@ namespace Esolang.Piet.Processor.Tests;
 [TestClass]
 public sealed class PietProcessorTests
 {
+    public TestContext TestContext { get; set; } = default!;
+
     static readonly MethodInfo ExecuteCommandMethod = typeof(PietProcessor)
         .GetMethod("ExecuteCommand", BindingFlags.NonPublic | BindingFlags.Static)!;
 
@@ -82,6 +84,28 @@ public sealed class PietProcessorTests
         var result = processor.RunAndOutputString();
 
         Assert.AreEqual("Hello, world!", result);
+    }
+
+    [TestMethod]
+    public void RunToEnd_ReturnsZero()
+    {
+        var program = new PietProgram(1, 1, new[] { PietColor.White });
+        var processor = new PietProcessor(program);
+
+        var exitCode = processor.RunToEnd(cancellationToken: TestContext.CancellationTokenSource.Token);
+
+        Assert.AreEqual(0, exitCode);
+    }
+
+    [TestMethod]
+    public async Task RunToEndAsync_ReturnsZero()
+    {
+        var program = new PietProgram(1, 1, new[] { PietColor.White });
+        var processor = new PietProcessor(program);
+
+        var exitCode = await processor.RunToEndAsync(cancellationToken: TestContext.CancellationTokenSource.Token);
+
+        Assert.AreEqual(0, exitCode);
     }
 
     [TestMethod]

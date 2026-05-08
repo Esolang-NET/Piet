@@ -16,6 +16,7 @@ This sample uses multiple image formats:
 - `samples/hello-world.png` (PNG, output)
 - `samples/input-output.png` (PNG, input + output)
 - `samples/ascii-piet-sample.txt` (ascii-piet text, output)
+- `data:text/ascii-piet;codel-size=1,l_ C` (inline ascii-piet data URI, output)
 - `samples/ppm-sample.ppm` (PPM, output)
 - `samples/dot.gif` (GIF, output)
 - `samples/dot-codel-11.gif` (GIF, output, codel size 11)
@@ -99,6 +100,7 @@ RunHw111Gif:Hello, world!
 - `RunWithPipeReader` -> `input-output.png`
 - `RunWithPipeWriter` -> `hello-world.png`
 - `RunWithTextWriter` -> `hello-world.png`
+- `RunInlineAsciiPiet` -> `data:text/ascii-piet;codel-size=1,l_ C`
 - `RunDotGif` -> `dot.gif`
 - `RunDotCodel11Gif` -> `dot-codel-11.gif` (codel size 11)
 - `RunHw111Gif` -> `hw1-11.gif` (codel size 11)

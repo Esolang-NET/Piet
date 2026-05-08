@@ -32,6 +32,61 @@ public class MethodGeneratorTests
     ];
 
     // 2×1 RGB PNG: LightRed(0xFF,0xC0,0xC0) → Magenta(0xFF,0x00,0xFF).
+
+    [TestMethod]
+    public void Generator_RuntimeInternalMembers_AreEditorBrowsableNever()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public partial void RunSync();
+
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public partial System.Threading.Tasks.Task<string> RunAsync();
+
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public partial System.Collections.Generic.IEnumerable<byte> RunEnumerable();
+
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public partial System.Collections.Generic.IAsyncEnumerable<byte> RunAsyncEnumerable(System.Threading.CancellationToken ct = default);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/program.png.piet.txt",
+                MakeTransformedText("program.png", MinimalLightRedPng)));
+        var runResult = driver.GetRunResult();
+
+        AssertNoErrors(diagnostics);
+
+        var runtimeSource = runResult.Results
+            .SelectMany(static r => r.GeneratedSources)
+            .Single(static s => s.HintName == MethodGenerator.GeneratePietRuntimeFileName)
+            .SourceText
+            .ToString();
+
+        const string marker = "[EditorBrowsable(EditorBrowsableState.Never)]";
+        var occurrenceCount = 0;
+        var currentIndex = 0;
+        while ((currentIndex = runtimeSource.IndexOf(marker, currentIndex, StringComparison.Ordinal)) >= 0)
+        {
+            occurrenceCount++;
+            currentIndex += marker.Length;
+        }
+
+        Assert.AreEqual(
+            5,
+            occurrenceCount,
+            "Expected EditorBrowsable(Never) on runtime class and each internal runtime entrypoint method.");
+
+        AssertNoErrors(outputCompilation);
+    }
     // Transition produces hDiff=5,lDiff=1 → cmd 16 (out number). Used to test PT0007.
     static readonly byte[] TwoPixelOutputPng =
     [
@@ -1104,7 +1159,7 @@ public class MethodGeneratorTests
             public partial class Sample
             {
                 [Esolang.Piet.GeneratePietMethod("program.png")]
-                public partial int Run();
+                public partial double Run();
             }
             """;
 
@@ -1120,6 +1175,73 @@ public class MethodGeneratorTests
         Assert.IsTrue(
             generatorDiagnostics.Any(static x => x.Id == "PT0002"),
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public void Generator_WithIntReturn_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public partial int Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/program.png.piet.txt",
+                MakeTransformedText("program.png", MinimalLightRedPng)));
+        var runResult = driver.GetRunResult();
+
+        AssertNoErrors(diagnostics);
+
+        Assert.IsTrue(
+            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial int Run()")),
+            "Expected generated int return method implementation was not found.");
+
+        AssertNoErrors(outputCompilation);
+    }
+
+    [TestMethod]
+    public void Generator_WithIntExitCodePatterns_ReturnsZero()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public static partial int RunInt();
+
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public static partial System.Threading.Tasks.Task<int> RunTaskInt();
+
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public static partial System.Threading.Tasks.ValueTask<int> RunValueTaskInt();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/program.png.piet.txt",
+                MakeTransformedText("program.png", MinimalLightRedPng)));
+        var runResult = driver.GetRunResult();
+
+        AssertNoErrors(diagnostics);
+        AssertNoErrors(outputCompilation);
+
+        var generatedText = string.Join("\n", runResult.GeneratedTrees.Select(tree => tree.GetText(CancellationToken).ToString()));
+        Assert.IsTrue(generatedText.Contains("RunInt("), "Expected RunInt method was not found.");
+        Assert.IsTrue(generatedText.Contains("RunTaskInt("), "Expected RunTaskInt method was not found.");
+        Assert.IsTrue(generatedText.Contains("RunValueTaskInt("), "Expected RunValueTaskInt method was not found.");
+        Assert.IsTrue(generatedText.Contains("return 0;"), "Expected exit-code return statement was not found.");
     }
 
     [TestMethod]
@@ -1835,7 +1957,7 @@ namespace Demo;
 
 public partial class Sample
 {
-    [Esolang.Piet.GeneratePietMethod("data:text/acii-piet;codel-size=1,l_ C")]
+    [Esolang.Piet.GeneratePietMethod("data:text/ascii-piet;codel-size=1,l_ C")]
     public static partial void Run();
 }
 """;
@@ -1863,7 +1985,7 @@ namespace Demo;
 
 public partial class Sample
 {
-    [Esolang.Piet.GeneratePietMethod("data:text/acii-piet;codel-size=1;base64,bF8gQw==")]
+    [Esolang.Piet.GeneratePietMethod("data:text/ascii-piet;codel-size=1;base64,bF8gQw==")]
     public static partial void Run();
 }
 """;
@@ -1892,7 +2014,7 @@ namespace Demo;
 
 public partial class Sample
 {
-    [Esolang.Piet.GeneratePietMethod("data:text/acii-piet;codel-size=abc,l_ C")]
+    [Esolang.Piet.GeneratePietMethod("data:text/ascii-piet;codel-size=abc,l_ C")]
     public static partial void Run();
 }
 """;
@@ -1921,7 +2043,7 @@ namespace Demo;
 
 public partial class Sample
 {
-    [Esolang.Piet.GeneratePietMethod("data:text/acii-piet;codel-size=1")]
+    [Esolang.Piet.GeneratePietMethod("data:text/ascii-piet;codel-size=1")]
     public static partial void Run();
 }
 """;

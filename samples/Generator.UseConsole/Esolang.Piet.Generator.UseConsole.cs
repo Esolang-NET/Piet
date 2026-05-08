@@ -10,6 +10,10 @@ using System.Threading.Tasks;
 var asciiPiet = PietSample.RunAsciiPiet();
 Console.WriteLine($"RunAsciiPiet: {asciiPiet}");
 
+// inline ascii-piet (data URI) の出力例
+var inlineAsciiPiet = PietSample.RunInlineAsciiPiet();
+Console.WriteLine($"RunInlineAsciiPiet: {inlineAsciiPiet}");
+
 // PPM (.ppm) 画像の出力例
 var ppm = PietSample.RunPpm();
 Console.WriteLine($"RunPpm: {ppm}");
@@ -80,6 +84,12 @@ partial class PietSample
     /// </summary>
     [GeneratePietMethod("ascii-piet-sample.txt")]
     public static partial string RunAsciiPiet();
+
+    /// <summary>
+    /// Executes an inline ASCII-Piet program embedded as a data URI.
+    /// </summary>
+    [GeneratePietMethod("data:text/ascii-piet;codel-size=1,l_ C")]
+    public static partial string RunInlineAsciiPiet();
 
     /// <summary>
     /// Executes the PPM sample program and returns its text output.
