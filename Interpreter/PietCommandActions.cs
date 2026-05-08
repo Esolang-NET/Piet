@@ -1,13 +1,23 @@
 using Esolang.Piet.Parser;
 using Esolang.Piet.Processor;
+using System.Text;
 
 namespace Esolang.Piet.Interpreter;
 
 internal static class PietCommandActions
 {
-    public static Task<int> RunAsync(string path, int codelSize, bool asciiPiet, CancellationToken cancellationToken)
+    public static Task<int> RunAsync(string? path, string? asciiPietText, int codelSize, bool asciiPiet, CancellationToken cancellationToken)
     {
-        var program = PietParser.Parse(path, codelSize);
+        PietProgram program;
+        if (!string.IsNullOrWhiteSpace(asciiPietText))
+        {
+            var bytes = Encoding.ASCII.GetBytes(asciiPietText);
+            program = PietParser.Parse(bytes, ".txt", codelSize);
+        }
+        else
+        {
+            program = PietParser.Parse(path!, codelSize);
+        }
 
         if (asciiPiet)
             return WriteAsciiPietAsync(program);

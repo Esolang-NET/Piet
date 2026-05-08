@@ -6,10 +6,18 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+
+- `dotnet-piet` (`Esolang.Piet.Interpreter`): added `--ascii-piet-text` option to execute inline ascii-piet text directly without requiring a file path.
+- `Esolang.Piet.Interpreter.Tests`: added CLI tests for inline ascii-piet input mode and argument-validation paths (missing input source / conflicting path+inline input).
+- `Esolang.Piet.Interpreter.Tests`: added sample-based conformance vectors (hello-world, no-op, ascii-piet text, PPM, GIF) for execution exit-code checks and representative output checks.
+- `Esolang.Piet.Generator.Tests`: added sample-based conformance vectors using real sample assets to verify generation succeeds without diagnostics.
+
 ### Changed
 
 - `Esolang.Piet.Generator`: `TextWriter` and `PipeWriter` output parameters can now be combined with `int`, `Task`, `Task<int>`, `ValueTask`, and `ValueTask<int>` return types. Only string/byte-sequence return types (`string`, `Task<string>`, `ValueTask<string>`, `IEnumerable<byte>`, `IAsyncEnumerable<byte>`) still conflict with explicit output parameters (`PT0011`).
 - `Esolang.Piet.Generator`: PT0011 diagnostic message updated to clarify that only string or byte-sequence return types conflict with output parameters.
+- `dotnet-piet` (`Esolang.Piet.Interpreter`): root command `path` argument is now optional and validated conditionally so either `path` or `--ascii-piet-text` must be supplied.
 
 ### Fixed
 

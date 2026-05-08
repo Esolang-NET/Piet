@@ -12,9 +12,10 @@ public static class PietInterpreterExtensions
     /// </summary>
     public static RootCommand BuildRootCommand()
     {
-        var inputArgument = new Argument<string>("path")
+        var inputArgument = new Argument<string?>("path")
         {
             Description = "Path to a Piet image file.",
+            Arity = ArgumentArity.ZeroOrOne,
         };
         var codelSizeOption = new Option<int>("--codel-size", "-cs")
         {
@@ -25,27 +26,54 @@ public static class PietInterpreterExtensions
         {
             Description = "Write the parsed program as ascii-piet text without a trailing newline and exit.",
         };
+        var asciiPietTextOption = new Option<string?>("--ascii-piet-text")
+        {
+            Description = "Inline ascii-piet text to execute directly (path can be omitted).",
+        };
 
-        var parseCommand = BuildParseCommand(inputArgument, codelSizeOption);
+        var parseCommand = BuildParseCommand(codelSizeOption);
         var rootCommand = new RootCommand("Run Piet programs from image files.")
         {
             inputArgument,
             codelSizeOption,
             asciiPietOption,
+            asciiPietTextOption,
             parseCommand,
         };
+        rootCommand.Validators.Add(parseResult =>
+        {
+            var path = parseResult.GetValue(inputArgument);
+            var asciiPietText = parseResult.GetValue(asciiPietTextOption);
+            var hasPath = !string.IsNullOrWhiteSpace(path);
+            var hasAsciiPietText = !string.IsNullOrWhiteSpace(asciiPietText);
+
+            if (!hasPath && !hasAsciiPietText)
+            {
+                parseResult.AddError("Specify either path or --ascii-piet-text.");
+                return;
+            }
+
+            if (hasPath && hasAsciiPietText)
+                parseResult.AddError("path and --ascii-piet-text cannot be specified together.");
+        });
         rootCommand.SetAction((parseResult, cancellationToken) =>
         {
             var path = parseResult.GetValue(inputArgument);
             var codelSize = parseResult.GetValue(codelSizeOption);
             var asciiPiet = parseResult.GetValue(asciiPietOption);
-            return PietCommandActions.RunAsync(path!, codelSize, asciiPiet, cancellationToken);
+            var asciiPietText = parseResult.GetValue(asciiPietTextOption);
+            return PietCommandActions.RunAsync(path, asciiPietText, codelSize, asciiPiet, cancellationToken);
         });
         return rootCommand;
     }
 
-    private static Command BuildParseCommand(Argument<string> inputArgument, Option<int> codelSizeOption)
+    private static Command BuildParseCommand(Option<int> codelSizeOption)
     {
+        var inputArgument = new Argument<string>("path")
+        {
+            Description = "Path to a Piet image file.",
+        };
+
         var parseCommand = new Command("parse", "Parse a Piet source and write ascii-piet text without a trailing newline.")
         {
             inputArgument,

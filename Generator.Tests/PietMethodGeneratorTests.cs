@@ -1861,6 +1861,70 @@ public class MethodGeneratorTests
             "Compilation contains errors after running generator. " + string.Join(" | ", pipeWriterErrors));
     }
 
+    [TestMethod]
+    [DataRow("hello-world.png", "samples", "Generator.UseConsole", "samples", "hello-world.png")]
+    [DataRow("ascii-piet-sample.txt", "samples", "Generator.UseConsole", "samples", "ascii-piet-sample.txt")]
+    [DataRow("ppm-sample.ppm", "samples", "Generator.UseConsole", "samples", "ppm-sample.ppm")]
+    [DataRow("dot.gif", "samples", "Generator.UseConsole", "samples", "dot.gif")]
+    [DataRow("dot-codel-11.gif", "samples", "Generator.UseConsole", "samples", "dot-codel-11.gif")]
+    public void Generator_WithSampleConformanceVector_GeneratesWithoutDiagnostics(
+        string logicalPath,
+        string p1,
+        string p2,
+        string p3,
+        string p4)
+    {
+        var samplePath = FindFileInRepository(p1, p2, p3, p4);
+        var transformed = MakeTransformedText(logicalPath, File.ReadAllBytes(samplePath));
+        var source = $$"""
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("{{logicalPath}}")]
+                public partial string Run();
+            }
+            """;
+
+        _ = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText($"obj/{logicalPath}.piet.txt", transformed));
+
+        AssertNoErrors(diagnostics);
+        AssertNoErrors(outputCompilation);
+    }
+
+    [TestMethod]
+    public void Generator_WithInputOutputSampleAndNoInputMechanism_ReportsDiagnostic()
+    {
+        const string logicalPath = "input-output.png";
+        var samplePath = FindFileInRepository("samples", "Generator.UseConsole", "samples", logicalPath);
+        var transformed = MakeTransformedText(logicalPath, File.ReadAllBytes(samplePath));
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("input-output.png")]
+                public partial void Run();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/input-output.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0008"),
+            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
     GeneratorDriver RunGeneratorsAndUpdateCompilation(
         string source,
         out Compilation outputCompilation,
@@ -1897,6 +1961,21 @@ public class MethodGeneratorTests
         public override string Path { get; } = path;
 
         public override SourceText? GetText(CancellationToken cancellationToken = default) => sourceText;
+    }
+
+    static string FindFileInRepository(params string[] relativeParts)
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            var candidate = Path.Combine(directory.FullName, Path.Combine(relativeParts));
+            if (File.Exists(candidate))
+                return candidate;
+
+            directory = directory.Parent;
+        }
+
+        throw new FileNotFoundException($"Could not find file in repository: {Path.Combine(relativeParts)}");
     }
 
     [TestMethod]
