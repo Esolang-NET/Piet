@@ -533,7 +533,7 @@ public class MethodGeneratorTests
     }
 
     [TestMethod]
-    public void Generator_WithTaskReturnAndTextWriterParameter_ReportsReturnOutputConflictDiagnostic()
+    public void Generator_WithTaskReturnAndTextWriterParameter_GeneratesMethod()
     {
         const string source = """
             namespace Demo;
@@ -548,19 +548,23 @@ public class MethodGeneratorTests
         var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
-            out _,
-            out _,
+            out var outputCompilation,
+            out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
+        AssertNoErrors(diagnostics);
+
+        Assert.IsFalse(
             generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+            "PT0011 should not be reported for Task return + TextWriter parameter.");
+
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
-    public void Generator_WithTaskReturnAndPipeWriterParameter_ReportsReturnOutputConflictDiagnostic()
+    public void Generator_WithTaskReturnAndPipeWriterParameter_GeneratesMethod()
     {
         const string source = """
             namespace Demo;
@@ -575,19 +579,23 @@ public class MethodGeneratorTests
         var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
-            out _,
-            out _,
+            out var outputCompilation,
+            out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
+        AssertNoErrors(diagnostics);
+
+        Assert.IsFalse(
             generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+            "PT0011 should not be reported for Task return + PipeWriter parameter.");
+
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
-    public void Generator_WithValueTaskReturnAndTextWriterParameter_ReportsReturnOutputConflictDiagnostic()
+    public void Generator_WithValueTaskReturnAndTextWriterParameter_GeneratesMethod()
     {
         const string source = """
             namespace Demo;
@@ -602,19 +610,23 @@ public class MethodGeneratorTests
         var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
-            out _,
-            out _,
+            out var outputCompilation,
+            out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
+        AssertNoErrors(diagnostics);
+
+        Assert.IsFalse(
             generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+            "PT0011 should not be reported for ValueTask return + TextWriter parameter.");
+
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
-    public void Generator_WithValueTaskReturnAndPipeWriterParameter_ReportsReturnOutputConflictDiagnostic()
+    public void Generator_WithValueTaskReturnAndPipeWriterParameter_GeneratesMethod()
     {
         const string source = """
             namespace Demo;
@@ -629,15 +641,19 @@ public class MethodGeneratorTests
         var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
-            out _,
-            out _,
+            out var outputCompilation,
+            out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
+        AssertNoErrors(diagnostics);
+
+        Assert.IsFalse(
             generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+            "PT0011 should not be reported for ValueTask return + PipeWriter parameter.");
+
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -2204,7 +2220,7 @@ public partial class Sample
     }
 
     [TestMethod]
-    public void Generator_WithTaskReturnAndTextWriterParameter_GeneratesThrowingMethod()
+    public void Generator_WithTaskReturnAndTextWriterParameter_GeneratesCorrectMethod()
     {
         const string source = """
             namespace Demo;
@@ -2218,24 +2234,25 @@ public partial class Sample
 
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
-            out _,
-            out _,
+            out var outputCompilation,
+            out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt",
                 MakeTransformedText("samples/hello-world.png", MinimalLightRedPng)));
 
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(generatorDiagnostics.Any(static x => x.Id == "PT0011"));
+        AssertNoErrors(diagnostics);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree =>
-                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0011")),
-            "Expected throw for PT0011 was not generated.");
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            "PT0011 should not be reported for Task return + TextWriter parameter.");
+
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
-    public void Generator_WithTaskReturnAndPipeWriterParameter_GeneratesThrowingMethod()
+    public void Generator_WithTaskReturnAndPipeWriterParameter_GeneratesCorrectMethod()
     {
         const string source = """
             namespace Demo;
@@ -2249,24 +2266,25 @@ public partial class Sample
 
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
-            out _,
-            out _,
+            out var outputCompilation,
+            out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt",
                 MakeTransformedText("samples/hello-world.png", MinimalLightRedPng)));
 
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(generatorDiagnostics.Any(static x => x.Id == "PT0011"));
+        AssertNoErrors(diagnostics);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree =>
-                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0011")),
-            "Expected throw for PT0011 was not generated.");
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            "PT0011 should not be reported for Task return + PipeWriter parameter.");
+
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
-    public void Generator_WithValueTaskReturnAndTextWriterParameter_GeneratesThrowingMethod()
+    public void Generator_WithValueTaskReturnAndTextWriterParameter_GeneratesCorrectMethod()
     {
         const string source = """
             namespace Demo;
@@ -2280,24 +2298,25 @@ public partial class Sample
 
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
-            out _,
-            out _,
+            out var outputCompilation,
+            out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt",
                 MakeTransformedText("samples/hello-world.png", MinimalLightRedPng)));
 
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(generatorDiagnostics.Any(static x => x.Id == "PT0011"));
+        AssertNoErrors(diagnostics);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree =>
-                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0011")),
-            "Expected throw for PT0011 was not generated.");
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            "PT0011 should not be reported for ValueTask return + TextWriter parameter.");
+
+        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
-    public void Generator_WithValueTaskReturnAndPipeWriterParameter_GeneratesThrowingMethod()
+    public void Generator_WithValueTaskReturnAndPipeWriterParameter_GeneratesCorrectMethod()
     {
         const string source = """
             namespace Demo;
@@ -2311,20 +2330,21 @@ public partial class Sample
 
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
-            out _,
-            out _,
+            out var outputCompilation,
+            out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt",
                 MakeTransformedText("samples/hello-world.png", MinimalLightRedPng)));
 
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(generatorDiagnostics.Any(static x => x.Id == "PT0011"));
+        AssertNoErrors(diagnostics);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree =>
-                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0011")),
-            "Expected throw for PT0011 was not generated.");
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            "PT0011 should not be reported for ValueTask return + PipeWriter parameter.");
+
+        AssertNoErrors(outputCompilation);
     }
 
     void AssertNoErrors(ImmutableArray<Diagnostic> diagnostics) =>
@@ -2336,5 +2356,249 @@ public partial class Sample
         var diagnostics = outputCompilation.GetDiagnostics(CancellationToken);
         Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
             "Compilation contains errors after running generator." + string.Join("\n", diagnostics.Select(static x => x.ToString())));
+    }
+
+    // -----------------------------------------------------------------------
+    // int / Task<int> / ValueTask<int> + TextWriter / PipeWriter の組み合わせ
+    // -----------------------------------------------------------------------
+
+    [TestMethod]
+    public void Generator_WithIntReturnAndTextWriterParameter_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial int Run(System.IO.TextWriter output);
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        AssertNoErrors(diagnostics);
+
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            "PT0011 should not be reported for int return + TextWriter parameter.");
+
+        AssertNoErrors(outputCompilation);
+    }
+
+    [TestMethod]
+    public void Generator_WithIntReturnAndPipeWriterParameter_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial int Run(System.IO.Pipelines.PipeWriter output);
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        AssertNoErrors(diagnostics);
+
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            "PT0011 should not be reported for int return + PipeWriter parameter.");
+
+        AssertNoErrors(outputCompilation);
+    }
+
+    [TestMethod]
+    public void Generator_WithTaskIntReturnAndTextWriterParameter_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial System.Threading.Tasks.Task<int> Run(System.IO.TextWriter output);
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        AssertNoErrors(diagnostics);
+
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            "PT0011 should not be reported for Task<int> return + TextWriter parameter.");
+
+        AssertNoErrors(outputCompilation);
+    }
+
+    [TestMethod]
+    public void Generator_WithTaskIntReturnAndPipeWriterParameter_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial System.Threading.Tasks.Task<int> Run(System.IO.Pipelines.PipeWriter output);
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        AssertNoErrors(diagnostics);
+
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            "PT0011 should not be reported for Task<int> return + PipeWriter parameter.");
+
+        AssertNoErrors(outputCompilation);
+    }
+
+    [TestMethod]
+    public void Generator_WithValueTaskIntReturnAndTextWriterParameter_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial System.Threading.Tasks.ValueTask<int> Run(System.IO.TextWriter output);
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        AssertNoErrors(diagnostics);
+
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            "PT0011 should not be reported for ValueTask<int> return + TextWriter parameter.");
+
+        AssertNoErrors(outputCompilation);
+    }
+
+    [TestMethod]
+    public void Generator_WithValueTaskIntReturnAndPipeWriterParameter_GeneratesMethod()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial System.Threading.Tasks.ValueTask<int> Run(System.IO.Pipelines.PipeWriter output);
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        AssertNoErrors(diagnostics);
+
+        Assert.IsFalse(
+            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            "PT0011 should not be reported for ValueTask<int> return + PipeWriter parameter.");
+
+        AssertNoErrors(outputCompilation);
+    }
+
+    [TestMethod]
+    public void Generator_WithStringReturnAndPipeWriterParameter_ReportsReturnOutputConflictDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial string Run(System.IO.Pipelines.PipeWriter output);
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            "PT0011 should be reported for string return + PipeWriter parameter.");
+    }
+
+    [TestMethod]
+    public void Generator_WithIEnumerableByteReturnAndTextWriterParameter_ReportsReturnOutputConflictDiagnostic()
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("hello-world.png")]
+                public partial System.Collections.Generic.IEnumerable<byte> Run(System.IO.TextWriter output);
+            }
+            """;
+
+        var transformed = MakeTransformedText("samples/hello-world.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out _,
+            out _,
+            new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
+        var runResult = driver.GetRunResult();
+        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+        Assert.IsTrue(
+            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            "PT0011 should be reported for IEnumerable<byte> return + TextWriter parameter.");
     }
 }

@@ -583,7 +583,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         var staticModifier = methodSymbol.IsStatic ? " static" : string.Empty;
         var asyncModifier = executionBinding.ReturnKind switch
         {
-            ReturnKind.TaskInt or ReturnKind.TaskString or ReturnKind.ValueTaskInt or ReturnKind.ValueTaskString or ReturnKind.AsyncEnumerableByte => " async",
+            ReturnKind.Task or ReturnKind.TaskInt or ReturnKind.TaskString or ReturnKind.ValueTask or ReturnKind.ValueTaskInt or ReturnKind.ValueTaskString or ReturnKind.AsyncEnumerableByte => " async",
             _ => string.Empty,
         };
         var accessibility = GetAccessibility(methodSymbol.DeclaredAccessibility);
@@ -1280,7 +1280,8 @@ public partial class MethodGenerator : IIncrementalGenerator
 
             if (p.Type.ToDisplayString() == "System.IO.TextWriter")
             {
-                if (returnKind is not ReturnKind.Void)
+                if (returnKind is ReturnKind.String or ReturnKind.TaskString or ReturnKind.ValueTaskString
+                                or ReturnKind.EnumerableByte or ReturnKind.AsyncEnumerableByte)
                 {
                     return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName,
                         DiagnosticDescriptors.ReturnOutputConflict.Id, p.Locations.ElementAt(0));
@@ -1297,7 +1298,8 @@ public partial class MethodGenerator : IIncrementalGenerator
 
             if (p.Type.ToDisplayString() == "System.IO.Pipelines.PipeWriter")
             {
-                if (returnKind is not ReturnKind.Void)
+                if (returnKind is ReturnKind.String or ReturnKind.TaskString or ReturnKind.ValueTaskString
+                                or ReturnKind.EnumerableByte or ReturnKind.AsyncEnumerableByte)
                 {
                     return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName,
                         DiagnosticDescriptors.ReturnOutputConflict.Id);
@@ -1328,8 +1330,10 @@ public partial class MethodGenerator : IIncrementalGenerator
                 DiagnosticDescriptors.InvalidParameter.Id);
         }
 
-        // Return + output parameter conflict
-        if (returnKind is not ReturnKind.Void && outputKind is OutputKind.TextWriter or OutputKind.PipeWriter)
+        // Return + output parameter conflict (string/enumerable returns conflict with writer params)
+        if (returnKind is ReturnKind.String or ReturnKind.TaskString or ReturnKind.ValueTaskString
+                       or ReturnKind.EnumerableByte or ReturnKind.AsyncEnumerableByte
+            && outputKind is OutputKind.TextWriter or OutputKind.PipeWriter)
         {
             return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName,
                 DiagnosticDescriptors.ReturnOutputConflict.Id);

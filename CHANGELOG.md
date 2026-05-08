@@ -6,6 +6,15 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Changed
+
+- `Esolang.Piet.Generator`: `TextWriter` and `PipeWriter` output parameters can now be combined with `int`, `Task`, `Task<int>`, `ValueTask`, and `ValueTask<int>` return types. Only string/byte-sequence return types (`string`, `Task<string>`, `ValueTask<string>`, `IEnumerable<byte>`, `IAsyncEnumerable<byte>`) still conflict with explicit output parameters (`PT0011`).
+- `Esolang.Piet.Generator`: PT0011 diagnostic message updated to clarify that only string or byte-sequence return types conflict with output parameters.
+
+### Fixed
+
+- `Esolang.Piet.Generator`: `Task` and `ValueTask` return types were missing the `async` modifier on the generated method signature when combined with `TextWriter` or `PipeWriter` parameters.
+
 ## [1.1.0] - 2026-05-08
 
 ### Added
