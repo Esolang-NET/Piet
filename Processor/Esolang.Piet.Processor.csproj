@@ -6,6 +6,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>Execution engine for Piet programs.</Description>
     <PackageId>Esolang.Piet.Processor</PackageId>
+    <PackageTags>esolang;piet;processor</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net6.0'))">

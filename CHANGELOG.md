@@ -18,6 +18,7 @@ The format is based on Keep a Changelog.
 - `Esolang.Piet.Generator`: `TextWriter` and `PipeWriter` output parameters can now be combined with `int`, `Task`, `Task<int>`, `ValueTask`, and `ValueTask<int>` return types. Only string/byte-sequence return types (`string`, `Task<string>`, `ValueTask<string>`, `IEnumerable<byte>`, `IAsyncEnumerable<byte>`) still conflict with explicit output parameters (`PT0011`).
 - `Esolang.Piet.Generator`: PT0011 diagnostic message updated to clarify that only string or byte-sequence return types conflict with output parameters.
 - `dotnet-piet` (`Esolang.Piet.Interpreter`): root command `path` argument is now optional and validated conditionally so either `path` or `--ascii-piet-text` must be supplied.
+- Package metadata: added NuGet `PackageTags` for packable Piet packages (`Generator`, `Parser`, `Processor`, `dotnet-piet`) to improve search/discovery.
 
 ### Fixed
 

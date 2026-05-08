@@ -14,6 +14,7 @@
     <IncludeSymbols>false</IncludeSymbols>
     <Description>Source generator for Piet programs.</Description>
     <PackageId>Esolang.Piet.Generator</PackageId>
+    <PackageTags>esolang;piet;generator;source-generator;roslyn-analyzer</PackageTags>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <DevelopmentDependency>true</DevelopmentDependency>
   </PropertyGroup>
