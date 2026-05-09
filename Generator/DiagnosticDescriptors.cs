@@ -83,7 +83,7 @@ public static class DiagnosticDescriptors
         title: "Required output interface not provided",
         messageFormat: "The Piet program requires output, but the method does not provide an output mechanism",
         category: Category,
-        defaultSeverity: DiagnosticSeverity.Error,
+        defaultSeverity: DiagnosticSeverity.Hidden,
         isEnabledByDefault: true);
 
     /// <summary>
@@ -94,7 +94,7 @@ public static class DiagnosticDescriptors
         title: "Required input interface not provided",
         messageFormat: "The Piet program requires input, but the method does not provide an input mechanism",
         category: Category,
-        defaultSeverity: DiagnosticSeverity.Error,
+        defaultSeverity: DiagnosticSeverity.Hidden,
         isEnabledByDefault: true);
 
     /// <summary>
@@ -125,7 +125,7 @@ public static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor ReturnOutputConflict = new(
         id: "PT0011",
         title: "Return type and output parameter conflict",
-        messageFormat: "The method '{0}' cannot combine a non-void return type with an explicit output parameter",
+        messageFormat: "The method '{0}' cannot combine a string or byte-sequence return type with an explicit output parameter (TextWriter or PipeWriter)",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);

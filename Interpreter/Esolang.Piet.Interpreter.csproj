@@ -12,6 +12,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>Command-line interpreter for Piet programs.</Description>
     <PackageId>dotnet-piet</PackageId>
+    <PackageTags>esolang;piet;interpreter;cli;dotnet-tool</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net6.0'))">

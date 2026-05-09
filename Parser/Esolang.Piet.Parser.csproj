@@ -6,6 +6,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>Core parsing primitives for Piet programs.</Description>
     <PackageId>Esolang.Piet.Parser</PackageId>
+    <PackageTags>esolang;piet;parser</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net6.0'))">

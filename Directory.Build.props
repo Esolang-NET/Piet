@@ -3,9 +3,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>14</LangVersion>
-    <AssemblyVersion>1.1.0.3</AssemblyVersion>
-    <FileVersion>1.1.0.3</FileVersion>
-    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.1.4</AssemblyVersion>
+    <FileVersion>1.1.1.4</FileVersion>
+    <Version>1.1.1</Version>
     <PackageProjectUrl>https://github.com/Esolang-NET/Piet/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Esolang-NET/Piet.git</RepositoryUrl>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

@@ -16,10 +16,22 @@ dotnet tool install --global dotnet-piet
 dotnet-piet path/to/program.png
 ```
 
+You can also run inline ascii-piet text directly without providing a path:
+
+```bash
+dotnet-piet --ascii-piet-text "l_ C"
+```
+
 To convert a parsed program to ascii-piet text and write it to standard output without a trailing newline:
 
 ```bash
 dotnet-piet path/to/program.png --ascii-piet
+```
+
+This also works with inline ascii-piet text:
+
+```bash
+dotnet-piet --ascii-piet-text "l_ C" --ascii-piet
 ```
 
 Or with a dedicated parse command:

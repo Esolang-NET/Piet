@@ -6,6 +6,27 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.1.1]
+
+### Added
+
+- `dotnet-piet` (`Esolang.Piet.Interpreter`): added `--ascii-piet-text` option to execute inline ascii-piet text directly without requiring a file path.
+- `Esolang.Piet.Interpreter.Tests`: added CLI tests for inline ascii-piet input mode and argument-validation paths (missing input source / conflicting path+inline input).
+- `Esolang.Piet.Interpreter.Tests`: added hybrid conformance vectors combining inline ascii-piet checks and sample-file checks (hello-world, ascii-piet text, PPM, GIF) for execution exit-code and representative output verification.
+- `Esolang.Piet.Generator.Tests`: added sample-based conformance vectors using real sample assets to verify generation succeeds without diagnostics.
+- `Esolang.Piet.Generator`: `PT0008` / `PT0007` Severity `Error`→ `Hidden`
+
+### Changed
+
+- `Esolang.Piet.Generator`: `TextWriter` and `PipeWriter` output parameters can now be combined with `int`, `Task`, `Task<int>`, `ValueTask`, and `ValueTask<int>` return types. Only string/byte-sequence return types (`string`, `Task<string>`, `ValueTask<string>`, `IEnumerable<byte>`, `IAsyncEnumerable<byte>`) still conflict with explicit output parameters (`PT0011`).
+- `Esolang.Piet.Generator`: PT0011 diagnostic message updated to clarify that only string or byte-sequence return types conflict with output parameters.
+- `dotnet-piet` (`Esolang.Piet.Interpreter`): root command `path` argument is now optional and validated conditionally so either `path` or `--ascii-piet-text` must be supplied.
+- Package metadata: added NuGet `PackageTags` for packable Piet packages (`Generator`, `Parser`, `Processor`, `dotnet-piet`) to improve search/discovery.
+
+### Fixed
+
+- `Esolang.Piet.Generator`: `Task` and `ValueTask` return types were missing the `async` modifier on the generated method signature when combined with `TextWriter` or `PipeWriter` parameters.
+
 ## [1.1.0] - 2026-05-08
 
 ### Added
@@ -62,3 +83,9 @@ The format is based on Keep a Changelog.
 
 - Initial repository structure for Piet support.
 - Parser, processor, and interpreter package skeletons.
+
+[Unreleased]: https://github.com/Esolang-NET/Piet/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/Esolang-NET/Piet/tree/v1.1.1
+[1.1.0]: https://github.com/Esolang-NET/Piet/tree/v1.1.0
+[1.0.0]: https://github.com/Esolang-NET/Piet/tree/v1.0.0
+[0.1.0-preview-1]: https://github.com/Esolang-NET/Piet/tree/v0.1.0-preview-1

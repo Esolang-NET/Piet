@@ -345,7 +345,7 @@ partial class PietSample
     public static partial void RunDotCodel11Gif();
 
     [GeneratePietMethod("hw1-11.gif", codelSize: 11)]
-    public static partial string RunHw111Gif(string input = "");
+    public static partial string RunHw111Gif();
 }
 ```
 
@@ -361,7 +361,8 @@ Console.WriteLine($"RunHw111Gif: {PietSample.RunHw111Gif()}");
 
 - At most one input source: `string`, `TextReader`, or `PipeReader`.
 - At most one output destination: `TextWriter` or `PipeWriter`.
-- Output parameters cannot be combined with non-`void` return types (`PT0011`).
+- `TextWriter` / `PipeWriter` output parameters can be combined with `void`, `int`, `Task`, `Task<int>`, `ValueTask`, and `ValueTask<int>` return types.
+- `TextWriter` / `PipeWriter` output parameters **cannot** be combined with string or byte-sequence return types (`string`, `Task<string>`, `ValueTask<string>`, `IEnumerable<byte>`, `IAsyncEnumerable<byte>`) — reports `PT0011`.
 - `CancellationToken` may be combined with other supported parameters.
 - Use at most one `CancellationToken` parameter.
 
@@ -388,7 +389,7 @@ For a concrete sample project and runnable examples, see [samples/Generator.UseC
 | PT0008 | Required input interface not provided. |
 | PT0009 | Duplicate image path mapping. |
 | PT0010 | Input interface provided but not required (Hidden). |
-| PT0011 | Non-void return type conflicts with explicit output parameter. |
+| PT0011 | String or byte-sequence return type conflicts with explicit output parameter (`TextWriter`/`PipeWriter`). |
 | PT0012 | Consumer language version may be too low (C# 8.0 or later is recommended). |
 
 ## See also
