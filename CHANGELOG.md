@@ -6,6 +6,8 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.1.1]
+
 ### Added
 
 - `dotnet-piet` (`Esolang.Piet.Interpreter`): added `--ascii-piet-text` option to execute inline ascii-piet text directly without requiring a file path.
@@ -82,7 +84,8 @@ The format is based on Keep a Changelog.
 - Initial repository structure for Piet support.
 - Parser, processor, and interpreter package skeletons.
 
-[Unreleased]: https://github.com/Esolang-NET/Piet/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Esolang-NET/Piet/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/Esolang-NET/Piet/tree/v1.1.1
 [1.1.0]: https://github.com/Esolang-NET/Piet/tree/v1.1.0
 [1.0.0]: https://github.com/Esolang-NET/Piet/tree/v1.0.0
 [0.1.0-preview-1]: https://github.com/Esolang-NET/Piet/tree/v0.1.0-preview-1
