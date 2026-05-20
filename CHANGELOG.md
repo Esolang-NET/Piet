@@ -6,6 +6,15 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+
+- `GEMINI.md`: Added project development instructions.
+
+### Changed
+
+- Tests: Migrated test projects to Microsoft Testing Platform (MTP).
+- Build: Sorted `PackageReference` items alphabetically in project files and removed `coverlet.collector`.
+- `Esolang.Piet.Generator`: Refactored type detection logic using `KnownTypes` for simplification.
 ## [1.1.1]
 
 ### Added
