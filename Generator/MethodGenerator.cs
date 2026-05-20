@@ -85,6 +85,53 @@ public partial class MethodGenerator : IIncrementalGenerator
         ReturnAsyncEnumerable,
     }
 
+    readonly struct KnownTypes
+    {
+        public readonly INamedTypeSymbol? String;
+        public readonly INamedTypeSymbol? Task;
+        public readonly INamedTypeSymbol? TaskInt;
+        public readonly INamedTypeSymbol? TaskString;
+        public readonly INamedTypeSymbol? ValueTask;
+        public readonly INamedTypeSymbol? ValueTaskInt;
+        public readonly INamedTypeSymbol? ValueTaskString;
+        public readonly INamedTypeSymbol? IEnumerableByte;
+        public readonly INamedTypeSymbol? IAsyncEnumerableByte;
+        public readonly INamedTypeSymbol? TextReader;
+        public readonly INamedTypeSymbol? PipeReader;
+        public readonly INamedTypeSymbol? TextWriter;
+        public readonly INamedTypeSymbol? PipeWriter;
+        public readonly INamedTypeSymbol? CancellationToken;
+
+        public KnownTypes(Compilation compilation)
+        {
+            String = compilation.GetSpecialType(SpecialType.System_String);
+            var byteSymbol = compilation.GetSpecialType(SpecialType.System_Byte);
+            var intSymbol = compilation.GetSpecialType(SpecialType.System_Int32);
+            
+            var taskGeneric = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task`1");
+            Task = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task");
+            TaskInt = taskGeneric?.Construct(intSymbol);
+            TaskString = taskGeneric?.Construct(String);
+
+            var valueTaskGeneric = compilation.GetTypeByMetadataName("System.Threading.Tasks.ValueTask`1");
+            ValueTask = compilation.GetTypeByMetadataName("System.Threading.Tasks.ValueTask");
+            ValueTaskInt = valueTaskGeneric?.Construct(intSymbol);
+            ValueTaskString = valueTaskGeneric?.Construct(String);
+
+            var enumerableGeneric = compilation.GetTypeByMetadataName("System.Collections.Generic.IEnumerable`1");
+            IEnumerableByte = enumerableGeneric?.Construct(byteSymbol);
+
+            var asyncEnumerableGeneric = compilation.GetTypeByMetadataName("System.Collections.Generic.IAsyncEnumerable`1");
+            IAsyncEnumerableByte = asyncEnumerableGeneric?.Construct(byteSymbol);
+
+            TextReader = compilation.GetTypeByMetadataName("System.IO.TextReader");
+            PipeReader = compilation.GetTypeByMetadataName("System.IO.Pipelines.PipeReader");
+            TextWriter = compilation.GetTypeByMetadataName("System.IO.TextWriter");
+            PipeWriter = compilation.GetTypeByMetadataName("System.IO.Pipelines.PipeWriter");
+            CancellationToken = compilation.GetTypeByMetadataName("System.Threading.CancellationToken");
+        }
+    }
+
     readonly struct ExecutionBinding(
         bool isValid,
         ReturnKind returnKind,
@@ -235,11 +282,14 @@ public partial class MethodGenerator : IIncrementalGenerator
             .Select(static (provider, _) => provider.GlobalOptions.TryGetValue("build_property.MSBuildProjectDirectory", out var projectDirectory)
                 || provider.GlobalOptions.TryGetValue("build_property.ProjectDir", out projectDirectory)
                 ? projectDirectory : null);
-        var generationInputs = generatedTargets.Combine(additionalFiles).Combine(languageVersion).Combine(projectDirrectory);
+        var compilation = context.CompilationProvider;
+        var knownTypes = compilation.Select(static (c, _) => new KnownTypes(c));
+
+        var generationInputs = generatedTargets.Combine(additionalFiles).Combine(languageVersion).Combine(projectDirrectory).Combine(knownTypes);
 
         context.RegisterSourceOutput(generationInputs, static (context, input) =>
         {
-            (((var sources, var imagePaths), var currentLanguageVersion), var projectDir) = input;
+            ((((var sources, var imagePaths), var currentLanguageVersion), var projectDir), var types) = input;
 
             if (sources.IsDefaultOrEmpty)
             {
@@ -253,7 +303,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
             foreach (var source in sources)
             {
-                var (emitted, runtimeType_) = Emit(context, source, imagePaths, currentLanguageVersion, projectDir);
+                var (emitted, runtimeType_) = Emit(context, source, imagePaths, currentLanguageVersion, projectDir, types);
                 runtimeTypes |= runtimeType_;
                 if (!emitted.HasValue)
                 {
@@ -280,7 +330,8 @@ public partial class MethodGenerator : IIncrementalGenerator
         GeneratorAttributeSyntaxContext source,
         ImmutableArray<AdditionalImageFile> additionalImageFiles,
         LanguageVersion currentLanguageVersion,
-        string? projectDirectory)
+        string? projectDirectory,
+        KnownTypes types)
     {
         if (source.TargetSymbol is not IMethodSymbol methodSymbol || source.TargetNode is not MethodDeclarationSyntax methodSyntax)
         {
@@ -385,7 +436,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             );
         }
 
-        var executionBinding = BindExecutionSignature(methodSymbol);
+        var executionBinding = BindExecutionSignature(methodSymbol, types);
         if (!executionBinding.IsValid)
         {
             if (string.Equals(executionBinding.ErrorId, DiagnosticDescriptors.InvalidReturnType.Id, StringComparison.Ordinal))
@@ -1183,41 +1234,23 @@ public partial class MethodGenerator : IIncrementalGenerator
             _ => languageVersion >= LanguageVersion.CSharp8,
         };
 
-    private static ExecutionBinding BindExecutionSignature(IMethodSymbol method)
+    private static ExecutionBinding BindExecutionSignature(IMethodSymbol method, KnownTypes types)
     {
-        var returnKind = method.ReturnType switch
-        {
-            { SpecialType: SpecialType.System_Void } => ReturnKind.Void,
-            { SpecialType: SpecialType.System_Int32 } => ReturnKind.Int,
-            { Name: "String", ContainingNamespace.Name: "System" } => ReturnKind.String,
+        var returnType = method.ReturnType;
 
-            INamedTypeSymbol t when t.Name == "Task" && t.TypeArguments.Length == 0
-                => ReturnKind.Task,
-            INamedTypeSymbol t when t.Name == "Task" && t.TypeArguments.Length == 1 &&
-                                   t.TypeArguments[0].SpecialType == SpecialType.System_Int32
-                => ReturnKind.TaskInt,
-            INamedTypeSymbol t when t.Name == "Task" && t.TypeArguments.Length == 1 &&
-                                   t.TypeArguments[0].SpecialType == SpecialType.System_String
-                => ReturnKind.TaskString,
+        var returnKind = ReturnKind.Invalid;
 
-            INamedTypeSymbol t when t.Name == "ValueTask" && t.TypeArguments.Length == 0
-                => ReturnKind.ValueTask,
-            INamedTypeSymbol t when t.Name == "ValueTask" && t.TypeArguments.Length == 1 &&
-                                   t.TypeArguments[0].SpecialType == SpecialType.System_Int32
-                => ReturnKind.ValueTaskInt,
-            INamedTypeSymbol t when t.Name == "ValueTask" && t.TypeArguments.Length == 1 &&
-                                   t.TypeArguments[0].SpecialType == SpecialType.System_String
-                => ReturnKind.ValueTaskString,
-            INamedTypeSymbol t when t.Name == "IEnumerable" &&
-                                   t.TypeArguments.Length == 1 &&
-                                   t.TypeArguments[0].SpecialType == SpecialType.System_Byte
-                => ReturnKind.EnumerableByte,
-            INamedTypeSymbol t when t.Name == "IAsyncEnumerable" &&
-                                   t.TypeArguments.Length == 1 &&
-                                   t.TypeArguments[0].SpecialType == SpecialType.System_Byte
-                => ReturnKind.AsyncEnumerableByte,
-            _ => ReturnKind.Invalid
-        };
+        if (returnType.SpecialType == SpecialType.System_Void) returnKind = ReturnKind.Void;
+        else if (returnType.SpecialType == SpecialType.System_Int32) returnKind = ReturnKind.Int;
+        else if (SymbolEqualityComparer.Default.Equals(returnType, types.String)) returnKind = ReturnKind.String;
+        else if (SymbolEqualityComparer.Default.Equals(returnType, types.Task)) returnKind = ReturnKind.Task;
+        else if (SymbolEqualityComparer.Default.Equals(returnType, types.TaskInt)) returnKind = ReturnKind.TaskInt;
+        else if (SymbolEqualityComparer.Default.Equals(returnType, types.TaskString)) returnKind = ReturnKind.TaskString;
+        else if (SymbolEqualityComparer.Default.Equals(returnType, types.ValueTask)) returnKind = ReturnKind.ValueTask;
+        else if (SymbolEqualityComparer.Default.Equals(returnType, types.ValueTaskInt)) returnKind = ReturnKind.ValueTaskInt;
+        else if (SymbolEqualityComparer.Default.Equals(returnType, types.ValueTaskString)) returnKind = ReturnKind.ValueTaskString;
+        else if (SymbolEqualityComparer.Default.Equals(returnType, types.IEnumerableByte)) returnKind = ReturnKind.EnumerableByte;
+        else if (SymbolEqualityComparer.Default.Equals(returnType, types.IAsyncEnumerableByte)) returnKind = ReturnKind.AsyncEnumerableByte;
 
         if (returnKind == ReturnKind.Invalid)
             return new(false, returnKind, InputKind.None, OutputKind.None, "", "", null,
@@ -1246,7 +1279,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                     DiagnosticDescriptors.InvalidParameter.Id, p.Locations.ElementAt(0));
             }
 
-            if (p.Type.SpecialType == SpecialType.System_String)
+            if (SymbolEqualityComparer.Default.Equals(p.Type, types.String))
             {
                 if (inputKind is not InputKind.None)
                     return new(false, returnKind, inputKind, outputKind, "", "", null,
@@ -1257,7 +1290,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (p.Type.ToDisplayString() == "System.IO.TextReader")
+            if (SymbolEqualityComparer.Default.Equals(p.Type, types.TextReader))
             {
                 if (inputKind is not InputKind.None)
                     return new(false, returnKind, inputKind, outputKind, "", "", null,
@@ -1268,7 +1301,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (p.Type.ToDisplayString() == "System.IO.Pipelines.PipeReader")
+            if (SymbolEqualityComparer.Default.Equals(p.Type, types.PipeReader))
             {
                 if (inputKind is not InputKind.None)
                     return new(false, returnKind, inputKind, outputKind, "", "", null,
@@ -1279,7 +1312,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (p.Type.ToDisplayString() == "System.IO.TextWriter")
+            if (SymbolEqualityComparer.Default.Equals(p.Type, types.TextWriter))
             {
                 if (returnKind is ReturnKind.String or ReturnKind.TaskString or ReturnKind.ValueTaskString
                                 or ReturnKind.EnumerableByte or ReturnKind.AsyncEnumerableByte)
@@ -1297,7 +1330,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (p.Type.ToDisplayString() == "System.IO.Pipelines.PipeWriter")
+            if (SymbolEqualityComparer.Default.Equals(p.Type, types.PipeWriter))
             {
                 if (returnKind is ReturnKind.String or ReturnKind.TaskString or ReturnKind.ValueTaskString
                                 or ReturnKind.EnumerableByte or ReturnKind.AsyncEnumerableByte)
@@ -1315,7 +1348,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (p.Type.ToDisplayString() == "System.Threading.CancellationToken")
+            if (SymbolEqualityComparer.Default.Equals(p.Type, types.CancellationToken))
             {
                 if (hasCancellationToken)
                     return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName,
