@@ -46,11 +46,11 @@ partial class MethodGenerator
 
         // LogExecuting(logger, a1, a2, a3)
         Func<string, string, string, string> callLogExecuting
-             = enableLogging 
+             = enableLogging
                 ? static (a1, a2, a3) => $$"""
                 global::Esolang.Piet.__Generated.LoggerUtilities.LogExecuting(logger, hDiff * 3 + lDiff, blockSize, index);
 
-                """ 
+                """
                 : static (_, _, _) => string.Empty;
         var builder = new StringBuilder();
         builder.AppendLine("""

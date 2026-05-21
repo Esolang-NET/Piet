@@ -2,12 +2,12 @@ using Esolang.Piet.Parser;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Collections.Immutable;
-using System.Text;
-using System.Collections.Generic;
-using System.Linq;
-using System.IO;
 using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.IO;
+using System.Linq;
+using System.Text;
 
 namespace Esolang.Piet.Generator;
 
@@ -113,7 +113,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             String = compilation.GetSpecialType(SpecialType.System_String);
             var byteSymbol = compilation.GetSpecialType(SpecialType.System_Byte);
             var intSymbol = compilation.GetSpecialType(SpecialType.System_Int32);
-            
+
             var taskGeneric = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task`1");
             Task = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task");
             TaskInt = taskGeneric?.Construct(intSymbol);
@@ -323,7 +323,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 {
                     continue;
                 }
-                
+
                 builder.AppendLine(emitted.Value.Source);
                 emittedCount++;
             }
@@ -676,7 +676,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         var generatorFeatures = executionBinding.GeneratorFeatures;
         if (executionBinding.LoggerName is not null)
             generatorFeatures |= GeneratorFeatures.UseLogging;
-        
+
         return (new EmittedMethod(code.ToString()), generatorFeatures);
     }
 
@@ -1440,7 +1440,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 cancellationTokenName = p.Name;
                 continue;
             }
-            
+
             if (IsLoggerType(p.Type, types))
             {
                 if (hasLogger)
@@ -1465,7 +1465,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName, loggerName,
                 DiagnosticDescriptors.ReturnOutputConflict.Id);
         }
-        
+
         loggerName ??= FindLoggerField(method.ContainingType, method.IsStatic, types);
 
         return new(true, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName, loggerName, null);

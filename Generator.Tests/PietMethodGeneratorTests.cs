@@ -269,8 +269,8 @@ public class MethodGeneratorTests(TestContext TestContext)
             "generator-tests",
             references: referenceList,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
-                specificDiagnosticOptions: new[] { 
-                    new KeyValuePair<string, ReportDiagnostic>("CS1701", ReportDiagnostic.Suppress) 
+                specificDiagnosticOptions: new[] {
+                    new KeyValuePair<string, ReportDiagnostic>("CS1701", ReportDiagnostic.Suppress)
                 }
             )
         );
