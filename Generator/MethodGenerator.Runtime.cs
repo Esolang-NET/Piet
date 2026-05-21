@@ -10,31 +10,33 @@ partial class MethodGenerator
     public const string GeneratePietRuntimeFileName = "PietRuntime.g.cs";
 
     /// <summary>
-    /// The types of runtimes that may be needed by the generated methods.
+    /// The features that may be needed by the generated methods.
     /// </summary>
-    [System.Flags]
-    enum RuntimeType
+    [Flags]
+    enum GeneratorFeatures
     {
-        /// <summary>No runtime needed.</summary>
-        None = 0b0000,
+        /// <summary>No features needed.</summary>
+        None = 0b00000,
         /// <summary>Synchronous runtime needed.</summary>
-        Sync = 0b0001,
+        Sync = 0b00001,
         /// <summary>Asynchronous runtime needed.</summary>
-        Async = 0b0010,
+        Async = 0b00010,
         /// <summary>Enumerable runtime needed.</summary>
-        Enumerable = 0b0100,
+        Enumerable = 0b00100,
         /// <summary>Asynchronous enumerable runtime needed.</summary>
-        AsyncEnumerable = 0b1000,
+        AsyncEnumerable = 0b01000,
+        /// <summary>Logging support needed.</summary>
+        UseLogging = 0b10000,
     }
 
     /// <summary>
     /// Tries to generate the source code for the shared Piet interpreter runtime if needed.
     /// </summary>
-    static bool TryMakePietRuntimeSource(RuntimeType runtimeTypes, out string filename, out string source)
+    static bool TryMakePietRuntimeSource(GeneratorFeatures features, out string filename, out string source)
     {
         filename = default!;
         source = default!;
-        if (runtimeTypes == RuntimeType.None)
+        if (features == GeneratorFeatures.None)
             return false;
 
         var builder = new StringBuilder();
@@ -192,15 +194,20 @@ partial class MethodGenerator
                     }
                 }
         """);
-        if ((runtimeTypes & (RuntimeType.Sync | RuntimeType.Enumerable)) > 0)
+        if ((features & (GeneratorFeatures.Sync | GeneratorFeatures.Enumerable)) > 0)
             builder.AppendLine("""
                 private static void ExecuteCmd(
                     int hDiff, int lDiff, int blockSize,
                     List<int> stack, ref int dp, ref int cc,
                     Func<int?> readNumber,
                     Func<int?> readChar,
-                    Action<byte> writeOutput)
+                    Action<byte> writeOutput,
+                    object? logger = null,
+                    int index = 0)
                 {
+                    if (logger != null)
+                        global::Esolang.Piet.__Generated.LoggerUtilities.LogExecuting(logger, hDiff * 3 + lDiff, blockSize, index);
+
                     switch (hDiff * 3 + lDiff)
                     {
                         case 0: break;
@@ -282,8 +289,33 @@ partial class MethodGenerator
                             break;
                     }
                 }
+                
+                public static void Execute(
+                    byte[] codels, int width, int height,
+                    Func<int?> readNumber,
+                    Func<int?> readChar,
+                    Action<byte> writeOutput,
+                    CancellationToken ct)
+                    => ExecuteCore(codels, width, height, readNumber, readChar, writeOutput, null, 0, ref DpInit, ref CcInit, ct);
+
+                public static void Execute(
+                    byte[] codels, int width, int height,
+                    Func<int?> readNumber,
+                    Func<int?> readChar,
+                    Action<byte> writeOutput,
+                    object? logger,
+                    int index,
+                    CancellationToken ct)
+                {
+                    int dp = 0;
+                    int cc = 0;
+                    ExecuteCore(codels, width, height, readNumber, readChar, writeOutput, logger, index, ref dp, ref cc, ct);
+                }
+                private static int DpInit = 0;
+                private static int CcInit = 0;
         """);
-        if ((runtimeTypes & (RuntimeType.Async | RuntimeType.AsyncEnumerable)) > 0)
+
+        if ((features & (GeneratorFeatures.Async | GeneratorFeatures.AsyncEnumerable)) > 0)
             builder.AppendLine("""
                 private static async global::System.Threading.Tasks.ValueTask<(int dp, int cc)> ExecuteCmdAsync(
                     int hDiff, int lDiff, int blockSize,
@@ -291,8 +323,13 @@ partial class MethodGenerator
                     Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readNumberAsync,
                     Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readCharAsync,
                     Action<byte> writeOutput,
-                    CancellationToken ct)
+                    object? logger = null,
+                    int index = 0,
+                    CancellationToken ct = default)
                 {
+                    if (logger is global::Microsoft.Extensions.Logging.ILogger l)
+                        global::Esolang.Piet.__Generated.LoggerUtilities.LogExecuting(l, hDiff * 3 + lDiff, blockSize, index);
+
                     switch (hDiff * 3 + lDiff)
                     {
                         case 0: break;
@@ -381,42 +418,53 @@ partial class MethodGenerator
 
                     return (dp, cc);
                 }
-
-        """);
-
-        if ((runtimeTypes & RuntimeType.Sync) != 0)
-            builder.AppendLine("""
-                // ============================================================
-                // 1. Sync: 全出力を byte[] として返す
-                // ============================================================
-
-                [EditorBrowsable(EditorBrowsableState.Never)]
-                internal static void Execute(
+                
+                public static global::System.Threading.Tasks.Task ExecuteAsync(
                     byte[] codels, int width, int height,
-                    Func<int?> readNumber,
-                    Func<int?> readChar,
+                    Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readNumberAsync,
+                    Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readCharAsync,
                     Action<byte> writeOutput,
                     CancellationToken ct)
-                {
-                    ExecuteCore(
-                        codels, width, height,
-                        readNumber, readChar,
-                        writeOutput,
-                        ct);
-                }
+                    => ExecuteAsync(codels, width, height, readNumberAsync, readCharAsync, writeOutput, null, 0, ct);
 
-                private static void ExecuteCore(
+                public static global::System.Threading.Tasks.Task ExecuteAsync(
+                    byte[] codels, int width, int height,
+                    Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readNumberAsync,
+                    Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readCharAsync,
+                    Action<byte> writeOutput,
+                    object? logger,
+                    int index,
+                    CancellationToken ct)
+                    => ExecuteCoreAsync(codels, width, height, readNumberAsync, readCharAsync, writeOutput, logger, index, ct);
+        """);
+
+        if ((features & GeneratorFeatures.Sync) != 0)
+            builder.AppendLine("""
+                internal static void ExecuteCore(
                     byte[] codels, int width, int height,
                     Func<int?> readNumber,
                     Func<int?> readChar,
                     Action<byte> writeOutput,
+                    ref int dp,
+                    ref int cc,
+                    CancellationToken ct)
+                    => ExecuteCore(codels, width, height, readNumber, readChar, writeOutput, null, 0, ref dp, ref cc, ct);
+
+                [EditorBrowsable(EditorBrowsableState.Never)]
+                internal static void ExecuteCore(
+                    byte[] codels, int width, int height,
+                    Func<int?> readNumber,
+                    Func<int?> readChar,
+                    Action<byte> writeOutput,
+                    object? logger,
+                    int index,
+                    ref int dp,
+                    ref int cc,
                     CancellationToken ct)
                 {
                     const byte Black = 0;
                     const byte White = 1;
 
-                    int dp = 0;
-                    int cc = 0;
                     int cx = 0, cy = 0;
                     var stack = new List<int>();
 
@@ -468,7 +516,7 @@ partial class MethodGenerator
                                 ExecuteCmd(
                                     hDiff, lDiff, blockCells.Count,
                                     stack, ref dp, ref cc,
-                                    readNumber, readChar, writeOutput);
+                                    readNumber, readChar, writeOutput, logger, index);
                             }
 
                             cx = nx;
@@ -483,34 +531,20 @@ partial class MethodGenerator
                 }
         """);
 
-        if ((runtimeTypes & RuntimeType.Async) != 0)
+        if ((features & GeneratorFeatures.Async) != 0)
             builder.AppendLine("""
                 // ============================================================
                 // 2. Async: 全出力を Task<byte[]> として返す
                 // ============================================================
 
                 [EditorBrowsable(EditorBrowsableState.Never)]
-                internal static async global::System.Threading.Tasks.Task ExecuteAsync(
-                    byte[] codels, int width, int height,
-                    Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readNumberAsync,
-                    Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readCharAsync,
-                    Action<byte> writeOutput,
-                    CancellationToken ct)
-                {
-                    var output = new List<byte>();
-
-                    await ExecuteCoreAsync(
-                        codels, width, height,
-                        readNumberAsync, readCharAsync,
-                        writeOutput,
-                        ct).ConfigureAwait(false);
-                }
-
                 private static async global::System.Threading.Tasks.Task ExecuteCoreAsync(
                     byte[] codels, int width, int height,
                     Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readNumberAsync,
                     Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readCharAsync,
                     Action<byte> writeOutput,
+                    object? logger,
+                    int index,
                     CancellationToken ct)
                 {
                     const byte Black = 0;
@@ -570,6 +604,7 @@ partial class MethodGenerator
                                     hDiff, lDiff, blockCells.Count,
                                     stack, dp, cc,
                                     readNumberAsync, readCharAsync, writeOutput,
+                                    logger, index,
                                     ct).ConfigureAwait(false);
                             }
 
@@ -585,7 +620,7 @@ partial class MethodGenerator
                 }
         """);
 
-        if ((runtimeTypes & RuntimeType.Enumerable) != 0)
+        if ((features & GeneratorFeatures.Enumerable) != 0)
             builder.AppendLine("""
                 // ============================================================
                 // 3. Enumerable: 実行しながら逐次 byte を返す
@@ -596,21 +631,8 @@ partial class MethodGenerator
                     byte[] codels, int width, int height,
                     Func<int?> readNumber,
                     Func<int?> readChar,
-                    CancellationToken ct)
-                {
-                    foreach (var b in ExecuteCoreEnumerable(
-                        codels, width, height,
-                        readNumber, readChar,
-                        ct))
-                    {
-                        yield return b;
-                    }
-                }
-
-                private static IEnumerable<byte> ExecuteCoreEnumerable(
-                    byte[] codels, int width, int height,
-                    Func<int?> readNumber,
-                    Func<int?> readChar,
+                    object? logger,
+                    int index,
                     CancellationToken ct)
                 {
                     const byte Black = 0;
@@ -682,7 +704,7 @@ partial class MethodGenerator
                                         ExecuteCmd(
                                             hDiff, lDiff, blockCells.Count,
                                             stack, ref dp, ref cc,
-                                            readNumber, readChar, _ => { });
+                                            readNumber, readChar, _ => { }, logger, index);
                                         yield break;
                                 }
                             }
@@ -699,7 +721,7 @@ partial class MethodGenerator
                 }
         """);
 
-        if ((runtimeTypes & RuntimeType.AsyncEnumerable) != 0)
+        if ((features & GeneratorFeatures.AsyncEnumerable) != 0)
             builder.AppendLine("""
                 // ============================================================
                 // 4. AsyncEnumerable: 非同期で逐次 byte を返す
@@ -710,21 +732,8 @@ partial class MethodGenerator
                     byte[] codels, int width, int height,
                     Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readNumberAsync,
                     Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readCharAsync,
-                    [global::System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
-                {
-                    await foreach (var b in ExecuteCoreAsyncEnumerable(
-                        codels, width, height,
-                        readNumberAsync, readCharAsync,
-                        ct))
-                    {
-                        yield return b;
-                    }
-                }
-
-                private static async IAsyncEnumerable<byte> ExecuteCoreAsyncEnumerable(
-                    byte[] codels, int width, int height,
-                    Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readNumberAsync,
-                    Func<CancellationToken, global::System.Threading.Tasks.ValueTask<int?>> readCharAsync,
+                    object? logger,
+                    int index,
                     [global::System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
                 {
                     const byte Black = 0;
@@ -786,6 +795,7 @@ partial class MethodGenerator
                                     stack, dp, cc,
                                     readNumberAsync, readCharAsync,
                                     b => buffer.Add(b),
+                                    logger, index,
                                     ct).ConfigureAwait(false);
 
                                 foreach (var b in buffer)

@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
+using System.Reflection;
 using System.Text;
 
 namespace Esolang.Piet.Generator.Tests;
@@ -213,6 +214,13 @@ public class MethodGeneratorTests
                 {
                     referenceList.Add(MetadataReference.CreateFromFile(pipelinesAssemblyLocation));
                 }
+            }
+        }
+        {
+            var assemblyLocation = typeof(Microsoft.Extensions.Logging.ILogger).Assembly.Location;
+            if (!string.IsNullOrWhiteSpace(assemblyLocation))
+            {
+                referenceList.Add(MetadataReference.CreateFromFile(assemblyLocation));
             }
         }
 #if !NET
@@ -1923,6 +1931,158 @@ public class MethodGeneratorTests
         Assert.IsTrue(
             generatorDiagnostics.Any(static x => x.Id == "PT0008"),
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+    }
+
+    [TestMethod]
+    public async Task Generator_WithLoggerParameter_LogsExecution()
+    {
+        const string source = """
+            namespace Demo;
+
+            public class FakeLogger : Microsoft.Extensions.Logging.ILogger
+            {
+                public System.Collections.Generic.List<string> Logs = new System.Collections.Generic.List<string>();
+                public System.IDisposable BeginScope<TState>(TState state) => null!;
+                public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+                public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception exception, System.Func<TState, System.Exception, string> formatter)
+                {
+                    Logs.Add(formatter(state, exception));
+                }
+            }
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public partial void Run(FakeLogger logger);
+            }
+            """;
+
+        var transformed = MakeTransformedText("program.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/program.png.piet.txt", transformed));
+        try
+        {
+
+            AssertNoErrors(diagnostics);
+            AssertNoErrors(outputCompilation);
+            
+            var runResult = driver.GetRunResult();
+            AssertNoErrors(runResult.Diagnostics);
+
+            var asm = Emit(outputCompilation, CancellationToken);
+            var t = asm.GetType("Demo.Sample")!;
+            var instance = System.Activator.CreateInstance(t)!;
+            var typelogger = asm.GetType("Demo.FakeLogger");
+            Assert.IsNotNull(typelogger);
+            var logger = Activator.CreateInstance(typelogger);
+            Assert.IsNotNull(logger);
+            var logs = typelogger.GetField("Logs")?.GetValue(logger) as List<string>;
+            Assert.IsNotNull(logs);
+
+            var m = t.GetMethod("Run");
+            Assert.IsNotNull(m);
+            m.Invoke(instance, [logger]);
+            Assert.IsNotEmpty(logs, "No logs were captured.");
+        }
+        catch
+        {
+            foreach (var tree in outputCompilation.SyntaxTrees)
+                TestContext.WriteLine($"// {tree.FilePath}\n{tree.GetText(CancellationToken)}");
+            throw;
+        }
+    }
+
+    [TestMethod]
+    public async Task Generator_WithLoggerPrimaryConstructor_LogsExecution()
+    {
+        const string source = """
+            namespace Demo;
+
+            public class FakeLogger : Microsoft.Extensions.Logging.ILogger
+            {
+                public System.Collections.Generic.List<string> Logs = new System.Collections.Generic.List<string>();
+                public System.IDisposable BeginScope<TState>(TState state) => null!;
+                public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+                public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception exception, System.Func<TState, System.Exception, string> formatter)
+                {
+                    Logs.Add(formatter(state, exception));
+                }
+            }
+
+            public partial class Sample(FakeLogger logger)
+            {
+                [Esolang.Piet.GeneratePietMethod("program.png")]
+                public partial void Run();
+            }
+            """;
+
+        var transformed = MakeTransformedText("program.png", MinimalLightRedPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/program.png.piet.txt", transformed));
+
+        try
+        {
+            AssertNoErrors(diagnostics);
+            AssertNoErrors(outputCompilation);
+
+            var runResult = driver.GetRunResult();
+
+            AssertNoErrors(runResult.Diagnostics);
+
+            var asm = Emit(outputCompilation, CancellationToken);
+            var t = asm.GetType("Demo.Sample")!;
+            var typelogger = asm.GetType("Demo.FakeLogger");
+            Assert.IsNotNull(typelogger);
+            var logger = Activator.CreateInstance(typelogger);
+            Assert.IsNotNull(logger);
+            var logs = typelogger.GetField("Logs")?.GetValue(logger) as List<string>;
+            Assert.IsNotNull(logs);
+            var instance = Activator.CreateInstance(t, [logger]);
+            Assert.IsNotNull(instance);
+
+            var m = t.GetMethod("Run");
+            Assert.IsNotNull(m);
+            m.Invoke(instance, null);
+            Assert.IsNotEmpty(logs, "No logs were captured.");
+        }
+        catch
+        {
+            foreach (var tree in outputCompilation.SyntaxTrees)
+                TestContext.WriteLine($"// {tree.FilePath}\n{tree.GetText(CancellationToken)}");
+            throw;
+        }
+    }
+
+
+
+    Assembly Emit(Compilation compilation, CancellationToken cancellationToken)
+    {
+        using var ms = new MemoryStream();
+        var result = compilation.Emit(ms, cancellationToken: cancellationToken);
+        if (!result.Success)
+        {
+            foreach (var d in compilation.GetDiagnostics(cancellationToken))
+                TestContext.WriteLine($"Diag: {d}");
+            foreach (var d in result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error))
+                TestContext.WriteLine(d.ToString());
+            foreach (var t in compilation.SyntaxTrees)
+                TestContext.WriteLine($"// {t.FilePath}\n{t}");
+            Assert.Fail("Compilation emit failed");
+        }
+        ms.Seek(0, SeekOrigin.Begin);
+
+#if NET48
+        return Assembly.Load(ms.ToArray());
+#else
+        var ctx = new System.Runtime.Loader.AssemblyLoadContext(nameof(MethodGeneratorTests), isCollectible: true);
+        return ctx.LoadFromStream(ms);
+#endif
     }
 
     GeneratorDriver RunGeneratorsAndUpdateCompilation(

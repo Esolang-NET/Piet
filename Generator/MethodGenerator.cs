@@ -4,6 +4,10 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Immutable;
 using System.Text;
+using System.Collections.Generic;
+using System.Linq;
+using System.IO;
+using System;
 
 namespace Esolang.Piet.Generator;
 
@@ -44,6 +48,26 @@ public partial class MethodGenerator : IIncrementalGenerator
         #pragma warning disable CS0219
         #pragma warning disable CS1998
 
+        """;
+
+    const string LoggerUtilityDeclaration = $$"""
+        namespace Esolang.Piet.__Generated {
+            [global::System.ComponentModel.EditorBrowsable(global::System.ComponentModel.EditorBrowsableState.Never)]
+            internal static class LoggerUtilities
+            {
+                private static readonly global::System.Action<global::Microsoft.Extensions.Logging.ILogger, int, int, int, global::System.Exception?> ExecutingCommand =
+                    global::Microsoft.Extensions.Logging.LoggerMessage.Define<int, int, int>(global::Microsoft.Extensions.Logging.LogLevel.Trace, 0, "Executing Piet command: op={Op}, value={Value}, index={Index}");
+
+                [global::System.ComponentModel.EditorBrowsable(global::System.ComponentModel.EditorBrowsableState.Never)]
+                public static void LogExecuting(object? logger, int op, int value, int index)
+                {
+                    if (logger is global::Microsoft.Extensions.Logging.ILogger l && l.IsEnabled(global::Microsoft.Extensions.Logging.LogLevel.Trace))
+                    {
+                        ExecutingCommand(l, op, value, index, null);
+                    }
+                }
+            }
+        }
         """;
 
     readonly struct EmittedMethod(string source)
@@ -101,6 +125,8 @@ public partial class MethodGenerator : IIncrementalGenerator
         public readonly INamedTypeSymbol? TextWriter;
         public readonly INamedTypeSymbol? PipeWriter;
         public readonly INamedTypeSymbol? CancellationToken;
+        public readonly INamedTypeSymbol? ILogger;
+        public readonly INamedTypeSymbol? ILoggerT;
 
         public KnownTypes(Compilation compilation)
         {
@@ -129,6 +155,8 @@ public partial class MethodGenerator : IIncrementalGenerator
             TextWriter = compilation.GetTypeByMetadataName("System.IO.TextWriter");
             PipeWriter = compilation.GetTypeByMetadataName("System.IO.Pipelines.PipeWriter");
             CancellationToken = compilation.GetTypeByMetadataName("System.Threading.CancellationToken");
+            ILogger = compilation.GetTypeByMetadataName("Microsoft.Extensions.Logging.ILogger");
+            ILoggerT = compilation.GetTypeByMetadataName("Microsoft.Extensions.Logging.ILogger`1");
         }
     }
 
@@ -140,6 +168,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         string inputExpression,
         string outputExpression,
         string? cancellationTokenName,
+        string? loggerName,
         string? errorId,
         Location? location = null)
     {
@@ -151,20 +180,20 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         public OutputKind OutputKind { get; } = outputKind;
 
-        public RuntimeType RuntimeType => ReturnKind switch
+        public GeneratorFeatures GeneratorFeatures => ReturnKind switch
         {
-            ReturnKind.Void => RuntimeType.Sync,
-            ReturnKind.Int => RuntimeType.Sync,
-            ReturnKind.String => RuntimeType.Sync,
-            ReturnKind.Task => RuntimeType.Async,
-            ReturnKind.TaskInt => RuntimeType.Async,
-            ReturnKind.TaskString => RuntimeType.Async,
-            ReturnKind.ValueTask => RuntimeType.Async,
-            ReturnKind.ValueTaskInt => RuntimeType.Async,
-            ReturnKind.ValueTaskString => RuntimeType.Async,
-            ReturnKind.EnumerableByte => RuntimeType.Enumerable,
-            ReturnKind.AsyncEnumerableByte => RuntimeType.AsyncEnumerable,
-            _ => RuntimeType.None,
+            ReturnKind.Void => GeneratorFeatures.Sync,
+            ReturnKind.Int => GeneratorFeatures.Sync,
+            ReturnKind.String => GeneratorFeatures.Sync,
+            ReturnKind.Task => GeneratorFeatures.Async,
+            ReturnKind.TaskInt => GeneratorFeatures.Async,
+            ReturnKind.TaskString => GeneratorFeatures.Async,
+            ReturnKind.ValueTask => GeneratorFeatures.Async,
+            ReturnKind.ValueTaskInt => GeneratorFeatures.Async,
+            ReturnKind.ValueTaskString => GeneratorFeatures.Async,
+            ReturnKind.EnumerableByte => GeneratorFeatures.Enumerable,
+            ReturnKind.AsyncEnumerableByte => GeneratorFeatures.AsyncEnumerable,
+            _ => GeneratorFeatures.None,
         };
 
         /// <summary>
@@ -185,6 +214,11 @@ public partial class MethodGenerator : IIncrementalGenerator
         /// The name of the CancellationToken parameter, if present.
         /// </summary>
         public string? CancellationTokenName { get; } = cancellationTokenName;
+
+        /// <summary>
+        /// The name of the ILogger parameter, if present.
+        /// </summary>
+        public string? LoggerName { get; } = loggerName;
 
         public string? ErrorId { get; } = errorId;
         public Location? Location { get; } = location;
@@ -298,34 +332,40 @@ public partial class MethodGenerator : IIncrementalGenerator
 
             var builder = new StringBuilder(GeneratedMethodsFileHeader);
             var emittedCount = 0;
-            var runtimeTypes = RuntimeType.None;
+            var features = GeneratorFeatures.None;
 
 
             foreach (var source in sources)
             {
-                var (emitted, runtimeType_) = Emit(context, source, imagePaths, currentLanguageVersion, projectDir, types);
-                runtimeTypes |= runtimeType_;
+                var (emitted, features_) = Emit(context, source, imagePaths, currentLanguageVersion, projectDir, types);
+                features |= features_;
                 if (!emitted.HasValue)
                 {
                     continue;
                 }
-
+                
                 builder.AppendLine(emitted.Value.Source);
                 emittedCount++;
+            }
+            
+            if ((features & GeneratorFeatures.UseLogging) != 0)
+            {
+                builder.Append("\n\n");
+                builder.Append(LoggerUtilityDeclaration);
             }
 
             if (emittedCount > 0)
             {
                 context.AddSource(GeneratedMethodsFileName, builder.ToString());
             }
-            if (TryMakePietRuntimeSource(runtimeTypes, out var runtimeFileName, out var runtimeSource))
+            if (TryMakePietRuntimeSource(features, out var runtimeFileName, out var runtimeSource))
                 context.AddSource(runtimeFileName, runtimeSource);
         });
     }
 
     static readonly int DefaultCodelSize = 1;
 
-    static (EmittedMethod?, RuntimeType) Emit(
+    static (EmittedMethod?, GeneratorFeatures) Emit(
         SourceProductionContext context,
         GeneratorAttributeSyntaxContext source,
         ImmutableArray<AdditionalImageFile> additionalImageFiles,
@@ -335,12 +375,12 @@ public partial class MethodGenerator : IIncrementalGenerator
     {
         if (source.TargetSymbol is not IMethodSymbol methodSymbol || source.TargetNode is not MethodDeclarationSyntax methodSyntax)
         {
-            return (null, RuntimeType.None);
+            return (null, GeneratorFeatures.None);
         }
 
         if (methodSymbol.ContainingType is null)
         {
-            return (null, RuntimeType.None);
+            return (null, GeneratorFeatures.None);
         }
 
         if (!IsLanguageVersionAtLeastCSharp8(currentLanguageVersion))
@@ -660,7 +700,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             code.AppendLine("}");
         }
 
-        return (new EmittedMethod(code.ToString()), executionBinding.RuntimeType);
+        return (new EmittedMethod(code.ToString()), executionBinding.GeneratorFeatures);
     }
 
     private static void EmitBody(
@@ -674,18 +714,15 @@ public partial class MethodGenerator : IIncrementalGenerator
         )
     {
         var ctName = executionBinding.CancellationTokenName ?? "default(global::System.Threading.CancellationToken)";
+        var loggerExpr = executionBinding.LoggerName ?? "null";
 
         // ------------------------------------------------------------
-        // 入力デリゲート生成（Sync / Async）
-        //   - InputKind.None      : すべて null を返す
-        //   - InputKind.String    : StringReader 経由
-        //   - InputKind.TextReader: TextReader 直接利用
-        //   - InputKind.PipeReader: PipeReader から UTF8 で読む
+        // 入力デリゲート生成
         // ------------------------------------------------------------
 
         switch (executionBinding)
         {
-            case { InputKind: InputKind.None, RuntimeType: RuntimeType.Sync or RuntimeType.Enumerable, HasExplicitInput: false } when mightUseInput:
+            case { InputKind: InputKind.None, GeneratorFeatures: GeneratorFeatures.Sync or GeneratorFeatures.Enumerable, HasExplicitInput: false } when mightUseInput:
                 builder.AppendLine("""
                 int? __pietReadNumber()
                     => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
@@ -693,13 +730,13 @@ public partial class MethodGenerator : IIncrementalGenerator
                     => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
         """);
                 break;
-            case { InputKind: InputKind.None, RuntimeType: RuntimeType.Sync or RuntimeType.Enumerable }:
+            case { InputKind: InputKind.None, GeneratorFeatures: GeneratorFeatures.Sync or GeneratorFeatures.Enumerable }:
                 builder.AppendLine("""
                 int? __pietReadNumber() => (int?)null;
                 int? __pietReadChar() => (int?)null;
         """);
                 break;
-            case { InputKind: InputKind.None, RuntimeType: RuntimeType.Async or RuntimeType.AsyncEnumerable, HasExplicitInput: false } when mightUseInput:
+            case { InputKind: InputKind.None, GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable, HasExplicitInput: false } when mightUseInput:
                 builder.AppendLine("""
                 global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                     => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
@@ -708,7 +745,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                     => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
         """);
                 break;
-            case { InputKind: InputKind.None, RuntimeType: RuntimeType.Async or RuntimeType.AsyncEnumerable }:
+            case { InputKind: InputKind.None, GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable }:
                 builder.AppendLine("""
                 global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                     => new global::System.Threading.Tasks.ValueTask<int?>((int?)null);
@@ -717,7 +754,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                     => new global::System.Threading.Tasks.ValueTask<int?>((int?)null);
         """);
                 break;
-            case { InputKind: InputKind.String, RuntimeType: RuntimeType.Sync or RuntimeType.Enumerable }:
+            case { InputKind: InputKind.String, GeneratorFeatures: GeneratorFeatures.Sync or GeneratorFeatures.Enumerable }:
                 builder.AppendLine($$"""
                 var __pietStringReader = new global::System.IO.StringReader({{executionBinding.InputExpression}});
 
@@ -736,7 +773,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                 break;
 
-            case { InputKind: InputKind.String, RuntimeType: RuntimeType.Async or RuntimeType.AsyncEnumerable }:
+            case { InputKind: InputKind.String, GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable }:
                 builder.AppendLine($$"""
                 var __pietStringReader = new global::System.IO.StringReader({{executionBinding.InputExpression}});
 
@@ -755,7 +792,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                 break;
 
-            case { InputKind: InputKind.TextReader, RuntimeType: RuntimeType.Sync or RuntimeType.Enumerable }:
+            case { InputKind: InputKind.TextReader, GeneratorFeatures: GeneratorFeatures.Sync or GeneratorFeatures.Enumerable }:
                 builder.AppendLine($$"""
                 int? __pietReadNumber()
                 {
@@ -772,7 +809,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                 break;
 
-            case { InputKind: InputKind.TextReader, RuntimeType: RuntimeType.Async or RuntimeType.AsyncEnumerable }:
+            case { InputKind: InputKind.TextReader, GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable }:
                 builder.AppendLine($$"""
                 global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                 {
@@ -812,7 +849,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                 break;
 
-            case { InputKind: InputKind.PipeReader, RuntimeType: RuntimeType.Sync or RuntimeType.Enumerable }:
+            case { InputKind: InputKind.PipeReader, GeneratorFeatures: GeneratorFeatures.Sync or GeneratorFeatures.Enumerable }:
                 builder.AppendLine($$"""
                 int? __pietReadNumber()
                 {
@@ -854,7 +891,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                 break;
 
-            case { InputKind: InputKind.PipeReader, RuntimeType: RuntimeType.Async or RuntimeType.AsyncEnumerable }:
+            case { InputKind: InputKind.PipeReader, GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable }:
                 builder.AppendLine($$"""
                 async global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                 {
@@ -899,28 +936,28 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         switch (executionBinding)
         {
-            case { RuntimeType: RuntimeType.Async or RuntimeType.Sync, OutputKind: OutputKind.ReturnString }:
+            case { GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.Sync, OutputKind: OutputKind.ReturnString }:
                 builder.AppendLine("""
                 var __pietBytes = new global::System.Collections.Generic.List<byte>();
                 void __pietWriteByte(byte b) => __pietBytes.Add(b);
         """);
                 break;
-            case { RuntimeType: RuntimeType.Async or RuntimeType.Sync, OutputKind: OutputKind.TextWriter }:
+            case { GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.Sync, OutputKind: OutputKind.TextWriter }:
                 builder.AppendLine($$"""
                 void __pietWriteByte(byte b) => {{executionBinding.OutputExpression}}.Write((char)b);
         """);
                 break;
-            case { RuntimeType: RuntimeType.Async or RuntimeType.Sync, OutputKind: OutputKind.PipeWriter }:
+            case { GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.Sync, OutputKind: OutputKind.PipeWriter }:
                 builder.AppendLine($$"""
                 void __pietWriteByte(byte b) => global::System.Buffers.BuffersExtensions.Write({{executionBinding.OutputExpression}}, [ b ]);
         """);
                 break;
-            case { RuntimeType: RuntimeType.Async or RuntimeType.Sync, HasExplicitOutput: false } when mightUseOutput:
+            case { GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.Sync, HasExplicitOutput: false } when mightUseOutput:
                 builder.AppendLine("""
                 void __pietWriteByte(byte b) => throw new global::System.InvalidOperationException("PT0007: Required output interface not provided");
         """);
                 break;
-            case { RuntimeType: RuntimeType.Async or RuntimeType.Sync }:
+            case { GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.Sync }:
                 builder.AppendLine("""
                 void __pietWriteByte(byte b) { }
         """);
@@ -943,7 +980,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                         {{heightExpression}},
                         __pietReadNumber,
                         __pietReadChar,
-                        __pietWriteByte,
+                        __pietWriteByte
+                        {{loggerExpr}},
                         {{ctName}}
                     );
                     return 0;
@@ -962,6 +1000,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumber,
                         __pietReadChar,
                         __pietWriteByte,
+                        {{executionBinding.LoggerName ?? "null"}},
+                        0,
                         {{ctName}}
                     );
                 }
@@ -979,6 +1019,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumberAsync,
                         __pietReadCharAsync,
                         __pietWriteByte,
+                        {{(executionBinding.LoggerName is not null ? $", logger: {executionBinding.LoggerName}, index: 0" : "")}},
                         {{ctName}}
                     ).ConfigureAwait(false);
                 }
@@ -996,6 +1037,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumberAsync,
                         __pietReadCharAsync,
                         __pietWriteByte,
+                        {{(executionBinding.LoggerName is not null ? $", logger: {executionBinding.LoggerName}, index: 0" : "")}},
                         {{ctName}}
                     ).ConfigureAwait(false);
                     return 0;
@@ -1014,6 +1056,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumberAsync,
                         __pietReadCharAsync,
                         __pietWriteByte,
+                        {{(executionBinding.LoggerName is not null ? $", logger: {executionBinding.LoggerName}, index: 0" : "")}},
                         {{ctName}}
                     ).ConfigureAwait(false);
                 }
@@ -1031,6 +1074,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumberAsync,
                         __pietReadCharAsync,
                         __pietWriteByte,
+                        {{(executionBinding.LoggerName is not null ? $", logger: {executionBinding.LoggerName}, index: 0" : "")}},
                         {{ctName}}
                     ).ConfigureAwait(false);
                     return 0;
@@ -1050,6 +1094,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumber,
                         __pietReadChar,
                         __pietWriteByte,
+                        {{executionBinding.LoggerName ?? "null"}},
+                        0,
                         {{ctName}}
                     );
                     var __pietString = global::System.Text.Encoding.UTF8.GetString(
@@ -1079,6 +1125,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumberAsync,
                         __pietReadCharAsync,
                         __pietWriteByte,
+                        {{loggerExpr}},
                         {{ctName}}
                     ).ConfigureAwait(false);
 
@@ -1109,6 +1156,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumberAsync,
                         __pietReadCharAsync,
                         __pietWriteByte,
+                        {{loggerExpr}},
                         {{ctName}}
                     ).ConfigureAwait(false);
 
@@ -1137,6 +1185,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                     {{heightExpression}},
                     __pietReadNumber,
                     __pietReadChar,
+                    {{loggerExpr}},
                     {{ctName}}))
                 {
                     yield return __pietByte;
@@ -1155,6 +1204,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                     {{heightExpression}},
                     __pietReadNumberAsync,
                     __pietReadCharAsync,
+                    {{loggerExpr}},
                     {{ctName}}))
                 {
                     yield return __pietByte;
@@ -1234,6 +1284,56 @@ public partial class MethodGenerator : IIncrementalGenerator
             _ => languageVersion >= LanguageVersion.CSharp8,
         };
 
+    static bool IsLoggerType(ITypeSymbol? type, KnownTypes types)
+    {
+        if (type is null) return false;
+        if (IsLoggerSymbol(type, types)) return true;
+        foreach (var iface in type.AllInterfaces)
+        {
+            if (IsLoggerSymbol(iface, types)) return true;
+        }
+        return false;
+    }
+
+    static bool IsLoggerSymbol(ITypeSymbol symbol, KnownTypes types)
+     => SymbolEqualityComparer.Default.Equals(symbol, types.ILogger)
+      || (symbol is INamedTypeSymbol named && named.IsGenericType && SymbolEqualityComparer.Default.Equals(named.ConstructedFrom, types.ILoggerT));
+
+    static string? FindLoggerField(ITypeSymbol? type, bool isStatic, KnownTypes types)
+    {
+        var currentType = type;
+        var shadowedNames = new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
+        while (currentType != null)
+        {
+            foreach (var field in currentType.GetMembers().OfType<IFieldSymbol>())
+            {
+                if (isStatic && !field.IsStatic) continue;
+
+                if (IsLoggerType(field.Type, types))
+                {
+                    return field.Name;
+                }
+                shadowedNames.Add(field.Name);
+            }
+            currentType = currentType.BaseType;
+        }
+
+        if (type is INamedTypeSymbol namedType)
+        {
+            foreach (var constructor in namedType.InstanceConstructors)
+            {
+                foreach (var parameter in constructor.Parameters)
+                {
+                    if (IsLoggerType(parameter.Type, types) && !shadowedNames.Contains(parameter.Name))
+                    {
+                        return parameter.Name;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     private static ExecutionBinding BindExecutionSignature(IMethodSymbol method, KnownTypes types)
     {
         var returnType = method.ReturnType;
@@ -1253,7 +1353,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         else if (SymbolEqualityComparer.Default.Equals(returnType, types.IAsyncEnumerableByte)) returnKind = ReturnKind.AsyncEnumerableByte;
 
         if (returnKind == ReturnKind.Invalid)
-            return new(false, returnKind, InputKind.None, OutputKind.None, "", "", null,
+            return new(false, returnKind, InputKind.None, OutputKind.None, "", "", null, null,
                 DiagnosticDescriptors.InvalidReturnType.Id);
 
         var outputKind = returnKind switch
@@ -1267,7 +1367,9 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         var inputKind = InputKind.None;
         var hasCancellationToken = false;
+        var hasLogger = false;
         string? cancellationTokenName = null;
+        string? loggerName = null;
         var inputExpr = "";
         var outputExpr = "";
 
@@ -1275,14 +1377,14 @@ public partial class MethodGenerator : IIncrementalGenerator
         {
             if (p.RefKind is not RefKind.None)
             {
-                return new(false, returnKind, inputKind, outputKind, "", "", null,
+                return new(false, returnKind, inputKind, outputKind, "", "", null, null,
                     DiagnosticDescriptors.InvalidParameter.Id, p.Locations.ElementAt(0));
             }
 
             if (SymbolEqualityComparer.Default.Equals(p.Type, types.String))
             {
                 if (inputKind is not InputKind.None)
-                    return new(false, returnKind, inputKind, outputKind, "", "", null,
+                    return new(false, returnKind, inputKind, outputKind, "", "", null, null,
                         DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
 
                 inputKind = InputKind.String;
@@ -1293,7 +1395,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             if (SymbolEqualityComparer.Default.Equals(p.Type, types.TextReader))
             {
                 if (inputKind is not InputKind.None)
-                    return new(false, returnKind, inputKind, outputKind, "", "", null,
+                    return new(false, returnKind, inputKind, outputKind, "", "", null, null,
                         DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
 
                 inputKind = InputKind.TextReader;
@@ -1304,7 +1406,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             if (SymbolEqualityComparer.Default.Equals(p.Type, types.PipeReader))
             {
                 if (inputKind is not InputKind.None)
-                    return new(false, returnKind, inputKind, outputKind, "", "", null,
+                    return new(false, returnKind, inputKind, outputKind, "", "", null, null,
                         DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
 
                 inputKind = InputKind.PipeReader;
@@ -1317,12 +1419,12 @@ public partial class MethodGenerator : IIncrementalGenerator
                 if (returnKind is ReturnKind.String or ReturnKind.TaskString or ReturnKind.ValueTaskString
                                 or ReturnKind.EnumerableByte or ReturnKind.AsyncEnumerableByte)
                 {
-                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName,
+                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName, loggerName,
                         DiagnosticDescriptors.ReturnOutputConflict.Id, p.Locations.ElementAt(0));
                 }
 
                 if (outputKind is not OutputKind.None)
-                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName,
+                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName, loggerName,
                         DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
 
                 outputExpr = p.Name;
@@ -1335,12 +1437,12 @@ public partial class MethodGenerator : IIncrementalGenerator
                 if (returnKind is ReturnKind.String or ReturnKind.TaskString or ReturnKind.ValueTaskString
                                 or ReturnKind.EnumerableByte or ReturnKind.AsyncEnumerableByte)
                 {
-                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName,
+                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName, loggerName,
                         DiagnosticDescriptors.ReturnOutputConflict.Id);
                 }
 
                 if (outputKind is not OutputKind.None)
-                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName,
+                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName, loggerName,
                         DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
 
                 outputExpr = p.Name;
@@ -1351,16 +1453,27 @@ public partial class MethodGenerator : IIncrementalGenerator
             if (SymbolEqualityComparer.Default.Equals(p.Type, types.CancellationToken))
             {
                 if (hasCancellationToken)
-                    return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName,
+                    return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName, loggerName,
                         DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
 
                 hasCancellationToken = true;
                 cancellationTokenName = p.Name;
                 continue;
             }
+            
+            if (IsLoggerType(p.Type, types))
+            {
+                if (hasLogger)
+                    return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName, loggerName,
+                        DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
+
+                hasLogger = true;
+                loggerName = p.Name;
+                continue;
+            }
 
             // ❌ Unsupported parameter → PT0003
-            return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName,
+            return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName, loggerName,
                 DiagnosticDescriptors.InvalidParameter.Id);
         }
 
@@ -1369,11 +1482,13 @@ public partial class MethodGenerator : IIncrementalGenerator
                        or ReturnKind.EnumerableByte or ReturnKind.AsyncEnumerableByte
             && outputKind is OutputKind.TextWriter or OutputKind.PipeWriter)
         {
-            return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName,
+            return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName, loggerName,
                 DiagnosticDescriptors.ReturnOutputConflict.Id);
         }
+        
+        loggerName ??= FindLoggerField(method.ContainingType, method.IsStatic, types);
 
-        return new(true, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName, null);
+        return new(true, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName, loggerName, null);
     }
 
 
@@ -1639,7 +1754,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         return (mightUseOutput, mightUseInput);
     }
 
-    static (EmittedMethod, RuntimeType) EmitErrorMethod(
+    static (EmittedMethod, GeneratorFeatures) EmitErrorMethod(
         IMethodSymbol methodSymbol,
         MethodDeclarationSyntax methodSyntax,
         string? ns,
@@ -1684,7 +1799,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         if (ns is not null)
             sb.AppendLine("}");
 
-        return (new EmittedMethod(sb.ToString()), RuntimeType.None);
+        return (new EmittedMethod(sb.ToString()), GeneratorFeatures.None);
     }
     static void AddGeneratedPietInfo(AdditionalImageFile? additionalImageFile, int? codelSize, PietProgram? program, string? projectDirectory, StringBuilder code)
     {
