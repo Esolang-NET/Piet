@@ -48,7 +48,7 @@ partial class MethodGenerator
         Func<string, string, string, string> callLogExecuting
              = enableLogging 
                 ? static (a1, a2, a3) => $$"""
-                global::Esolang.Piet.__Generated.LoggerUtilities.LogExecuting(logger, hDiff * 3 + lDiff, blockSize, index);";
+                global::Esolang.Piet.__Generated.LoggerUtilities.LogExecuting(logger, hDiff * 3 + lDiff, blockSize, index);
 
                 """ 
                 : static (_, _, _) => string.Empty;
@@ -516,7 +516,7 @@ partial class MethodGenerator
                         writeOutput,
                         ref dp,
                         ref cc,
-                        {{withLoggingParameter}}
+                        {{useLoggingParameter}}
                         cancellationToken: cancellationToken);
 
                 [EditorBrowsable(EditorBrowsableState.Never)]
@@ -895,10 +895,34 @@ partial class MethodGenerator
                             yield break;
                     }
                 }
+
         """);
 
         builder.AppendLine("""
             }
+
+        """);
+
+        if ((features & GeneratorFeatures.UseLogging) != 0)
+            builder.AppendLine("""
+            
+            [global::System.ComponentModel.EditorBrowsable(global::System.ComponentModel.EditorBrowsableState.Never)]
+            internal static class LoggerUtilities
+            {
+                private static readonly global::System.Action<global::Microsoft.Extensions.Logging.ILogger, int, int, int, global::System.Exception?> ExecutingCommand =
+                    global::Microsoft.Extensions.Logging.LoggerMessage.Define<int, int, int>(global::Microsoft.Extensions.Logging.LogLevel.Trace, 0, "Executing Piet command: op={Op}, value={Value}, index={Index}");
+
+                [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+                [global::System.ComponentModel.EditorBrowsable(global::System.ComponentModel.EditorBrowsableState.Never)]
+                public static void LogExecuting(global::Microsoft.Extensions.Logging.ILogger? logger, int op, int value, int index)
+                {
+                    if (logger is not global::Microsoft.Extensions.Logging.ILogger l || !l.IsEnabled(global::Microsoft.Extensions.Logging.LogLevel.Trace)) return;
+                    ExecutingCommand(l, op, value, index, null);
+                }
+            }
+
+        """);
+        builder.AppendLine("""
         }
         """);
 

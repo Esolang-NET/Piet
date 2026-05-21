@@ -50,26 +50,6 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         """;
 
-    const string LoggerUtilityDeclaration = $$"""
-        namespace Esolang.Piet.__Generated {
-            [global::System.ComponentModel.EditorBrowsable(global::System.ComponentModel.EditorBrowsableState.Never)]
-            internal static class LoggerUtilities
-            {
-                private static readonly global::System.Action<global::Microsoft.Extensions.Logging.ILogger, int, int, int, global::System.Exception?> ExecutingCommand =
-                    global::Microsoft.Extensions.Logging.LoggerMessage.Define<int, int, int>(global::Microsoft.Extensions.Logging.LogLevel.Trace, 0, "Executing Piet command: op={Op}, value={Value}, index={Index}");
-
-                [global::System.ComponentModel.EditorBrowsable(global::System.ComponentModel.EditorBrowsableState.Never)]
-                public static void LogExecuting(object? logger, int op, int value, int index)
-                {
-                    if (logger is global::Microsoft.Extensions.Logging.ILogger l && l.IsEnabled(global::Microsoft.Extensions.Logging.LogLevel.Trace))
-                    {
-                        ExecutingCommand(l, op, value, index, null);
-                    }
-                }
-            }
-        }
-        """;
-
     readonly struct EmittedMethod(string source)
     {
         public string Source { get; } = source;
@@ -346,12 +326,6 @@ public partial class MethodGenerator : IIncrementalGenerator
                 
                 builder.AppendLine(emitted.Value.Source);
                 emittedCount++;
-            }
-            
-            if ((features & GeneratorFeatures.UseLogging) != 0)
-            {
-                builder.Append("\n\n");
-                builder.Append(LoggerUtilityDeclaration);
             }
 
             if (emittedCount > 0)
@@ -699,8 +673,11 @@ public partial class MethodGenerator : IIncrementalGenerator
         {
             code.AppendLine("}");
         }
-
-        return (new EmittedMethod(code.ToString()), executionBinding.GeneratorFeatures);
+        var generatorFeatures = executionBinding.GeneratorFeatures;
+        if (executionBinding.LoggerName is not null)
+            generatorFeatures |= GeneratorFeatures.UseLogging;
+        
+        return (new EmittedMethod(code.ToString()), generatorFeatures);
     }
 
     private static void EmitBody(
