@@ -714,7 +714,11 @@ public partial class MethodGenerator : IIncrementalGenerator
         )
     {
         var ctName = executionBinding.CancellationTokenName ?? "default(global::System.Threading.CancellationToken)";
+        // `cancellationToken: {cName}`
+        var ctParameter = $"cancellationToken: {ctName}";
         var loggerExpr = executionBinding.LoggerName ?? "null";
+        // `logger: {loggerExpr}` or string.Empty
+        var logParameter = executionBinding.LoggerName is not null ? $"logger: {loggerExpr}," : string.Empty;
 
         // ------------------------------------------------------------
         // 入力デリゲート生成
@@ -980,9 +984,9 @@ public partial class MethodGenerator : IIncrementalGenerator
                         {{heightExpression}},
                         __pietReadNumber,
                         __pietReadChar,
-                        __pietWriteByte
-                        {{loggerExpr}},
-                        {{ctName}}
+                        __pietWriteByte,
+                        {{logParameter}}
+                        {{ctParameter}}
                     );
                     return 0;
                 }
@@ -1000,9 +1004,9 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumber,
                         __pietReadChar,
                         __pietWriteByte,
-                        {{executionBinding.LoggerName ?? "null"}},
-                        0,
-                        {{ctName}}
+                        {{logParameter}}
+                        index: 0,
+                        {{ctParameter}}
                     );
                 }
         """);
@@ -1019,8 +1023,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumberAsync,
                         __pietReadCharAsync,
                         __pietWriteByte,
-                        {{(executionBinding.LoggerName is not null ? $", logger: {executionBinding.LoggerName}, index: 0" : "")}},
-                        {{ctName}}
+                        {{logParameter}}
+                        {{ctParameter}}
                     ).ConfigureAwait(false);
                 }
         """);
@@ -1037,8 +1041,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumberAsync,
                         __pietReadCharAsync,
                         __pietWriteByte,
-                        {{(executionBinding.LoggerName is not null ? $", logger: {executionBinding.LoggerName}, index: 0" : "")}},
-                        {{ctName}}
+                        {{logParameter}}
+                        {{ctParameter}}
                     ).ConfigureAwait(false);
                     return 0;
                 }
@@ -1056,8 +1060,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumberAsync,
                         __pietReadCharAsync,
                         __pietWriteByte,
-                        {{(executionBinding.LoggerName is not null ? $", logger: {executionBinding.LoggerName}, index: 0" : "")}},
-                        {{ctName}}
+                        {{logParameter}}
+                        {{ctParameter}}
                     ).ConfigureAwait(false);
                 }
         """);
@@ -1074,8 +1078,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumberAsync,
                         __pietReadCharAsync,
                         __pietWriteByte,
-                        {{(executionBinding.LoggerName is not null ? $", logger: {executionBinding.LoggerName}, index: 0" : "")}},
-                        {{ctName}}
+                        {{logParameter}}
+                        {{ctParameter}}
                     ).ConfigureAwait(false);
                     return 0;
                 }
@@ -1094,9 +1098,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumber,
                         __pietReadChar,
                         __pietWriteByte,
-                        {{executionBinding.LoggerName ?? "null"}},
-                        0,
-                        {{ctName}}
+                        {{logParameter}}
+                        {{ctParameter}}
                     );
                     var __pietString = global::System.Text.Encoding.UTF8.GetString(
         #if NET5_0_OR_GREATER
@@ -1125,8 +1128,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumberAsync,
                         __pietReadCharAsync,
                         __pietWriteByte,
-                        {{loggerExpr}},
-                        {{ctName}}
+                        {{logParameter}}
+                        {{ctParameter}}
                     ).ConfigureAwait(false);
 
 
@@ -1156,8 +1159,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __pietReadNumberAsync,
                         __pietReadCharAsync,
                         __pietWriteByte,
-                        {{loggerExpr}},
-                        {{ctName}}
+                        {{logParameter}}
+                        {{ctParameter}}
                     ).ConfigureAwait(false);
 
                     var __pietString = global::System.Text.Encoding.UTF8.GetString(
@@ -1185,8 +1188,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                     {{heightExpression}},
                     __pietReadNumber,
                     __pietReadChar,
-                    {{loggerExpr}},
-                    {{ctName}}))
+                    {{logParameter}}
+                    {{ctParameter}}))
                 {
                     yield return __pietByte;
                 }
@@ -1204,8 +1207,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                     {{heightExpression}},
                     __pietReadNumberAsync,
                     __pietReadCharAsync,
-                    {{loggerExpr}},
-                    {{ctName}}))
+                    {{logParameter}}
+                    {{ctParameter}}))
                 {
                     yield return __pietByte;
                 }
