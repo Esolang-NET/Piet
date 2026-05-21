@@ -1989,6 +1989,7 @@ public class MethodGeneratorTests(TestContext TestContext)
     }
 
     [TestMethod]
+    [Timeout(10000, CooperativeCancellation = true)]
     public async Task Generator_WithLoggerParameter_LogsExecution()
     {
         const string source = """
@@ -2007,12 +2008,12 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             public partial class Sample
             {
-                [Esolang.Piet.GeneratePietMethod("program.png")]
-                public partial void Run(FakeLogger logger);
+                [Esolang.Piet.GeneratePietMethod("data:text/ascii-piet;codel-size=1,nqiaecfbknmeRtakcsqimemerTcnjlvutqiavtFsvubntqcslnqBbjemu   udjiNqifu  r  tlaFvldq rrr vneVujbm  k  nmsRsnadv a vfkqSkdceumbmuqcrVqesqfnbsrvtjUnfcltltdljceMkcltuemnbfnkB")]
+                public partial string Run(FakeLogger logger, System.Threading.CancellationToken ct);
             }
             """;
 
-        var transformed = MakeTransformedText("program.png", MinimalLightRedPng);
+        var transformed = MakeTransformedText("program.png", TwoPixelOutputPng);
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
             out var outputCompilation,
@@ -2039,8 +2040,10 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             var m = t.GetMethod("Run");
             Assert.IsNotNull(m);
-            m.Invoke(instance, [logger]);
+            var result = m.Invoke(instance, [logger, CancellationToken]) as string;
+            LogWriteLine($"result: {result}");
             Assert.IsNotEmpty(logs, "No logs were captured.");
+            LogWriteLine($"logs: {string.Join("\n", logs)}");
         }
         catch
         {
@@ -2051,6 +2054,7 @@ public class MethodGeneratorTests(TestContext TestContext)
     }
 
     [TestMethod]
+    [Timeout(10000, CooperativeCancellation = true)]
     public async Task Generator_WithLoggerPrimaryConstructor_LogsExecution()
     {
         const string source = """
@@ -2069,12 +2073,12 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             public partial class Sample(FakeLogger logger)
             {
-                [Esolang.Piet.GeneratePietMethod("program.png")]
-                public partial void Run();
+                [Esolang.Piet.GeneratePietMethod("data:text/ascii-piet;codel-size=1,nqiaecfbknmeRtakcsqimemerTcnjlvutqiavtFsvubntqcslnqBbjemu   udjiNqifu  r  tlaFvldq rrr vneVujbm  k  nmsRsnadv a vfkqSkdceumbmuqcrVqesqfnbsrvtjUnfcltltdljceMkcltuemnbfnkB")]
+                public partial string Run(System.Threading.CancellationToken ct);
             }
             """;
 
-        var transformed = MakeTransformedText("program.png", MinimalLightRedPng);
+        var transformed = MakeTransformedText("program.png", TwoPixelOutputPng);
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
             out var outputCompilation,
@@ -2103,8 +2107,11 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             var m = t.GetMethod("Run");
             Assert.IsNotNull(m);
-            m.Invoke(instance, null);
+            var reuslt = m.Invoke(instance, [CancellationToken]) as string;
+            Assert.IsNotNull(reuslt);
+            LogWriteLine($"result: {reuslt}");
             Assert.IsNotEmpty(logs, "No logs were captured.");
+            LogWriteLine($"logs: {string.Join("\n", logs)}");
         }
         catch
         {
