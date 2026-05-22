@@ -1912,7 +1912,6 @@ public class MethodGeneratorTests(TestContext TestContext)
     [TestMethod]
     public void Generator_WithValueTaskStringReturn_GeneratesMethod()
     {
-#if NETCOREAPP2_1_OR_GREATER
         const string source = """
             namespace Demo;
 
@@ -1945,10 +1944,6 @@ public class MethodGeneratorTests(TestContext TestContext)
             LogDiagnostics(diagnostics, outputCompilation);
             throw;
         }
-
-#else
-        Assert.Inconclusive("ValueTask return type support requires .NET 8 or later.");
-#endif
     }
 
     [TestMethod]
