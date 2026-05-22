@@ -64,7 +64,7 @@ public class MethodGeneratorTests(TestContext TestContext)
                 MakeTransformedText("program.png", MinimalLightRedPng)));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         var runtimeSource = runResult.Results
             .SelectMany(static r => r.GeneratedSources)
@@ -304,7 +304,7 @@ public class MethodGeneratorTests(TestContext TestContext)
                 MakeTransformedText("program.png", MinimalLightRedPng)));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
@@ -404,7 +404,7 @@ public class MethodGeneratorTests(TestContext TestContext)
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
@@ -437,7 +437,7 @@ public class MethodGeneratorTests(TestContext TestContext)
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("return")),
@@ -471,7 +471,7 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run(global::System.IO.TextReader input, global::System.IO.TextWriter output)")),
@@ -590,7 +590,7 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsFalse(
             generatorDiagnostics.Any(static x => x.Id == "PT0011"),
@@ -621,7 +621,7 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsFalse(
             generatorDiagnostics.Any(static x => x.Id == "PT0011"),
@@ -652,7 +652,7 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsFalse(
             generatorDiagnostics.Any(static x => x.Id == "PT0011"),
@@ -683,7 +683,7 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsFalse(
             generatorDiagnostics.Any(static x => x.Id == "PT0011"),
@@ -906,7 +906,7 @@ public class MethodGeneratorTests(TestContext TestContext)
                 MakeTransformedText("input.png", TwoPixelInputPng)));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         var generatedText = runResult.GeneratedTrees
             .Select(tree => tree.GetText(CancellationToken).ToString())
@@ -941,7 +941,7 @@ public class MethodGeneratorTests(TestContext TestContext)
                 MakeTransformedText("input.png", TwoPixelInputPng)));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         var generatedText = runResult.GeneratedTrees
             .Select(tree => tree.GetText(CancellationToken).ToString())
@@ -976,7 +976,7 @@ public class MethodGeneratorTests(TestContext TestContext)
                 MakeTransformedText("input.png", TwoPixelInputPng)));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         var generatedText = runResult.GeneratedTrees
             .Select(tree => tree.GetText(CancellationToken).ToString())
@@ -1011,7 +1011,7 @@ public class MethodGeneratorTests(TestContext TestContext)
                 MakeTransformedText("input.png", TwoPixelInputPng)));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         var generatedText = runResult.GeneratedTrees
             .Select(tree => tree.GetText(CancellationToken).ToString())
@@ -1084,7 +1084,7 @@ public class MethodGeneratorTests(TestContext TestContext)
             runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run(global::System.IO.Pipelines.PipeReader input)")),
             "Expected generated method implementation was not found.");
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         AssertNoErrors(outputCompilation);
     }
@@ -1110,7 +1110,7 @@ public class MethodGeneratorTests(TestContext TestContext)
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         var generated = runResult.GeneratedTrees
             .Select(tree => tree.GetText(CancellationToken).ToString())
@@ -1146,7 +1146,7 @@ public class MethodGeneratorTests(TestContext TestContext)
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("yield return")),
@@ -1176,7 +1176,7 @@ public class MethodGeneratorTests(TestContext TestContext)
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("CancellationToken ct")),
@@ -1194,7 +1194,7 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatedHints = runResult.Results.SelectMany(static r => r.GeneratedSources).Select(static s => s.HintName).ToArray();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsFalse(generatedHints.Contains(MethodGenerator.GeneratedMethodsFileName, StringComparer.Ordinal));
         Assert.IsFalse(generatedHints.Contains(MethodGenerator.GeneratePietRuntimeFileName, StringComparer.Ordinal));
@@ -1252,7 +1252,7 @@ public class MethodGeneratorTests(TestContext TestContext)
         {
             var runResult = driver.GetRunResult();
 
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             Assert.IsTrue(
                 runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial int Run()")),
@@ -1297,7 +1297,7 @@ public class MethodGeneratorTests(TestContext TestContext)
         {
             var runResult = driver.GetRunResult();
 
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
             AssertNoErrors(outputCompilation);
 
             var generatedText = string.Join("\n", runResult.GeneratedTrees.Select(tree => tree.GetText(CancellationToken).ToString()));
@@ -1495,7 +1495,7 @@ public class MethodGeneratorTests(TestContext TestContext)
                 MakeTransformedText("program.png", MinimalLightRedPng)));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         var generatedMethod = runResult.GeneratedTrees
             .Select(tree => tree.GetText(CancellationToken).ToString())
@@ -1699,7 +1699,7 @@ public class MethodGeneratorTests(TestContext TestContext)
                 MakeTransformedText("black.png", blackPng)));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
@@ -1734,7 +1734,7 @@ public class MethodGeneratorTests(TestContext TestContext)
             new TestAdditionalText("obj/black.png.piet.txt",
                 MakeTransformedText("black.png", blackPng)));
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         var diagnostics2 = outputCompilation.GetDiagnostics(CancellationToken);
         Assert.IsFalse(
@@ -1798,7 +1798,7 @@ public class MethodGeneratorTests(TestContext TestContext)
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public async partial global::System.Threading.Tasks.ValueTask<string> Run()"))
@@ -1835,7 +1835,7 @@ public class MethodGeneratorTests(TestContext TestContext)
         {
             var runResult = driver.GetRunResult();
 
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             var generatedText = runResult.GeneratedTrees
                 .Select(tree => tree.GetText(CancellationToken).ToString())
@@ -1875,7 +1875,7 @@ public class MethodGeneratorTests(TestContext TestContext)
                 MakeTransformedText("input.png", TwoPixelInputPng)));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         var pipeReaderErrors = outputCompilation.GetDiagnostics(CancellationToken)
             .Where(static x => x.Severity == DiagnosticSeverity.Error)
@@ -1908,7 +1908,7 @@ public class MethodGeneratorTests(TestContext TestContext)
                 MakeTransformedText("output.png", TwoPixelOutputPng)));
         var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsTrue(
             runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("global::System.Buffers.BuffersExtensions.Write(output, ")),
@@ -1955,7 +1955,7 @@ public class MethodGeneratorTests(TestContext TestContext)
             out var diagnostics,
             new TestAdditionalText($"obj/{logicalPath}.piet.txt", transformed));
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
         AssertNoErrors(outputCompilation);
     }
 
@@ -2022,7 +2022,7 @@ public class MethodGeneratorTests(TestContext TestContext)
         try
         {
 
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
             AssertNoErrors(outputCompilation);
 
             var runResult = driver.GetRunResult();
@@ -2087,7 +2087,7 @@ public class MethodGeneratorTests(TestContext TestContext)
 
         try
         {
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
             AssertNoErrors(outputCompilation);
 
             var runResult = driver.GetRunResult();
@@ -2156,7 +2156,7 @@ public class MethodGeneratorTests(TestContext TestContext)
             source,
             out outputCompilation,
             out diagnostics,
-            LanguageVersion.CSharp14,
+            LanguageVersion.CSharp11,
             additionalTexts);
 
     GeneratorDriver RunGeneratorsAndUpdateCompilationWithLanguageVersion(
@@ -2230,7 +2230,7 @@ public partial class Sample
             var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
             Assert.IsNotNull(generated, "Method not generated");
             Assert.IsTrue(generated.Contains("codelSize: 2"), "codelSize=2 not reflected in generated code");
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             AssertNoErrors(outputCompilation);
         }
@@ -2270,7 +2270,7 @@ public partial class Sample
             var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
             Assert.IsNotNull(generated, "Method not generated");
             Assert.IsTrue(generated.Contains("codelSize: 2"), "codelSize=2 not reflected in generated code");
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             AssertNoErrors(outputCompilation);
         }
@@ -2308,7 +2308,7 @@ public partial class Sample
             var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
             Assert.IsNotNull(generated, "Method not generated");
             Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize=1 not reflected in generated code");
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             AssertNoErrors(outputCompilation);
         }
@@ -2347,7 +2347,7 @@ public partial class Sample
             var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
             Assert.IsNotNull(generated, "Method not generated");
             Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize=1 not reflected in generated code");
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
             AssertNoErrors(outputCompilation);
         }
         catch
@@ -2385,7 +2385,7 @@ public partial class Sample
             var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
             Assert.IsNotNull(generated, "Method not generated");
             Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize fallback to default(1) was not reflected in generated code");
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
             AssertNoErrors(outputCompilation);
         }
         catch
@@ -2589,7 +2589,7 @@ public partial class Sample
             var runResult = driver.GetRunResult();
             var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             Assert.IsFalse(
                 generatorDiagnostics.Any(static x => x.Id == "PT0011"),
@@ -2629,7 +2629,7 @@ public partial class Sample
             var runResult = driver.GetRunResult();
             var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             Assert.IsFalse(
                 generatorDiagnostics.Any(static x => x.Id == "PT0011"),
@@ -2669,7 +2669,7 @@ public partial class Sample
             var runResult = driver.GetRunResult();
             var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             Assert.IsFalse(
                 generatorDiagnostics.Any(static x => x.Id == "PT0011"),
@@ -2709,7 +2709,7 @@ public partial class Sample
             var runResult = driver.GetRunResult();
             var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             Assert.IsFalse(
                 generatorDiagnostics.Any(static x => x.Id == "PT0011"),
@@ -2725,15 +2725,18 @@ public partial class Sample
         }
     }
 
-    void AssertNoErrors(ImmutableArray<Diagnostic> diagnostics) =>
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
-
-    void AssertNoErrors(Compilation outputCompilation)
+    void AssertNoErrors(ImmutableArray<Diagnostic> diagnostics, Compilation? compilation = null)
     {
-        var diagnostics = outputCompilation.GetDiagnostics(CancellationToken);
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator." + string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        var errors = diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
+        if (errors.Length > 0)
+        {
+            foreach (var d in errors) LogWriteLine(d.ToString());
+            if (compilation != null)
+            {
+                foreach (var t in compilation.SyntaxTrees) LogWriteLine($"// {t.FilePath}\n{t}");
+            }
+            Assert.Fail($"{errors.Length} error(s) in generator output");
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -2765,7 +2768,7 @@ public partial class Sample
             var runResult = driver.GetRunResult();
             var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             Assert.IsFalse(
                 generatorDiagnostics.Any(static x => x.Id == "PT0011"),
@@ -2805,7 +2808,7 @@ public partial class Sample
             var runResult = driver.GetRunResult();
             var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             Assert.IsFalse(
                 generatorDiagnostics.Any(static x => x.Id == "PT0011"),
@@ -2845,7 +2848,7 @@ public partial class Sample
             var runResult = driver.GetRunResult();
             var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             Assert.IsFalse(
                 generatorDiagnostics.Any(static x => x.Id == "PT0011"),
@@ -2885,7 +2888,7 @@ public partial class Sample
             var runResult = driver.GetRunResult();
             var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             Assert.IsFalse(
                 generatorDiagnostics.Any(static x => x.Id == "PT0011"),
@@ -2925,7 +2928,7 @@ public partial class Sample
             var runResult = driver.GetRunResult();
             var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             Assert.IsFalse(
                 generatorDiagnostics.Any(static x => x.Id == "PT0011"),
@@ -2965,7 +2968,7 @@ public partial class Sample
             var runResult = driver.GetRunResult();
             var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-            AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
             Assert.IsFalse(
                 generatorDiagnostics.Any(static x => x.Id == "PT0011"),
