@@ -7,14 +7,11 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-
-- `GEMINI.md`: Added project development instructions.
+- `Esolang.Piet.Generator`: Implement logging support for runtime instructions.
+- `Esolang.Piet.Generator.Tests`: Standardized test utility methods and improved diagnostic logging for test failures.
 
 ### Changed
 
-- Tests: Migrated test projects to Microsoft Testing Platform (MTP).
-- Build: Sorted `PackageReference` items alphabetically in project files and removed `coverlet.collector`.
-- `Esolang.Piet.Generator`: Refactored type detection logic using `KnownTypes` for simplification.
 ## [1.1.1]
 
 ### Added
