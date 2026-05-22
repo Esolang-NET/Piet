@@ -1912,7 +1912,7 @@ public class MethodGeneratorTests(TestContext TestContext)
     [TestMethod]
     public void Generator_WithValueTaskStringReturn_GeneratesMethod()
     {
-#if NET8_0_OR_GREATER
+#if NETCOREAPP2_1_OR_GREATER
         const string source = """
             namespace Demo;
 
@@ -2866,15 +2866,9 @@ public partial class Sample
     void AssertNoErrors(ImmutableArray<Diagnostic> diagnostics, Compilation? compilation = null)
     {
         var errors = diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
-        if (errors.Length > 0)
-        {
-            foreach (var d in errors) LogWriteLine(d.ToString());
-            if (compilation != null)
-            {
-                foreach (var t in compilation.SyntaxTrees) LogWriteLine($"// {t.FilePath}\n{t}");
-            }
-            Assert.Fail($"{errors.Length} error(s) in generator output");
-        }
+        Assert.IsEmpty(errors, $"{errors.Length} error(s) in generator output");
+        var errors2 = compilation?.GetDiagnostics(CancellationToken).Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
+        Assert.IsEmpty(errors2 ?? [], $"{errors2?.Length ?? 0} error(s) in compilation");
     }
 
     // -----------------------------------------------------------------------
