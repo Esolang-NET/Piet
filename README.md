@@ -55,14 +55,19 @@ dotnet tool install -g dotnet-piet
 | Execute Piet in-process | Esolang.Piet.Processor |
 | Run Piet from CLI | dotnet-piet |
 
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+
+
 ## NuGet
 
 | Project | NuGet | Summary |
 |---|---|---|
-| [dotnet-piet](./Interpreter/README.md) | [![NuGet: dotnet-piet](https://img.shields.io/nuget/v/dotnet-piet?logo=nuget)](https://www.nuget.org/packages/dotnet-piet/) | Piet command-line interpreter. |
-| [Esolang.Piet.Generator](./Generator/README.md) | [![NuGet: Esolang.Piet.Generator](https://img.shields.io/nuget/v/Esolang.Piet.Generator?logo=nuget)](https://www.nuget.org/packages/Esolang.Piet.Generator/) | Piet source generator. |
-| [Esolang.Piet.Parser](./Parser/README.md) | [![NuGet: Esolang.Piet.Parser](https://img.shields.io/nuget/v/Esolang.Piet.Parser?logo=nuget)](https://www.nuget.org/packages/Esolang.Piet.Parser/) | Piet source parser. |
-| [Esolang.Piet.Processor](./Processor/README.md) | [![NuGet: Esolang.Piet.Processor](https://img.shields.io/nuget/v/Esolang.Piet.Processor?logo=nuget)](https://www.nuget.org/packages/Esolang.Piet.Processor/) | Piet execution engine. |
+| [dotnet-piet](./Interpreter/README.md) | [![NuGet: dotnet-piet](https://img.shields.io/nuget/v/dotnet-piet?logo=nuget&label=1.1.2)](https://www.nuget.org/packages/dotnet-piet/) | Piet command-line interpreter. |
+| [Esolang.Piet.Generator](./Generator/README.md) | [![NuGet: Esolang.Piet.Generator](https://img.shields.io/nuget/v/Esolang.Piet.Generator?logo=nuget&label=1.1.2)](https://www.nuget.org/packages/Esolang.Piet.Generator/) | Piet source generator. |
+| [Esolang.Piet.Parser](./Parser/README.md) | [![NuGet: Esolang.Piet.Parser](https://img.shields.io/nuget/v/Esolang.Piet.Parser?logo=nuget&label=1.1.2)](https://www.nuget.org/packages/Esolang.Piet.Parser/) | Piet source parser. |
+| [Esolang.Piet.Processor](./Processor/README.md) | [![NuGet: Esolang.Piet.Processor](https://img.shields.io/nuget/v/Esolang.Piet.Processor?logo=nuget&label=1.1.2)](https://www.nuget.org/packages/Esolang.Piet.Processor/) | Piet execution engine. |
 
 ## Framework Support
 

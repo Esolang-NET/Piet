@@ -6,13 +6,13 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-05-25
+
 ### Added
 - `Esolang.Piet.Generator`: Implement logging support for runtime instructions.
 - `Esolang.Piet.Generator.Tests`: Standardized test utility methods and improved diagnostic logging for test failures.
 
-### Changed
-
-## [1.1.1]
+## [1.1.1] - 2026-05-09
 
 ### Added
 
@@ -90,7 +90,8 @@ The format is based on Keep a Changelog.
 - Initial repository structure for Piet support.
 - Parser, processor, and interpreter package skeletons.
 
-[Unreleased]: https://github.com/Esolang-NET/Piet/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/Esolang-NET/Piet/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/Esolang-NET/Piet/tree/v1.1.2
 [1.1.1]: https://github.com/Esolang-NET/Piet/tree/v1.1.1
 [1.1.0]: https://github.com/Esolang-NET/Piet/tree/v1.1.0
 [1.0.0]: https://github.com/Esolang-NET/Piet/tree/v1.0.0
