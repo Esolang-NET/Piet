@@ -3,12 +3,13 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
+using System.Reflection;
 using System.Text;
 
 namespace Esolang.Piet.Generator.Tests;
 
 [TestClass]
-public class MethodGeneratorTests
+public class MethodGeneratorTests(TestContext TestContext)
 {
     // Minimal 1×1 RGB PNG with LightRed (0xFF,0xC0,0xC0). CRC fields are zeroed (not validated by decoder).
     static readonly byte[] MinimalLightRedPng =
@@ -61,31 +62,37 @@ public class MethodGeneratorTests
             out var diagnostics,
             new TestAdditionalText("obj/program.png.piet.txt",
                 MakeTransformedText("program.png", MinimalLightRedPng)));
-        var runResult = driver.GetRunResult();
-
-        AssertNoErrors(diagnostics);
-
-        var runtimeSource = runResult.Results
-            .SelectMany(static r => r.GeneratedSources)
-            .Single(static s => s.HintName == MethodGenerator.GeneratePietRuntimeFileName)
-            .SourceText
-            .ToString();
-
-        const string marker = "[EditorBrowsable(EditorBrowsableState.Never)]";
-        var occurrenceCount = 0;
-        var currentIndex = 0;
-        while ((currentIndex = runtimeSource.IndexOf(marker, currentIndex, StringComparison.Ordinal)) >= 0)
+        try
         {
-            occurrenceCount++;
-            currentIndex += marker.Length;
+            var runResult = driver.GetRunResult();
+
+            AssertNoErrors(diagnostics, outputCompilation);
+
+            var runtimeSource = runResult.Results
+                .SelectMany(static r => r.GeneratedSources)
+                .Single(static s => s.HintName == MethodGenerator.GeneratePietRuntimeFileName)
+                .SourceText
+                .ToString();
+
+            const string marker = "[EditorBrowsable(EditorBrowsableState.Never)]";
+            var occurrenceCount = 0;
+            var currentIndex = 0;
+            while ((currentIndex = runtimeSource.IndexOf(marker, currentIndex, StringComparison.Ordinal)) >= 0)
+            {
+                occurrenceCount++;
+                currentIndex += marker.Length;
+            }
+
+            Assert.AreEqual(
+                5,
+                occurrenceCount,
+                "Expected EditorBrowsable(Never) on runtime class and each internal runtime entrypoint method.");
         }
-
-        Assert.AreEqual(
-            5,
-            occurrenceCount,
-            "Expected EditorBrowsable(Never) on runtime class and each internal runtime entrypoint method.");
-
-        AssertNoErrors(outputCompilation);
+        catch (Exception e) when (e is AssertFailedException or InvalidOperationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
     // Transition produces hDiff=5,lDiff=1 → cmd 16 (out number). Used to test PT0007.
     static readonly byte[] TwoPixelOutputPng =
@@ -181,9 +188,34 @@ public class MethodGeneratorTests
 
         return png.ToArray();
     }
-
-    public TestContext TestContext { get; set; } = default!;
     CancellationToken CancellationToken => TestContext.CancellationToken;
+    void LogWriteLine(string message) => TestContext.WriteLine(message);
+
+    void LogDiagnostics(ImmutableArray<Diagnostic>? diagnostics)
+    {
+        if (diagnostics is not { Length: > 0 }) return;
+        LogWriteLine(string.Join("\n", Enumerable.Select((IEnumerable<Diagnostic>)diagnostics, static d => d.ToString())));
+    }
+
+    void LogDiagnostics(Compilation? compilation) => LogDiagnostics(compilation?.GetDiagnostics(CancellationToken));
+
+    void LogDiagnostics(ImmutableArray<Diagnostic>? diagnostics, Compilation? compilation)
+    {
+        LogDiagnostics(diagnostics);
+        LogDiagnostics(compilation);
+        LogSyntaxTrees(compilation);
+    }
+
+    void LogSyntaxTrees(Compilation? compilation)
+    {
+        if (compilation is null) return;
+        LogWriteLine(string.Join("\n",
+            compilation.SyntaxTrees
+                .Select(tree => $"// {tree.FilePath}\n{tree.GetText(CancellationToken)}")
+            )
+        );
+    }
+
     Compilation baseCompilation = default!;
 
     [TestInitialize]
@@ -215,6 +247,13 @@ public class MethodGeneratorTests
                 }
             }
         }
+        {
+            var assemblyLocation = typeof(Microsoft.Extensions.Logging.ILogger).Assembly.Location;
+            if (!string.IsNullOrWhiteSpace(assemblyLocation))
+            {
+                referenceList.Add(MetadataReference.CreateFromFile(assemblyLocation));
+            }
+        }
 #if !NET
         {
             var pipelinesAssemblyLocation = typeof(Memory<>).Assembly.Location;
@@ -237,7 +276,12 @@ public class MethodGeneratorTests
         baseCompilation = CSharpCompilation.Create(
             "generator-tests",
             references: referenceList,
-            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                specificDiagnosticOptions: new[] {
+                    new KeyValuePair<string, ReportDiagnostic>("CS1701", ReportDiagnostic.Suppress)
+                }
+            )
+        );
     }
 
     [TestMethod]
@@ -266,15 +310,22 @@ public class MethodGeneratorTests
             out var diagnostics,
             new TestAdditionalText("obj/program.png.piet.txt",
                 MakeTransformedText("program.png", MinimalLightRedPng)));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
-            "Expected generated method implementation was not found.");
+            Assert.IsTrue(
+                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
+                "Expected generated method implementation was not found.");
+        }
+        catch (Exception e) when (e is AssertFailedException or InvalidOperationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
 
-        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -366,18 +417,26 @@ public class MethodGeneratorTests
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
-            "Expected generated method implementation was not found.");
+            Assert.IsTrue(
+                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
+                "Expected generated method implementation was not found.");
 
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.\n"
-            + string.Join("\n", outputCompilation.GetDiagnostics(CancellationToken).Select(static x => x.ToString())));
+            Assert.IsFalse(
+                outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+                "Compilation contains errors after running generator.\n"
+                + string.Join("\n", outputCompilation.GetDiagnostics(CancellationToken).Select(static x => x.ToString())));
+        }
+        catch (Exception e) when (e is AssertFailedException or InvalidOperationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -399,18 +458,26 @@ public class MethodGeneratorTests
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("return")),
-            "Expected generated string return path was not found.");
+            Assert.IsTrue(
+                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("return")),
+                "Expected generated string return path was not found.");
 
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.\n"
-            + string.Join("\n", outputCompilation.GetDiagnostics(CancellationToken).Select(static x => x.ToString())));
+            Assert.IsFalse(
+                outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+                "Compilation contains errors after running generator.\n"
+                + string.Join("\n", outputCompilation.GetDiagnostics(CancellationToken).Select(static x => x.ToString())));
+        }
+        catch (Exception e) when (e is AssertFailedException or InvalidOperationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -432,23 +499,31 @@ public class MethodGeneratorTests
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run(global::System.IO.TextReader input, global::System.IO.TextWriter output)")),
-            "Expected generated method implementation with TextReader/TextWriter parameters was not found.");
+            Assert.IsTrue(
+                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run(global::System.IO.TextReader input, global::System.IO.TextWriter output)")),
+                "Expected generated method implementation with TextReader/TextWriter parameters was not found.");
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id is "PT0007" or "PT0008"),
-            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id is "PT0007" or "PT0008"),
+                string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
 
-        Assert.IsFalse(
-            outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator.\n"
-            + string.Join("\n", outputCompilation.GetDiagnostics(CancellationToken).Select(static x => x.ToString())));
+            Assert.IsFalse(
+                outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+                "Compilation contains errors after running generator.\n"
+                + string.Join("\n", outputCompilation.GetDiagnostics(CancellationToken).Select(static x => x.ToString())));
+        }
+        catch (Exception e) when (e is AssertFailedException or InvalidOperationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -551,16 +626,22 @@ public class MethodGeneratorTests
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            "PT0011 should not be reported for Task return + TextWriter parameter.");
-
-        AssertNoErrors(outputCompilation);
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+                "PT0011 should not be reported for Task return + TextWriter parameter.");
+        }
+        catch (Exception e) when (e is AssertFailedException or InvalidOperationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -582,16 +663,23 @@ public class MethodGeneratorTests
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            "PT0011 should not be reported for Task return + PipeWriter parameter.");
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+                "PT0011 should not be reported for Task return + PipeWriter parameter.");
+        }
+        catch (Exception e) when (e is AssertFailedException or InvalidOperationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
 
-        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -613,16 +701,22 @@ public class MethodGeneratorTests
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            "PT0011 should not be reported for ValueTask return + TextWriter parameter.");
-
-        AssertNoErrors(outputCompilation);
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+                "PT0011 should not be reported for ValueTask return + TextWriter parameter.");
+        }
+        catch (Exception e) when (e is AssertFailedException or InvalidOperationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -644,16 +738,22 @@ public class MethodGeneratorTests
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            "PT0011 should not be reported for ValueTask return + PipeWriter parameter.");
-
-        AssertNoErrors(outputCompilation);
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+                "PT0011 should not be reported for ValueTask return + PipeWriter parameter.");
+        }
+        catch (Exception e) when (e is AssertFailedException or InvalidOperationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -868,20 +968,27 @@ public class MethodGeneratorTests
             out var diagnostics,
             new TestAdditionalText("obj/input.png.piet.txt",
                 MakeTransformedText("input.png", TwoPixelInputPng)));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        var generatedText = runResult.GeneratedTrees
-            .Select(tree => tree.GetText(CancellationToken).ToString())
-            .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
+            var generatedText = runResult.GeneratedTrees
+                .Select(tree => tree.GetText(CancellationToken).ToString())
+                .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
-        Assert.IsTrue(generatedText.Contains("new global::System.IO.StringReader(input)"),
-            "Expected StringReader adapter was not found in generated code.");
-        Assert.IsTrue(generatedText.Contains("global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync"),
-            "Expected async input delegate for string input was not found.");
+            Assert.IsTrue(generatedText.Contains("new global::System.IO.StringReader(input)"),
+                "Expected StringReader adapter was not found in generated code.");
+            Assert.IsTrue(generatedText.Contains("global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync"),
+                "Expected async input delegate for string input was not found.");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
 
-        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -903,20 +1010,27 @@ public class MethodGeneratorTests
             out var diagnostics,
             new TestAdditionalText("obj/input.png.piet.txt",
                 MakeTransformedText("input.png", TwoPixelInputPng)));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        var generatedText = runResult.GeneratedTrees
-            .Select(tree => tree.GetText(CancellationToken).ToString())
-            .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
+            var generatedText = runResult.GeneratedTrees
+                .Select(tree => tree.GetText(CancellationToken).ToString())
+                .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
-        Assert.IsTrue(generatedText.Contains("ReadLineAsync(__ct)"),
-            "Expected TextReader.ReadLineAsync path was not found in generated code.");
-        Assert.IsTrue(generatedText.Contains("__pietReadNumberAsyncAwaited"),
-            "Expected async awaited fallback path for TextReader input was not found.");
+            Assert.IsTrue(generatedText.Contains("ReadLineAsync(__ct)"),
+                "Expected TextReader.ReadLineAsync path was not found in generated code.");
+            Assert.IsTrue(generatedText.Contains("__pietReadNumberAsyncAwaited"),
+                "Expected async awaited fallback path for TextReader input was not found.");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
 
-        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -938,20 +1052,26 @@ public class MethodGeneratorTests
             out var diagnostics,
             new TestAdditionalText("obj/input.png.piet.txt",
                 MakeTransformedText("input.png", TwoPixelInputPng)));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        var generatedText = runResult.GeneratedTrees
-            .Select(tree => tree.GetText(CancellationToken).ToString())
-            .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
+            var generatedText = runResult.GeneratedTrees
+                .Select(tree => tree.GetText(CancellationToken).ToString())
+                .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
-        Assert.IsTrue(generatedText.Contains("ReadAsync(default(global::System.Threading.CancellationToken)).AsTask().GetAwaiter().GetResult();"),
-            "Expected synchronous PipeReader.ReadAsync bridge path was not found in generated code.");
-        Assert.IsTrue(generatedText.Contains("global::System.Buffers.BuffersExtensions.ToArray(__buffer)"),
-            "Expected PipeReader number-read conversion path was not found in generated code.");
-
-        AssertNoErrors(outputCompilation);
+            Assert.IsTrue(generatedText.Contains("ReadAsync(default(global::System.Threading.CancellationToken)).AsTask().GetAwaiter().GetResult();"),
+                "Expected synchronous PipeReader.ReadAsync bridge path was not found in generated code.");
+            Assert.IsTrue(generatedText.Contains("global::System.Buffers.BuffersExtensions.ToArray(__buffer)"),
+                "Expected PipeReader number-read conversion path was not found in generated code.");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -973,22 +1093,28 @@ public class MethodGeneratorTests
             out var diagnostics,
             new TestAdditionalText("obj/input.png.piet.txt",
                 MakeTransformedText("input.png", TwoPixelInputPng)));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        var generatedText = runResult.GeneratedTrees
-            .Select(tree => tree.GetText(CancellationToken).ToString())
-            .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
+            var generatedText = runResult.GeneratedTrees
+                .Select(tree => tree.GetText(CancellationToken).ToString())
+                .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
-        Assert.IsTrue(generatedText.Contains("async global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync"),
-            "Expected async PipeReader number-read delegate was not found in generated code.");
-        Assert.IsTrue(generatedText.Contains("await input.ReadAsync(__ct).ConfigureAwait(false);"),
-            "Expected PipeReader.ReadAsync await path was not found in generated code.");
-        Assert.IsTrue(generatedText.Contains("global::System.Buffers.BuffersExtensions.ToArray(__buffer)"),
-            "Expected PipeReader buffer conversion path was not found in generated code.");
-
-        AssertNoErrors(outputCompilation);
+            Assert.IsTrue(generatedText.Contains("async global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync"),
+                "Expected async PipeReader number-read delegate was not found in generated code.");
+            Assert.IsTrue(generatedText.Contains("await input.ReadAsync(__ct).ConfigureAwait(false);"),
+                "Expected PipeReader.ReadAsync await path was not found in generated code.");
+            Assert.IsTrue(generatedText.Contains("global::System.Buffers.BuffersExtensions.ToArray(__buffer)"),
+                "Expected PipeReader buffer conversion path was not found in generated code.");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -1037,20 +1163,26 @@ public class MethodGeneratorTests
             out var diagnostics,
             new TestAdditionalText("obj/program.png.piet.txt",
                 MakeTransformedText("program.png", MinimalLightRedPng)));
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0010" && x.Severity == DiagnosticSeverity.Hidden),
-            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+            Assert.IsTrue(
+                generatorDiagnostics.Any(static x => x.Id == "PT0010" && x.Severity == DiagnosticSeverity.Hidden),
+                string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run(global::System.IO.Pipelines.PipeReader input)")),
-            "Expected generated method implementation was not found.");
+            Assert.IsTrue(
+                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run(global::System.IO.Pipelines.PipeReader input)")),
+                "Expected generated method implementation was not found.");
 
-        AssertNoErrors(diagnostics);
-
-        AssertNoErrors(outputCompilation);
+            AssertNoErrors(diagnostics, outputCompilation);
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -1072,21 +1204,27 @@ public class MethodGeneratorTests
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        var generated = runResult.GeneratedTrees
-            .Select(tree => tree.GetText(CancellationToken).ToString())
-            .Single(static text => text.Contains("partial class Sample"));
+            var generated = runResult.GeneratedTrees
+                .Select(tree => tree.GetText(CancellationToken).ToString())
+                .Single(static text => text.Contains("partial class Sample"));
 
-        Assert.Contains("public async partial global::System.Threading.Tasks.Task<string> Run(", generated,
-            "Expected async Task<string> signature was not found.");
+            Assert.Contains("public async partial global::System.Threading.Tasks.Task<string> Run(", generated,
+                "Expected async Task<string> signature was not found.");
 
-        Assert.IsTrue(generated.Contains("PietRuntime.ExecuteAsync("),
-            "Expected async runtime call was not found.");
-
-        AssertNoErrors(outputCompilation);
+            Assert.IsTrue(generated.Contains("PietRuntime.ExecuteAsync("),
+                "Expected async runtime call was not found.");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -1108,15 +1246,21 @@ public class MethodGeneratorTests
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("yield return")),
-            "Expected yield return byte path was not found.");
-
-        AssertNoErrors(outputCompilation);
+            Assert.IsTrue(
+                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("yield return")),
+                "Expected yield return byte path was not found.");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -1138,15 +1282,22 @@ public class MethodGeneratorTests
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("CancellationToken ct")),
-            "Expected CancellationToken parameter was not found in generated code.");
+            Assert.IsTrue(
+                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("CancellationToken ct")),
+                "Expected CancellationToken parameter was not found in generated code.");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
 
-        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -1158,12 +1309,12 @@ public class MethodGeneratorTests
         var runResult = driver.GetRunResult();
         var generatedHints = runResult.Results.SelectMany(static r => r.GeneratedSources).Select(static s => s.HintName).ToArray();
 
-        AssertNoErrors(diagnostics);
+        AssertNoErrors(diagnostics, outputCompilation);
 
         Assert.IsFalse(generatedHints.Contains(MethodGenerator.GeneratedMethodsFileName, StringComparer.Ordinal));
         Assert.IsFalse(generatedHints.Contains(MethodGenerator.GeneratePietRuntimeFileName, StringComparer.Ordinal));
 
-        AssertNoErrors(outputCompilation);
+
     }
 
     [TestMethod]
@@ -1212,15 +1363,23 @@ public class MethodGeneratorTests
             out var diagnostics,
             new TestAdditionalText("obj/program.png.piet.txt",
                 MakeTransformedText("program.png", MinimalLightRedPng)));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial int Run()")),
-            "Expected generated int return method implementation was not found.");
+            Assert.IsTrue(
+                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial int Run()")),
+                "Expected generated int return method implementation was not found.");
 
-        AssertNoErrors(outputCompilation);
+
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -1248,16 +1407,24 @@ public class MethodGeneratorTests
             out var diagnostics,
             new TestAdditionalText("obj/program.png.piet.txt",
                 MakeTransformedText("program.png", MinimalLightRedPng)));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
-        AssertNoErrors(outputCompilation);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        var generatedText = string.Join("\n", runResult.GeneratedTrees.Select(tree => tree.GetText(CancellationToken).ToString()));
-        Assert.IsTrue(generatedText.Contains("RunInt("), "Expected RunInt method was not found.");
-        Assert.IsTrue(generatedText.Contains("RunTaskInt("), "Expected RunTaskInt method was not found.");
-        Assert.IsTrue(generatedText.Contains("RunValueTaskInt("), "Expected RunValueTaskInt method was not found.");
-        Assert.IsTrue(generatedText.Contains("return 0;"), "Expected exit-code return statement was not found.");
+
+            var generatedText = string.Join("\n", runResult.GeneratedTrees.Select(tree => tree.GetText(CancellationToken).ToString()));
+            Assert.IsTrue(generatedText.Contains("RunInt("), "Expected RunInt method was not found.");
+            Assert.IsTrue(generatedText.Contains("RunTaskInt("), "Expected RunTaskInt method was not found.");
+            Assert.IsTrue(generatedText.Contains("RunValueTaskInt("), "Expected RunValueTaskInt method was not found.");
+            Assert.IsTrue(generatedText.Contains("return 0;"), "Expected exit-code return statement was not found.");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -1439,18 +1606,25 @@ public class MethodGeneratorTests
             out var diagnostics,
             new TestAdditionalText("obj/program.png.piet.txt",
                 MakeTransformedText("program.png", MinimalLightRedPng)));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        var generatedMethod = runResult.GeneratedTrees
-            .Select(tree => tree.GetText(CancellationToken).ToString())
-            .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
+            var generatedMethod = runResult.GeneratedTrees
+                .Select(tree => tree.GetText(CancellationToken).ToString())
+                .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
-        Assert.IsTrue(generatedMethod.Contains("public static partial"), "Expected static modifier was not found.");
-        Assert.IsFalse(generatedMethod.Contains("namespace "), "Global namespace method should not emit a namespace declaration.");
+            Assert.IsTrue(generatedMethod.Contains("public static partial"), "Expected static modifier was not found.");
+            Assert.IsFalse(generatedMethod.Contains("namespace "), "Global namespace method should not emit a namespace declaration.");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
 
-        AssertNoErrors(outputCompilation);
     }
 
     [TestMethod]
@@ -1643,15 +1817,21 @@ public class MethodGeneratorTests
             out var diagnostics,
             new TestAdditionalText("obj/black.png.piet.txt",
                 MakeTransformedText("black.png", blackPng)));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
-            "Expected generated method implementation was not found.");
-
-        AssertNoErrors(outputCompilation);
+            Assert.IsTrue(
+                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
+                "Expected generated method implementation was not found.");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -1679,14 +1859,21 @@ public class MethodGeneratorTests
             LanguageVersion.CSharp12,
             new TestAdditionalText("obj/black.png.piet.txt",
                 MakeTransformedText("black.png", blackPng)));
+        try
+        {
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        AssertNoErrors(diagnostics);
-
-        var diagnostics2 = outputCompilation.GetDiagnostics(CancellationToken);
-        Assert.IsFalse(
-            diagnostics2.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator with C#12 parse options.\r\n"
-            + string.Join("\r\n", diagnostics2.Select(v => v.ToString())));
+            var diagnostics2 = outputCompilation.GetDiagnostics(CancellationToken);
+            Assert.IsFalse(
+                diagnostics2.Any(static x => x.Severity == DiagnosticSeverity.Error),
+                "Compilation contains errors after running generator with C#12 parse options.\r\n"
+                + string.Join("\r\n", diagnostics2.Select(v => v.ToString())));
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -1725,7 +1912,6 @@ public class MethodGeneratorTests
     [TestMethod]
     public void Generator_WithValueTaskStringReturn_GeneratesMethod()
     {
-#if NET8_0_OR_GREATER
         const string source = """
             namespace Demo;
 
@@ -1742,19 +1928,22 @@ public class MethodGeneratorTests
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public async partial global::System.Threading.Tasks.ValueTask<string> Run()"))
-            && runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("return __pietString;")),
-            "Expected ValueTask<string> return path was not found.");
-
-        AssertNoErrors(outputCompilation);
-#else
-        Assert.Inconclusive("ValueTask return type support requires .NET 8 or later.");
-#endif
+            Assert.IsTrue(
+                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public async partial global::System.Threading.Tasks.ValueTask<string> Run()"))
+                && runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("return __pietString;")),
+                "Expected ValueTask<string> return path was not found.");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -1777,18 +1966,25 @@ public class MethodGeneratorTests
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        var generatedText = runResult.GeneratedTrees
-            .Select(tree => tree.GetText(CancellationToken).ToString())
-            .FirstOrDefault(static t => t.Contains("IAsyncEnumerable")) ?? string.Empty;
+            var generatedText = runResult.GeneratedTrees
+                .Select(tree => tree.GetText(CancellationToken).ToString())
+                .FirstOrDefault(static t => t.Contains("IAsyncEnumerable")) ?? string.Empty;
 
-        Assert.IsTrue(generatedText.Contains("public async partial global::System.Collections.Generic.IAsyncEnumerable<byte> Run([global::System.Runtime.CompilerServices.EnumeratorCancellation] global::System.Threading.CancellationToken ct)"), "Expected async modifier in generated code.");
-        Assert.IsTrue(generatedText.Contains("yield return __pietByte;"), "Expected yield return byte path was not found.");
+            Assert.Contains("public async partial global::System.Collections.Generic.IAsyncEnumerable<byte> Run([global::System.Runtime.CompilerServices.EnumeratorCancellation] global::System.Threading.CancellationToken ct)", generatedText, "Expected async modifier in generated code.");
+            Assert.Contains("yield return __pietByte;", generatedText, "Expected yield return byte path was not found.");
 
-        AssertNoErrors(outputCompilation);
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -1810,18 +2006,26 @@ public class MethodGeneratorTests
             out var diagnostics,
             new TestAdditionalText("obj/input.png.piet.txt",
                 MakeTransformedText("input.png", TwoPixelInputPng)));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        var pipeReaderErrors = outputCompilation.GetDiagnostics(CancellationToken)
-            .Where(static x => x.Severity == DiagnosticSeverity.Error)
-            .Select(static x => x.ToString())
-            .ToArray();
+            var pipeReaderErrors = outputCompilation.GetDiagnostics(CancellationToken)
+                .Where(static x => x.Severity == DiagnosticSeverity.Error)
+                .Select(static x => x.ToString())
+                .ToArray();
 
-        Assert.IsFalse(
-            pipeReaderErrors.Length > 0,
-            "Compilation contains errors after running generator. " + string.Join(" | ", pipeReaderErrors));
+            Assert.IsEmpty(
+                pipeReaderErrors,
+                "Compilation contains errors after running generator. " + string.Join(" | ", pipeReaderErrors));
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -1843,22 +2047,30 @@ public class MethodGeneratorTests
             out var diagnostics,
             new TestAdditionalText("obj/output.png.piet.txt",
                 MakeTransformedText("output.png", TwoPixelOutputPng)));
-        var runResult = driver.GetRunResult();
+        try
+        {
+            var runResult = driver.GetRunResult();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("global::System.Buffers.BuffersExtensions.Write(output, ")),
-            "Expected PipeWriter.WriteAsync() was not found in generated code.");
+            Assert.IsTrue(
+                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("global::System.Buffers.BuffersExtensions.Write(output, ")),
+                "Expected PipeWriter.WriteAsync() was not found in generated code.");
 
-        var pipeWriterErrors = outputCompilation.GetDiagnostics(CancellationToken)
-            .Where(static x => x.Severity == DiagnosticSeverity.Error)
-            .Select(static x => x.ToString())
-            .ToArray();
+            var pipeWriterErrors = outputCompilation.GetDiagnostics(CancellationToken)
+                .Where(static x => x.Severity == DiagnosticSeverity.Error)
+                .Select(static x => x.ToString())
+                .ToArray();
 
-        Assert.IsFalse(
-            pipeWriterErrors.Length > 0,
-            "Compilation contains errors after running generator. " + string.Join(" | ", pipeWriterErrors));
+            Assert.IsEmpty(
+                pipeWriterErrors,
+                "Compilation contains errors after running generator. " + string.Join(" | ", pipeWriterErrors));
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -1892,8 +2104,8 @@ public class MethodGeneratorTests
             out var diagnostics,
             new TestAdditionalText($"obj/{logicalPath}.piet.txt", transformed));
 
-        AssertNoErrors(diagnostics);
-        AssertNoErrors(outputCompilation);
+        AssertNoErrors(diagnostics, outputCompilation);
+
     }
 
     [TestMethod]
@@ -1925,6 +2137,163 @@ public class MethodGeneratorTests
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
+    [TestMethod]
+    [Timeout(10000, CooperativeCancellation = true)]
+    public async Task Generator_WithLoggerParameter_LogsExecution()
+    {
+        const string source = """
+            namespace Demo;
+
+            public class FakeLogger : Microsoft.Extensions.Logging.ILogger
+            {
+                public System.Collections.Generic.List<string> Logs = new System.Collections.Generic.List<string>();
+                public System.IDisposable BeginScope<TState>(TState state) => null!;
+                public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+                public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception exception, System.Func<TState, System.Exception, string> formatter)
+                {
+                    Logs.Add(formatter(state, exception));
+                }
+            }
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("data:text/ascii-piet;codel-size=1,nqiaecfbknmeRtakcsqimemerTcnjlvutqiavtFsvubntqcslnqBbjemu   udjiNqifu  r  tlaFvldq rrr vneVujbm  k  nmsRsnadv a vfkqSkdceumbmuqcrVqesqfnbsrvtjUnfcltltdljceMkcltuemnbfnkB")]
+                public partial string Run(FakeLogger logger, System.Threading.CancellationToken ct);
+            }
+            """;
+
+        var transformed = MakeTransformedText("program.png", TwoPixelOutputPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/program.png.piet.txt", transformed));
+        try
+        {
+
+            AssertNoErrors(diagnostics, outputCompilation);
+
+
+            var runResult = driver.GetRunResult();
+            AssertNoErrors(runResult.Diagnostics);
+
+            var asm = Emit(outputCompilation, CancellationToken);
+            var t = asm.GetType("Demo.Sample")!;
+            var instance = System.Activator.CreateInstance(t)!;
+            var typelogger = asm.GetType("Demo.FakeLogger");
+            Assert.IsNotNull(typelogger);
+            var logger = Activator.CreateInstance(typelogger);
+            Assert.IsNotNull(logger);
+            var logs = typelogger.GetField("Logs")?.GetValue(logger) as List<string>;
+            Assert.IsNotNull(logs);
+
+            var m = t.GetMethod("Run");
+            Assert.IsNotNull(m);
+            var result = m.Invoke(instance, [logger, CancellationToken]) as string;
+            LogWriteLine($"result: {result}");
+            Assert.IsNotEmpty(logs, "No logs were captured.");
+            LogWriteLine($"logs: {string.Join("\n", logs)}");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
+    }
+
+    [TestMethod]
+    [Timeout(10000, CooperativeCancellation = true)]
+    public async Task Generator_WithLoggerPrimaryConstructor_LogsExecution()
+    {
+        const string source = """
+            namespace Demo;
+
+            public class FakeLogger : Microsoft.Extensions.Logging.ILogger
+            {
+                public System.Collections.Generic.List<string> Logs = new System.Collections.Generic.List<string>();
+                public System.IDisposable BeginScope<TState>(TState state) => null!;
+                public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+                public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception exception, System.Func<TState, System.Exception, string> formatter)
+                {
+                    Logs.Add(formatter(state, exception));
+                }
+            }
+
+            public partial class Sample(FakeLogger logger)
+            {
+                [Esolang.Piet.GeneratePietMethod("data:text/ascii-piet;codel-size=1,nqiaecfbknmeRtakcsqimemerTcnjlvutqiavtFsvubntqcslnqBbjemu   udjiNqifu  r  tlaFvldq rrr vneVujbm  k  nmsRsnadv a vfkqSkdceumbmuqcrVqesqfnbsrvtjUnfcltltdljceMkcltuemnbfnkB")]
+                public partial string Run(System.Threading.CancellationToken ct);
+            }
+            """;
+
+        var transformed = MakeTransformedText("program.png", TwoPixelOutputPng);
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/program.png.piet.txt", transformed));
+
+        try
+        {
+            AssertNoErrors(diagnostics, outputCompilation);
+
+
+            var runResult = driver.GetRunResult();
+
+            AssertNoErrors(runResult.Diagnostics);
+
+            var asm = Emit(outputCompilation, CancellationToken);
+            var t = asm.GetType("Demo.Sample")!;
+            var typelogger = asm.GetType("Demo.FakeLogger");
+            Assert.IsNotNull(typelogger);
+            var logger = Activator.CreateInstance(typelogger);
+            Assert.IsNotNull(logger);
+            var logs = typelogger.GetField("Logs")?.GetValue(logger) as List<string>;
+            Assert.IsNotNull(logs);
+            var instance = Activator.CreateInstance(t, [logger]);
+            Assert.IsNotNull(instance);
+
+            var m = t.GetMethod("Run");
+            Assert.IsNotNull(m);
+            var reuslt = m.Invoke(instance, [CancellationToken]) as string;
+            Assert.IsNotNull(reuslt);
+            LogWriteLine($"result: {reuslt}");
+            Assert.IsNotEmpty(logs, "No logs were captured.");
+            LogWriteLine($"logs: {string.Join("\n", logs)}");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
+    }
+
+
+
+    Assembly Emit(Compilation compilation, CancellationToken cancellationToken)
+    {
+        using var ms = new MemoryStream();
+        var result = compilation.Emit(ms, cancellationToken: cancellationToken);
+        if (!result.Success)
+        {
+            foreach (var d in compilation.GetDiagnostics(cancellationToken))
+                LogWriteLine($"Diag: {d}");
+            foreach (var d in result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error))
+                LogWriteLine(d.ToString());
+            foreach (var t in compilation.SyntaxTrees)
+                LogWriteLine($"// {t.FilePath}\n{t}");
+            Assert.Fail("Compilation emit failed");
+        }
+        ms.Seek(0, SeekOrigin.Begin);
+
+#if NET48
+        return Assembly.Load(ms.ToArray());
+#else
+        var ctx = new System.Runtime.Loader.AssemblyLoadContext(nameof(MethodGeneratorTests), isCollectible: true);
+        return ctx.LoadFromStream(ms);
+#endif
+    }
+
     GeneratorDriver RunGeneratorsAndUpdateCompilation(
         string source,
         out Compilation outputCompilation,
@@ -1934,7 +2303,7 @@ public class MethodGeneratorTests
             source,
             out outputCompilation,
             out diagnostics,
-            LanguageVersion.CSharp14,
+            LanguageVersion.CSharp12,
             additionalTexts);
 
     GeneratorDriver RunGeneratorsAndUpdateCompilationWithLanguageVersion(
@@ -1999,16 +2368,23 @@ public partial class Sample
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/program.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
-        Assert.IsEmpty(runResult.Diagnostics,
-            string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
-        // 生成コードにcodelSize=2が反映されているか（例: 配列長やコメント等で判定）
-        var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
-        Assert.IsNotNull(generated, "Method not generated");
-        Assert.IsTrue(generated.Contains("codelSize: 2"), "codelSize=2 not reflected in generated code");
-        AssertNoErrors(diagnostics);
+        try
+        {
+            var runResult = driver.GetRunResult();
+            Assert.IsEmpty(runResult.Diagnostics,
+                string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
+            // 生成コードにcodelSize=2が反映されているか（例: 配列長やコメント等で判定）
+            var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
+            Assert.IsNotNull(generated, "Method not generated");
+            Assert.IsTrue(generated.Contains("codelSize: 2"), "codelSize=2 not reflected in generated code");
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        AssertNoErrors(outputCompilation);
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -2031,15 +2407,21 @@ public partial class Sample
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/program.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
-        Assert.IsEmpty(runResult.Diagnostics,
-            string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
-        var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
-        Assert.IsNotNull(generated, "Method not generated");
-        Assert.IsTrue(generated.Contains("codelSize: 2"), "codelSize=2 not reflected in generated code");
-        AssertNoErrors(diagnostics);
-
-        AssertNoErrors(outputCompilation);
+        try
+        {
+            var runResult = driver.GetRunResult();
+            Assert.IsEmpty(runResult.Diagnostics,
+                string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
+            var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
+            Assert.IsNotNull(generated, "Method not generated");
+            Assert.IsTrue(generated.Contains("codelSize: 2"), "codelSize=2 not reflected in generated code");
+            AssertNoErrors(diagnostics, outputCompilation);
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -2060,15 +2442,21 @@ public partial class Sample
             source,
             out var outputCompilation,
             out var diagnostics);
-        var runResult = driver.GetRunResult();
-        Assert.IsEmpty(runResult.Diagnostics,
-            string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
-        var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
-        Assert.IsNotNull(generated, "Method not generated");
-        Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize=1 not reflected in generated code");
-        AssertNoErrors(diagnostics);
-
-        AssertNoErrors(outputCompilation);
+        try
+        {
+            var runResult = driver.GetRunResult();
+            Assert.IsEmpty(runResult.Diagnostics,
+                string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
+            var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
+            Assert.IsNotNull(generated, "Method not generated");
+            Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize=1 not reflected in generated code");
+            AssertNoErrors(diagnostics, outputCompilation);
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -2089,15 +2477,23 @@ public partial class Sample
             source,
             out var outputCompilation,
             out var diagnostics);
-        var runResult = driver.GetRunResult();
-        Assert.IsEmpty(runResult.Diagnostics,
-            string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
+        try
+        {
+            var runResult = driver.GetRunResult();
+            Assert.IsEmpty(runResult.Diagnostics,
+                string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
 
-        var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
-        Assert.IsNotNull(generated, "Method not generated");
-        Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize=1 not reflected in generated code");
-        AssertNoErrors(diagnostics);
-        AssertNoErrors(outputCompilation);
+            var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
+            Assert.IsNotNull(generated, "Method not generated");
+            Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize=1 not reflected in generated code");
+            AssertNoErrors(diagnostics, outputCompilation);
+
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -2118,15 +2514,23 @@ public partial class Sample
             source,
             out var outputCompilation,
             out var diagnostics);
-        var runResult = driver.GetRunResult();
-        Assert.IsEmpty(runResult.Diagnostics,
-            string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
+        try
+        {
+            var runResult = driver.GetRunResult();
+            Assert.IsEmpty(runResult.Diagnostics,
+                string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
 
-        var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
-        Assert.IsNotNull(generated, "Method not generated");
-        Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize fallback to default(1) was not reflected in generated code");
-        AssertNoErrors(diagnostics);
-        AssertNoErrors(outputCompilation);
+            var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
+            Assert.IsNotNull(generated, "Method not generated");
+            Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize fallback to default(1) was not reflected in generated code");
+            AssertNoErrors(diagnostics, outputCompilation);
+
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -2317,17 +2721,24 @@ public partial class Sample
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt",
                 MakeTransformedText("samples/hello-world.png", MinimalLightRedPng)));
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        AssertNoErrors(diagnostics);
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+                "PT0011 should not be reported for Task return + TextWriter parameter.");
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            "PT0011 should not be reported for Task return + TextWriter parameter.");
 
-        AssertNoErrors(outputCompilation);
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -2349,17 +2760,24 @@ public partial class Sample
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt",
                 MakeTransformedText("samples/hello-world.png", MinimalLightRedPng)));
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        AssertNoErrors(diagnostics);
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+                "PT0011 should not be reported for Task return + PipeWriter parameter.");
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            "PT0011 should not be reported for Task return + PipeWriter parameter.");
 
-        AssertNoErrors(outputCompilation);
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -2381,17 +2799,24 @@ public partial class Sample
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt",
                 MakeTransformedText("samples/hello-world.png", MinimalLightRedPng)));
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        AssertNoErrors(diagnostics);
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+                "PT0011 should not be reported for ValueTask return + TextWriter parameter.");
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            "PT0011 should not be reported for ValueTask return + TextWriter parameter.");
 
-        AssertNoErrors(outputCompilation);
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -2413,28 +2838,32 @@ public partial class Sample
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt",
                 MakeTransformedText("samples/hello-world.png", MinimalLightRedPng)));
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        AssertNoErrors(diagnostics);
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+                "PT0011 should not be reported for ValueTask return + PipeWriter parameter.");
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            "PT0011 should not be reported for ValueTask return + PipeWriter parameter.");
 
-        AssertNoErrors(outputCompilation);
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
-    void AssertNoErrors(ImmutableArray<Diagnostic> diagnostics) =>
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            string.Join("\n", diagnostics.Select(static x => x.ToString())));
-
-    void AssertNoErrors(Compilation outputCompilation)
+    void AssertNoErrors(ImmutableArray<Diagnostic> diagnostics, Compilation? compilation = null)
     {
-        var diagnostics = outputCompilation.GetDiagnostics(CancellationToken);
-        Assert.IsFalse(diagnostics.Any(static x => x.Severity == DiagnosticSeverity.Error),
-            "Compilation contains errors after running generator." + string.Join("\n", diagnostics.Select(static x => x.ToString())));
+        var errors = diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
+        Assert.IsEmpty(errors, $"{errors.Length} error(s) in generator output");
+        var errors2 = compilation?.GetDiagnostics(CancellationToken).Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
+        Assert.IsEmpty(errors2 ?? [], $"{errors2?.Length ?? 0} error(s) in compilation");
     }
 
     // -----------------------------------------------------------------------
@@ -2460,16 +2889,25 @@ public partial class Sample
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            "PT0011 should not be reported for int return + TextWriter parameter.");
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        AssertNoErrors(outputCompilation);
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+                "PT0011 should not be reported for int return + TextWriter parameter.");
+
+
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -2491,16 +2929,24 @@ public partial class Sample
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            "PT0011 should not be reported for int return + PipeWriter parameter.");
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+                "PT0011 should not be reported for int return + PipeWriter parameter.");
 
-        AssertNoErrors(outputCompilation);
+
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -2522,16 +2968,24 @@ public partial class Sample
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            "PT0011 should not be reported for Task<int> return + TextWriter parameter.");
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+                "PT0011 should not be reported for Task<int> return + TextWriter parameter.");
 
-        AssertNoErrors(outputCompilation);
+
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -2553,16 +3007,22 @@ public partial class Sample
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            "PT0011 should not be reported for Task<int> return + PipeWriter parameter.");
-
-        AssertNoErrors(outputCompilation);
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+                "PT0011 should not be reported for Task<int> return + PipeWriter parameter.");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -2584,16 +3044,24 @@ public partial class Sample
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            "PT0011 should not be reported for ValueTask<int> return + TextWriter parameter.");
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+                "PT0011 should not be reported for ValueTask<int> return + TextWriter parameter.");
 
-        AssertNoErrors(outputCompilation);
+
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]
@@ -2615,16 +3083,22 @@ public partial class Sample
             out var outputCompilation,
             out var diagnostics,
             new TestAdditionalText("obj/hello-world.png.piet.txt", transformed));
-        var runResult = driver.GetRunResult();
-        var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        AssertNoErrors(diagnostics);
+            AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
-            "PT0011 should not be reported for ValueTask<int> return + PipeWriter parameter.");
-
-        AssertNoErrors(outputCompilation);
+            Assert.IsFalse(
+                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+                "PT0011 should not be reported for ValueTask<int> return + PipeWriter parameter.");
+        }
+        catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation);
+            throw;
+        }
     }
 
     [TestMethod]

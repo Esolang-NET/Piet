@@ -3,9 +3,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>14</LangVersion>
-    <AssemblyVersion>1.1.1.4</AssemblyVersion>
-    <FileVersion>1.1.1.4</FileVersion>
-    <Version>1.1.1</Version>
+    <AssemblyVersion>1.1.2.5</AssemblyVersion>
+    <FileVersion>1.1.2.5</FileVersion>
+    <Version>1.1.2</Version>
     <PackageProjectUrl>https://github.com/Esolang-NET/Piet/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Esolang-NET/Piet.git</RepositoryUrl>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -36,11 +36,12 @@
     <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="\" Visible="false" Link="icon.png" />
   </ItemGroup>
 
-  <PropertyGroup Condition="$([System.String]::Copy('$(MSBuildProjectName)').EndsWith('.Tests')) == 'True'">
+  <PropertyGroup Condition="$([System.String]::Copy('$(MSBuildProjectName)').EndsWith('.Tests')) == 'True'">    
     <TestResultsFolderPath>$(MSBuildProjectDirectory)\TestResults</TestResultsFolderPath>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <IsPublishable>false</IsPublishable>
     <NoWarn>$(NoWarn);RS1035</NoWarn>
-  </PropertyGroup>
-</Project>
+    <EnableMSTestRunner>true</EnableMSTestRunner>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup></Project>

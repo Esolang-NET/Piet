@@ -371,6 +371,25 @@ Console.WriteLine($"RunHw111Gif: {PietSample.RunHw111Gif()}");
 - Generated code expects C# 8.0 or later features (for example, async iterators and nullable context directives).
 - If the consumer project language version is lower than C# 8.0, the generator reports `PT0012` as a warning.
 
+## Logger Support
+
+The generator automatically detects and injects logging support if an `ILogger` or `ILogger<T>` is available. It searches in the following order:
+
+1. **Method Parameters**: If a parameter of type `ILogger` or `ILogger<T>` is declared, it is used directly.
+2. **Primary Constructor Parameters**: If a primary constructor parameter of type `ILogger` or `ILogger<T>` is present in the class, it is used.
+3. **Class Fields**: If no parameter or constructor argument is provided, the generator searches for a field of type `ILogger` or `ILogger<T>` within the containing class (including accessible fields in base classes).
+
+When a logger is detected, the generated code will emit `Trace` level logs for each Piet command execution.
+
+**Example:**
+```csharp
+public partial class MyPiet(ILogger<MyPiet> logger)
+{
+    [GeneratePietMethod("hello-world.png")]
+    public partial void Run(); // 'logger' from primary constructor will be used
+}
+```
+
 ## Samples
 
 For a concrete sample project and runnable examples, see [samples/Generator.UseConsole/README.md](../samples/Generator.UseConsole/README.md).

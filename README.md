@@ -4,40 +4,38 @@
 
 ## Quick Start (Generator)
 
-Write Piet once, call it as a C# method.
+Write Piet program once, call it as a C# method.
 
-```cs
+```csharp
 using Esolang.Piet;
-
-Console.WriteLine(PietSample.RunToString());
 
 partial class PietSample
 {
-		[GeneratePietMethod("hello-world.png")]
-		public static partial string? RunToString();
+    [GeneratePietMethod("Programs/hello.png")]
+    public static partial string HelloWorld();
 }
-
-// output:
-// Hello, world!
-```
-
-Add the source image in your project file:
-
-```xml
-<ItemGroup>
-	<PietImage Include="samples\hello-world.png" PietLogicalPath="hello-world.png" />
-</ItemGroup>
 ```
 
 ## Generator Guide
 
-For detailed Generator signatures and patterns (`string`, `TextReader`, `PipeReader`, `TextWriter`, `PipeWriter`, sync/async returns, byte-sequence returns), see:
+For detailed Generator signatures, patterns, and source specification (including inline sources), see:
 
 - [Generator README](./Generator/README.md)
 
-For runnable examples including `TextReader`/`PipeReader` input, `TextWriter`/`PipeWriter` output, and multiple return patterns, see:
+### Generator Signatures
 
-- [UseConsole sample](./samples/Generator.UseConsole/README.md)
+| Attribute Argument | `partial` Method Parameters (Input) | `partial` Method Return Types (Output) |
+| :--- | :--- | :--- |
+| `string` (Path/Inline) | `byte[]?` (Image Data) | `void`, `string`, `string?`, `int`, `Task`, `ValueTask`, `IEnumerable<byte>`, `IAsyncEnumerable<byte>` |
+
+## Implementation Status
+
+| Area | Status |
+|---|---|
+| Piet program parsing | ✅ |
+| Image processing (codel size) | ✅ |
+| Runtime execution | ✅ |
+| Piet specific instructions | ✅ |
 
 ## Install
 
@@ -51,25 +49,30 @@ dotnet tool install -g dotnet-piet
 ## Choose Package
 
 | Want to do | Package |
-| --- | --- |
+|---|---|
 | Generate C# methods from Piet at compile time | Esolang.Piet.Generator |
-| Parse image source into normalized codels | Esolang.Piet.Parser |
+| Parse source into a Piet program | Esolang.Piet.Parser |
 | Execute Piet in-process | Esolang.Piet.Processor |
 | Run Piet from CLI | dotnet-piet |
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+
 
 ## NuGet
 
 | Project | NuGet | Summary |
-| --- | --- | --- |
-| [dotnet-piet](./Interpreter/README.md) | [![NuGet: dotnet-piet](https://img.shields.io/nuget/v/dotnet-piet?logo=nuget)](https://www.nuget.org/packages/dotnet-piet/) | piet command line utility dotnet-piet command. |
-| [Esolang.Piet.Generator](./Generator/README.md) | [![NuGet: Esolang.Piet.Generator](https://img.shields.io/nuget/v/Esolang.Piet.Generator?logo=nuget)](https://www.nuget.org/packages/Esolang.Piet.Generator/) | piet method generator. |
-| [Esolang.Piet.Parser](./Parser/README.md) | [![NuGet: Esolang.Piet.Parser](https://img.shields.io/nuget/v/Esolang.Piet.Parser?logo=nuget)](https://www.nuget.org/packages/Esolang.Piet.Parser/) | piet image parser. |
-| [Esolang.Piet.Processor](./Processor/README.md) | [![NuGet: Esolang.Piet.Processor](https://img.shields.io/nuget/v/Esolang.Piet.Processor?logo=nuget)](https://www.nuget.org/packages/Esolang.Piet.Processor/) | piet processor. |
+|---|---|---|
+| [dotnet-piet](./Interpreter/README.md) | [![NuGet: dotnet-piet](https://img.shields.io/nuget/v/dotnet-piet?logo=nuget&label=1.1.2)](https://www.nuget.org/packages/dotnet-piet/) | Piet command-line interpreter. |
+| [Esolang.Piet.Generator](./Generator/README.md) | [![NuGet: Esolang.Piet.Generator](https://img.shields.io/nuget/v/Esolang.Piet.Generator?logo=nuget&label=1.1.2)](https://www.nuget.org/packages/Esolang.Piet.Generator/) | Piet source generator. |
+| [Esolang.Piet.Parser](./Parser/README.md) | [![NuGet: Esolang.Piet.Parser](https://img.shields.io/nuget/v/Esolang.Piet.Parser?logo=nuget&label=1.1.2)](https://www.nuget.org/packages/Esolang.Piet.Parser/) | Piet source parser. |
+| [Esolang.Piet.Processor](./Processor/README.md) | [![NuGet: Esolang.Piet.Processor](https://img.shields.io/nuget/v/Esolang.Piet.Processor?logo=nuget&label=1.1.2)](https://www.nuget.org/packages/Esolang.Piet.Processor/) | Piet execution engine. |
 
 ## Framework Support
 
 | Project | Target frameworks |
-| --- | --- |
+|---|---|
 | Esolang.Piet.Generator | netstandard2.0 |
 | Esolang.Piet.Parser | net8.0, net9.0, net10.0, netstandard2.0, netstandard2.1 |
 | Esolang.Piet.Processor | net8.0, net9.0, net10.0 |
@@ -81,6 +84,5 @@ dotnet tool install -g dotnet-piet
 
 ## See also
 
-- Piet language reference: https://www.dangermouse.net/esoteric/piet.html
-
-**Note:** GIF (`.gif`) is also supported.
+- [The official Piet page](https://www.dangermouse.net/esoteric/piet.html)
+- [Piet on Esolangs wiki](https://esolangs.org/wiki/Piet)
