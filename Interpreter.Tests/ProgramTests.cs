@@ -7,9 +7,9 @@ namespace Esolang.Piet.Interpreter.Tests;
 [TestClass]
 public class ProgramTests(TestContext TestContext)
 {
-#pragma warning disable MSTEST0054 // TestContext.CancellationTokenSource.Token の代わりに TestContext.CancellationToken を使用する
+#pragma warning disable MSTEST0054
     CancellationToken CancellationToken => TestContext.CancellationTokenSource.Token;
-#pragma warning restore MSTEST0054 // TestContext.CancellationTokenSource.Token の代わりに TestContext.CancellationToken を使用する
+#pragma warning restore MSTEST0054
     static int Run(string[] args)
     {
         var entryPoint = typeof(Program).Assembly.EntryPoint;
@@ -21,21 +21,12 @@ public class ProgramTests(TestContext TestContext)
     }
 
     [TestMethod]
-    public void RunAsync_Default_ReturnsZero()
-    {
-        var exitCode = Run([]);
-        Assert.AreEqual(0, exitCode);
-    }
+    public void Run_Default_ReturnsZero() => Assert.AreEqual(0, Run([]));
 
     [TestMethod]
     [DataRow("_")]
     [DataRow("??")]
-    public void Run_AsciiPietTextWithoutPath_ReturnsZero(string asciiPietText)
-    {
-        var exitCode = Run(["--ascii-piet-text", asciiPietText]);
-
-        Assert.AreEqual(0, exitCode);
-    }
+    public void Run_AsciiPietTextWithoutPath_ReturnsZero(string asciiPietText) => Assert.AreEqual(0, Run(["--ascii-piet-text", asciiPietText]));
 
     [TestMethod]
     [DataRow("_", "_")]
@@ -46,34 +37,20 @@ public class ProgramTests(TestContext TestContext)
         try
         {
             Console.SetOut(writer);
-
-            var exitCode = Run(["--ascii-piet-text", asciiPietText, "--ascii-piet"]);
-
-            Assert.AreEqual(0, exitCode);
+            Assert.AreEqual(0, Run(["--ascii-piet-text", asciiPietText, "--ascii-piet"]));
             Assert.AreEqual(expectedAsciiPiet, writer.ToString());
         }
-        finally
-        {
-            Console.SetOut(originalOutput);
-        }
+        finally { Console.SetOut(originalOutput); }
     }
 
     [TestMethod]
-    public void Run_WithoutPathAndWithoutAsciiPietText_ReturnsNonZero()
-    {
-        var exitCode = Run([]);
-
-        Assert.AreNotEqual(0, exitCode);
-    }
+    public void Run_WithoutPathAndWithoutAsciiPietText_ReturnsNonZero() => Assert.AreNotEqual(0, Run([]));
 
     [TestMethod]
     public void Run_WithPathAndAsciiPietText_ReturnsNonZero()
     {
         var path = FindFileInRepository("samples", "Generator.UseConsole", "samples", "no-op.png");
-
-        var exitCode = Run([path, "--ascii-piet-text", "_"]);
-
-        Assert.AreNotEqual(0, exitCode);
+        Assert.AreNotEqual(0, Run([path, "--ascii-piet-text", "_"]));
     }
 
     [TestMethod]
@@ -84,10 +61,7 @@ public class ProgramTests(TestContext TestContext)
     public void Run_SamplePrograms_ReturnZero(string sampleFileName)
     {
         var path = FindFileInRepository("samples", "Generator.UseConsole", "samples", sampleFileName);
-
-        var exitCode = Run([path]);
-
-        Assert.AreEqual(0, exitCode, $"Expected success exit code for sample '{sampleFileName}'.");
+        Assert.AreEqual(0, Run([path]), $"Expected success exit code for sample '{sampleFileName}'.");
     }
 
     [TestMethod]
@@ -101,17 +75,10 @@ public class ProgramTests(TestContext TestContext)
         try
         {
             Console.SetOut(writer);
-
-            var exitCode = await Program.RunAsync([path]);
-            var actual = writer.ToString().TrimEnd('\r', '\n');
-
-            Assert.AreEqual(0, exitCode, $"Expected success exit code for sample '{sampleFileName}'.");
-            Assert.AreEqual(expectedOutput, actual);
+            Assert.AreEqual(0, await Program.RunAsync([path]));
+            Assert.AreEqual(expectedOutput, writer.ToString().TrimEnd('\r', '\n'));
         }
-        finally
-        {
-            Console.SetOut(originalOutput);
-        }
+        finally { Console.SetOut(originalOutput); }
     }
 
     [TestMethod]
@@ -122,26 +89,14 @@ public class ProgramTests(TestContext TestContext)
         try
         {
             Console.SetOut(writer);
-
-            var exitCode = await Program.RunAsync(["--ascii-piet-text", "_"]);
-            var actual = writer.ToString().TrimEnd('\r', '\n');
-
-            Assert.AreEqual(0, exitCode);
-            Assert.AreEqual(string.Empty, actual);
+            Assert.AreEqual(0, await Program.RunAsync(["--ascii-piet-text", "_"]));
+            Assert.AreEqual(string.Empty, writer.ToString().TrimEnd('\r', '\n'));
         }
-        finally
-        {
-            Console.SetOut(originalOutput);
-        }
+        finally { Console.SetOut(originalOutput); }
     }
 
     [TestMethod]
-    public void Run_HelpOption_ReturnsNonZero()
-    {
-        // CLI apps often return non-zero for help display depending on implementation
-        var exitCode = Run(["--help"]);
-        Assert.AreNotEqual(0, exitCode);
-    }
+    public void Run_HelpOption_ReturnsNonZero() => Assert.AreNotEqual(0, Run(["--help"]));
 
     [TestMethod]
     public async Task RunAsync_WhitePixelImage_ReturnsZero()
@@ -154,15 +109,9 @@ public class ProgramTests(TestContext TestContext)
                 image[0, 0] = new Rgba32(255, 255, 255);
                 image.Save(path);
             }
-
-            var exitCode = await Program.RunAsync([path]);
-            Assert.AreEqual(0, exitCode);
+            Assert.AreEqual(0, await Program.RunAsync([path]));
         }
-        finally
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
+        finally { if (File.Exists(path)) File.Delete(path); }
     }
 
     [TestMethod]
@@ -181,19 +130,14 @@ public class ProgramTests(TestContext TestContext)
                 image[1, 1] = new Rgba32(0, 192, 192);
                 image.Save(path);
             }
-
             Console.SetOut(writer);
-
-            var exitCode = await Program.RunAsync([path, "--ascii-piet"]);
-
-            Assert.AreEqual(0, exitCode);
+            Assert.AreEqual(0, await Program.RunAsync([path, "--ascii-piet"]));
             Assert.AreEqual("l_ C", writer.ToString());
         }
         finally
         {
             Console.SetOut(originalOutput);
-            if (File.Exists(path))
-                File.Delete(path);
+            if (File.Exists(path)) File.Delete(path);
         }
     }
 
@@ -213,19 +157,14 @@ public class ProgramTests(TestContext TestContext)
                 image[1, 1] = new Rgba32(0, 192, 192);
                 image.Save(path);
             }
-
             Console.SetOut(writer);
-
-            var exitCode = await Program.RunAsync(["parse", path]);
-
-            Assert.AreEqual(0, exitCode);
+            Assert.AreEqual(0, await Program.RunAsync(["parse", path]));
             Assert.AreEqual("l_ C", writer.ToString());
         }
         finally
         {
             Console.SetOut(originalOutput);
-            if (File.Exists(path))
-                File.Delete(path);
+            if (File.Exists(path)) File.Delete(path);
         }
     }
 
@@ -235,12 +174,9 @@ public class ProgramTests(TestContext TestContext)
         while (directory is not null)
         {
             var candidate = Path.Combine(directory.FullName, Path.Combine(relativeParts));
-            if (File.Exists(candidate))
-                return candidate;
-
+            if (File.Exists(candidate)) return candidate;
             directory = directory.Parent;
         }
-
-        throw new FileNotFoundException($"Could not find file in repository: {Path.Combine(relativeParts)}");
+        throw new FileNotFoundException($"Could not find file: {Path.Combine(relativeParts)}");
     }
 }
