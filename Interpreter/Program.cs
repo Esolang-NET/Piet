@@ -1,22 +1,18 @@
 using Esolang.Piet.Interpreter;
+using System.CommandLine;
 
-namespace Esolang.Piet.Interpreter;
+var rootCommand = PietInterpreterExtensions.BuildRootCommand();
+return await rootCommand.Parse(args).InvokeAsync();
 
 /// <summary>
 /// Entry point for the dotnet-piet command-line tool.
 /// </summary>
-public static class Program
+public partial class Program
 {
-    /// <summary>
-    /// Runs the command-line pipeline and returns the process exit code.
-    /// </summary>
+    /// <inheritdoc/>
     public static async Task<int> RunAsync(string[] args)
     {
         var rootCommand = PietInterpreterExtensions.BuildRootCommand();
         return await rootCommand.Parse(args).InvokeAsync();
     }
-
-    /// <summary>Application entry point.</summary>
-    public static async Task<int> Main(string[] args)
-        => await RunAsync(args);
 }
