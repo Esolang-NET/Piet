@@ -21,7 +21,7 @@ public class ProgramTests(TestContext TestContext)
     }
 
     [TestMethod]
-    public void Run_Default_ReturnsZero() => Assert.AreEqual(0, Run([]));
+    public void Run_Default_ReturnOne() => Assert.AreEqual(1, Run([]));
 
     [TestMethod]
     [DataRow("_")]
@@ -75,7 +75,7 @@ public class ProgramTests(TestContext TestContext)
         try
         {
             Console.SetOut(writer);
-            Assert.AreEqual(0, await Program.RunAsync([path]));
+            Assert.AreEqual(0, await Program.RunAsync([path], CancellationToken));
             Assert.AreEqual(expectedOutput, writer.ToString().TrimEnd('\r', '\n'));
         }
         finally { Console.SetOut(originalOutput); }
@@ -89,14 +89,14 @@ public class ProgramTests(TestContext TestContext)
         try
         {
             Console.SetOut(writer);
-            Assert.AreEqual(0, await Program.RunAsync(["--ascii-piet-text", "_"]));
+            Assert.AreEqual(0, await Program.RunAsync(["--ascii-piet-text", "_"], CancellationToken));
             Assert.AreEqual(string.Empty, writer.ToString().TrimEnd('\r', '\n'));
         }
         finally { Console.SetOut(originalOutput); }
     }
 
     [TestMethod]
-    public void Run_HelpOption_ReturnsNonZero() => Assert.AreNotEqual(0, Run(["--help"]));
+    public void Run_HelpOption_ReturnsZero() => Assert.AreEqual(0, Run(["--help"]));
 
     [TestMethod]
     public async Task RunAsync_WhitePixelImage_ReturnsZero()
@@ -109,7 +109,7 @@ public class ProgramTests(TestContext TestContext)
                 image[0, 0] = new Rgba32(255, 255, 255);
                 image.Save(path);
             }
-            Assert.AreEqual(0, await Program.RunAsync([path]));
+            Assert.AreEqual(0, await Program.RunAsync([path], CancellationToken));
         }
         finally { if (File.Exists(path)) File.Delete(path); }
     }
@@ -131,7 +131,7 @@ public class ProgramTests(TestContext TestContext)
                 image.Save(path);
             }
             Console.SetOut(writer);
-            Assert.AreEqual(0, await Program.RunAsync([path, "--ascii-piet"]));
+            Assert.AreEqual(0, await Program.RunAsync([path, "--ascii-piet"], CancellationToken));
             Assert.AreEqual("l_ C", writer.ToString());
         }
         finally
@@ -158,7 +158,7 @@ public class ProgramTests(TestContext TestContext)
                 image.Save(path);
             }
             Console.SetOut(writer);
-            Assert.AreEqual(0, await Program.RunAsync(["parse", path]));
+            Assert.AreEqual(0, await Program.RunAsync(["parse", path], CancellationToken));
             Assert.AreEqual("l_ C", writer.ToString());
         }
         finally
