@@ -1,14 +1,22 @@
 using Esolang.Piet.Interpreter;
 
 CancellationTokenSource cts = new();
-Console.CancelKeyPress += (sender, eventArgs) =>
+void CancelKeyPress(object? _, ConsoleCancelEventArgs e)
 {
-    eventArgs.Cancel = true;
+    e.Cancel = true;
     cts.Cancel();
-};
+}
+;
 
-return await RunAsync(args, cts.Token);
-
+Console.CancelKeyPress += CancelKeyPress;
+try
+{
+    return await RunAsync(args, cts.Token);
+}
+finally
+{
+    Console.CancelKeyPress -= CancelKeyPress;
+}
 /// <summary>
 /// Entry point for the dotnet-piet command-line tool.
 /// </summary>
