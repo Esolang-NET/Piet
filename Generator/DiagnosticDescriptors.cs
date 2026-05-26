@@ -140,4 +140,15 @@ public static class DiagnosticDescriptors
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
+
+    /// <summary>
+    /// PT0013: Method must be partial.
+    /// </summary>
+    public static readonly DiagnosticDescriptor MethodMustBePartial = new(
+        id: "PT0013",
+        title: "Method must be partial",
+        messageFormat: "The method '{0}' must be declared as 'partial'",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }

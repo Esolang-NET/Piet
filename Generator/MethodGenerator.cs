@@ -398,6 +398,27 @@ public partial class MethodGenerator : IIncrementalGenerator
                 "Invalid image path parameter"
             );
         }
+
+        if (!methodSymbol.IsPartialDefinition)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.MethodMustBePartial,
+                methodSyntax.Identifier.GetLocation(),
+                methodSymbol.Name));
+            return EmitErrorMethod(
+                methodSymbol,
+                methodSyntax,
+                ns,
+                typeKeyword,
+                null,
+                projectDirectory,
+                null,
+                null,
+                DiagnosticDescriptors.MethodMustBePartial.Id,
+                $"Method {methodSymbol.Name} must be declared as partial"
+            );
+        }
+
         if (TryResolveImagePath(imagePath, additionalImageFiles) is not { } resolvedImageFile)
         {
             context.ReportDiagnostic(Diagnostic.Create(

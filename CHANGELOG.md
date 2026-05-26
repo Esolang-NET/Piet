@@ -6,6 +6,9 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+- `Esolang.Piet.Generator`: Added PT0013 diagnostic for enforcing partial method declaration.
+
 ## [1.1.2] - 2026-05-25
 
 ### Added
