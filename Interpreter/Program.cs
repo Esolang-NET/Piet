@@ -1,18 +1,22 @@
 using Esolang.Piet.Interpreter;
-using System.CommandLine;
 
-var rootCommand = PietInterpreterExtensions.BuildRootCommand();
-return await rootCommand.Parse(args).InvokeAsync();
+CancellationTokenSource cts = new();
+Console.CancelKeyPress += (sender, eventArgs) =>
+{
+    eventArgs.Cancel = true;
+    cts.Cancel();
+};
+
+return await RunAsync(args, cts.Token);
 
 /// <summary>
 /// Entry point for the dotnet-piet command-line tool.
 /// </summary>
-public partial class Program
+internal partial class Program
 {
-    /// <inheritdoc/>
-    public static async Task<int> RunAsync(string[] args)
+    public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
         var rootCommand = PietInterpreterExtensions.BuildRootCommand();
-        return await rootCommand.Parse(args).InvokeAsync();
+        return await rootCommand.Parse(args).InvokeAsync(cancellationToken: cancellationToken);
     }
 }
