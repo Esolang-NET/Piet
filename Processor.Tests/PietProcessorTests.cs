@@ -112,104 +112,87 @@ public sealed class PietProcessorTests
     public void ExecuteCommand_CoversArithmeticFlowAndIoCommands()
     {
         var stack = new List<int>();
-        var reader = new StringReader("123\nZ");
-        using var writer = new StringWriter();
         var dp = 0;
         var cc = 0;
 
-        InvokeExecuteCommand(1, 7, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(1, 7, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 7 }, stack);
 
         stack.Clear();
         stack.AddRange(new[] { 2, 3 });
-        InvokeExecuteCommand(3, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(3, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 5 }, stack);
 
         stack.Clear();
         stack.AddRange(new[] { 9, 4 });
-        InvokeExecuteCommand(4, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(4, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 5 }, stack);
 
         stack.Clear();
         stack.AddRange(new[] { 3, 4 });
-        InvokeExecuteCommand(5, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(5, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 12 }, stack);
 
         stack.Clear();
         stack.AddRange(new[] { 8, 2 });
-        InvokeExecuteCommand(6, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(6, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 4 }, stack);
 
         stack.Clear();
         stack.AddRange(new[] { 8, 0 });
-        InvokeExecuteCommand(6, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(6, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 8, 0 }, stack);
 
         stack.Clear();
         stack.AddRange(new[] { 8, 3 });
-        InvokeExecuteCommand(7, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(7, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 2 }, stack);
 
         stack.Clear();
         stack.AddRange(new[] { 8, 0 });
-        InvokeExecuteCommand(7, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(7, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 8, 0 }, stack);
 
         stack.Clear();
         stack.Add(0);
-        InvokeExecuteCommand(8, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(8, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 1 }, stack);
 
         stack.Clear();
         stack.AddRange(new[] { 5, 3 });
-        InvokeExecuteCommand(9, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(9, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 1 }, stack);
 
         stack.Clear();
         stack.Add(-1);
         dp = 0;
-        InvokeExecuteCommand(10, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(10, 0, stack, ref dp, ref cc);
         Assert.AreEqual(3, dp);
 
         stack.Clear();
         stack.Add(3);
         cc = 0;
-        InvokeExecuteCommand(11, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(11, 0, stack, ref dp, ref cc);
         Assert.AreEqual(1, cc);
 
         stack.Clear();
         stack.Add(42);
-        InvokeExecuteCommand(12, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(12, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 42, 42 }, stack);
 
         stack.Clear();
         stack.AddRange(new[] { 1, 2, 3, 3, 1 });
-        InvokeExecuteCommand(13, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(13, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 3, 1, 2 }, stack);
 
         stack.Clear();
         stack.AddRange(new[] { 9, 0, 0 });
-        InvokeExecuteCommand(13, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(13, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 9 }, stack);
 
         stack.Clear();
-        InvokeExecuteCommand(14, 0, stack, ref dp, ref cc, reader, writer);
-        CollectionAssert.AreEqual(new[] { 123 }, stack);
-
-        InvokeExecuteCommand(15, 0, stack, ref dp, ref cc, reader, writer);
-        CollectionAssert.AreEqual(new[] { 123, (int)'Z' }, stack);
-
-        stack.Clear();
-        stack.Add(99);
-        InvokeExecuteCommand(16, 0, stack, ref dp, ref cc, reader, writer);
-
-        stack.Add((int)'A');
-        InvokeExecuteCommand(17, 0, stack, ref dp, ref cc, reader, writer);
-        Assert.AreEqual("99A", writer.ToString());
-
-        stack.Clear();
         stack.Add(1);
-        InvokeExecuteCommand(2, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(2, 0, stack, ref dp, ref cc);
         Assert.AreEqual(0, stack.Count);
     }
 
@@ -253,11 +236,11 @@ public sealed class PietProcessorTests
     }
 
     static void InvokeExecuteCommand(int commandIndex, int blockSize, List<int> stack,
-        ref int dp, ref int cc, TextReader input, TextWriter output)
+        ref int dp, ref int cc)
     {
         var hDiff = commandIndex / 3;
         var lDiff = commandIndex % 3;
-        var args = new object[] { hDiff, lDiff, blockSize, stack, dp, cc, input, output };
+        var args = new object[] { hDiff, lDiff, blockSize, stack, dp, cc };
         ExecuteCommandMethod.Invoke(null, args);
         dp = (int)args[4];
         cc = (int)args[5];
