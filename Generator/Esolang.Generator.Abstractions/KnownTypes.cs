@@ -196,7 +196,7 @@ public readonly struct KnownTypes(Compilation compilation)
 
         builder.Append(nameof(ILoggerT)).Append('=');
         AppendNamedTypeSymbol(ILoggerT, builder);
-        
+
         return true;
         static void AppendNamedTypeSymbol(INamedTypeSymbol? symbol, StringBuilder builder)
         {

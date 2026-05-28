@@ -62,9 +62,9 @@ public sealed partial class PietProcessor : IEventProcessor
                 {
                     var hDiff = (((HueTable[nextColor] - HueTable[blockColor]) % 6) + 6) % 6;
                     var lDiff = (((LightnessTable[nextColor] - LightnessTable[blockColor]) % 3) + 3) % 3;
-                    
+
                     var commandIndex = (hDiff * 3) + lDiff;
-                    
+
                     // Matching old mapping:
                     // 14: Input Int, 15: Input Char, 16: Output Int, 17: Output Char
                     if (commandIndex == 14) // Input Int

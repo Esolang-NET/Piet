@@ -52,12 +52,12 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
     /// <summary>
     /// Executes the program.
     /// </summary>
-    public void Run() => this.RunToEnd(Input, Output);
+    public void Run() => RunToEnd(Input, Output);
 
     /// <summary>
     /// Executes the program with explicit I/O.
     /// </summary>
-    public void Run(TextReader? input, TextWriter? output) => this.RunToEnd(input ?? Input, output ?? Output);
+    public void Run(TextReader? input, TextWriter? output) => RunToEnd(input ?? Input, output ?? Output);
 
     /// <summary>
     /// Executes the program and collects UTF-8 output as a string.
@@ -65,7 +65,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
     public string? RunAndOutputString(TextReader? input = null)
     {
         using var writer = new StringWriter();
-        this.RunToEnd(input ?? Input, writer);
+        RunToEnd(input ?? Input, writer);
         var result = writer.ToString().TrimEnd('\0', '\r', '\n');
         return result.Length == 0 ? null : result;
     }
@@ -73,7 +73,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
     /// <inheritdoc/>
     public int RunToEnd(TextReader? input = null, TextWriter? output = null, CancellationToken cancellationToken = default)
     {
-        var result = this.RunToEndAsync(input ?? Input, output ?? Output, cancellationToken);
+        var result = RunToEndAsync(input ?? Input, output ?? Output, cancellationToken);
         if (result.IsCompleted)
             return result.GetAwaiter().GetResult();
         return result.AsTask().GetAwaiter().GetResult();
