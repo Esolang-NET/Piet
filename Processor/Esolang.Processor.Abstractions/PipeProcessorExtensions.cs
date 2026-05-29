@@ -1,5 +1,6 @@
 #nullable enable
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipelines;
 using System.Text;
 
@@ -8,6 +9,7 @@ namespace Esolang.Processor;
 /// <summary>
 /// Provides extension methods for running <see cref="IEventProcessor"/> using <see cref="PipeReader"/> and <see cref="PipeWriter"/>.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public static class PipeProcessorExtensions
 {
     /// <summary>

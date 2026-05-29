@@ -23,6 +23,7 @@ namespace Esolang.Generator;
 /// <param name="ErrorId">The diagnostic error ID if the binding failed.</param>
 /// <param name="Location">The location associated with the error.</param>
 [DebuggerDisplay("{ToString(),nq}")]
+[ExcludeFromCodeCoverage]
 public record struct MethodSignatureBinding(
     bool IsValid,
     MethodReturnKind ReturnKind,

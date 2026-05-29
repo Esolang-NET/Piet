@@ -1,11 +1,13 @@
 #nullable enable
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Esolang.Processor;
 
 /// <summary>
 /// Provides extension methods for running <see cref="IEventProcessor"/> using <see cref="TextReader"/> and <see cref="TextWriter"/>.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public static class TextProcessorExtensions
 {
     /// <summary>

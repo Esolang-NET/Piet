@@ -1,4 +1,6 @@
 #nullable enable
+using System.Diagnostics.CodeAnalysis;
+
 namespace Esolang.Processor;
 
 /// <summary>
@@ -41,6 +43,7 @@ public interface IOEvent
 /// <summary>
 /// Represents an event requesting a character input.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public abstract class InputCharEvent : IOEvent
 {
     /// <summary>
@@ -53,6 +56,7 @@ public abstract class InputCharEvent : IOEvent
 /// <summary>
 /// Represents an event requesting an integer input.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public abstract class InputIntEvent : IOEvent
 {
     /// <summary>
@@ -66,6 +70,7 @@ public abstract class InputIntEvent : IOEvent
 /// Represents an event that outputs a character.
 /// </summary>
 /// <param name="Output">The character to output.</param>
+[ExcludeFromCodeCoverage]
 public sealed class OutputCharEvent(char Output) : IOEvent
 {
     /// <summary>
@@ -78,6 +83,7 @@ public sealed class OutputCharEvent(char Output) : IOEvent
 /// Represents an event that outputs an integer.
 /// </summary>
 /// <param name="Output">The integer to output.</param>
+[ExcludeFromCodeCoverage]
 public sealed class OutputIntEvent(int Output) : IOEvent
 {
     /// <summary>
@@ -90,6 +96,7 @@ public sealed class OutputIntEvent(int Output) : IOEvent
 /// Represents an event indicating the end of execution.
 /// </summary>
 /// <param name="exitCode">The exit code.</param>
+[ExcludeFromCodeCoverage]
 public sealed class EndEvent(int exitCode) : IOEvent
 {
     /// <summary>
