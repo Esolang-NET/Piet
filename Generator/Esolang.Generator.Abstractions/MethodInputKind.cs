@@ -1,4 +1,5 @@
 namespace Esolang.Generator;
+#nullable enable
 
 /// <summary>
 /// Specifies the input mechanism of the generated method.
