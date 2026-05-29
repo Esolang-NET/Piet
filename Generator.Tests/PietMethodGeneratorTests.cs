@@ -575,7 +575,7 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.Contains(static x => x.Id == "PT0004",
+        Assert.Contains(static x => x.Id == "PT0003",
             generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
@@ -1530,8 +1530,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
         Assert.Contains(
-            static x => x.Id == "PT0004", generatorDiagnostics,
-            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+            static x => x.Id == "PT0003", generatorDiagnostics,
+            "PT0003 should be reported for multiple input kinds.");
     }
 
     [TestMethod]

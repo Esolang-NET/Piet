@@ -329,6 +329,28 @@ public partial class MethodGenerator : IIncrementalGenerator
             duplicateParameterErrorId: DiagnosticDescriptors.DuplicateParameter.Id,
             returnOutputConflictErrorId: DiagnosticDescriptors.ReturnOutputConflict.Id);
 
+        if (binding is { IsValid: true, UnhandledParameters.Count: > 0 })
+        {
+            foreach (var parameter in binding.UnhandledParameters)
+            {
+                var discriptor = DiagnosticDescriptors.InvalidParameter;
+                var typeDisplayString = parameter.Type.ToDisplayString();
+                context.ReportDiagnostic(Diagnostic.Create(discriptor, parameter.Locations[0], typeDisplayString));
+                return EmitErrorMethod(
+                    methodSymbol,
+                    methodSyntax,
+                    ns,
+                    typeKeyword,
+                    resolvedImageFile,
+                    projectDirectory,
+                    codelSize,
+                    null,
+                    DiagnosticDescriptors.InvalidParameter.Id,
+                    string.Format(DiagnosticDescriptors.InvalidParameter.MessageFormat.ToString(), typeDisplayString)
+                );
+            }
+        }
+
         if (!binding.IsValid)
         {
             if (string.Equals(binding.ErrorId, DiagnosticDescriptors.InvalidReturnType.Id, StringComparison.Ordinal))
