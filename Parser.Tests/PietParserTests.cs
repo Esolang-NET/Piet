@@ -183,15 +183,15 @@ public sealed class PietParserTests
         PietParser.ApplyPngFilter(1, row, prev, 3);
         CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 2, 3, 4 }, row);
 
-        row = new byte[] { 1, 1, 1 };
+        row = [1, 1, 1];
         PietParser.ApplyPngFilter(2, row, prev, 3);
         CollectionAssert.AreEqual(new byte[] { 2, 2, 2 }, row);
 
-        row = new byte[] { 2, 2, 2 };
+        row = [2, 2, 2];
         PietParser.ApplyPngFilter(3, row, prev, 3);
         CollectionAssert.AreEqual(new byte[] { 2, 2, 2 }, row);
 
-        row = new byte[] { 1, 1, 1 };
+        row = [1, 1, 1];
         PietParser.ApplyPngFilter(4, row, prev, 3);
         CollectionAssert.AreEqual(new byte[] { 2, 2, 2 }, row);
 

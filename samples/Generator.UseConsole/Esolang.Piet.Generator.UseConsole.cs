@@ -37,13 +37,13 @@ Console.WriteLine($"RunToValueTaskString: {valueTaskString}");
 
 // IEnumerable<byte> return
 var bytes = new List<byte>(PietSample.RunToEnumerableBytes());
-Console.WriteLine($"RunToEnumerableBytes: {Encoding.UTF8.GetString(bytes.ToArray())}");
+Console.WriteLine($"RunToEnumerableBytes: {Encoding.UTF8.GetString([.. bytes])}");
 
 // IAsyncEnumerable<byte> return
 var asyncBytes = new List<byte>();
 await foreach (var b in PietSample.RunToAsyncEnumerableBytes(CancellationToken.None))
     asyncBytes.Add(b);
-Console.WriteLine($"RunToAsyncEnumerableBytes: {Encoding.UTF8.GetString(asyncBytes.ToArray())}");
+Console.WriteLine($"RunToAsyncEnumerableBytes: {Encoding.UTF8.GetString([.. asyncBytes])}");
 
 // string input parameter
 var withStringInput = PietSample.RunWithStringInput("123");

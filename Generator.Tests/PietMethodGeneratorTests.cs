@@ -156,14 +156,14 @@ public class MethodGeneratorTests(TestContext TestContext)
         }
 
         var png = new List<byte>();
-        png.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+        png.AddRange([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
 
         WriteInt32BE(png, 13);
-        png.AddRange(new byte[] { 0x49, 0x48, 0x44, 0x52 });
+        png.AddRange([0x49, 0x48, 0x44, 0x52]);
         WriteInt32BE(png, width);
         WriteInt32BE(png, height);
-        png.AddRange(new byte[] { 0x08, 0x02, 0x00, 0x00, 0x00 });
-        png.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
+        png.AddRange([0x08, 0x02, 0x00, 0x00, 0x00]);
+        png.AddRange([0x00, 0x00, 0x00, 0x00]);
 
         var idatPayload = new List<byte>
         {
@@ -175,18 +175,18 @@ public class MethodGeneratorTests(TestContext TestContext)
             (byte)((~rawScanlineBytes.Length >> 8) & 0xFF),
         };
         idatPayload.AddRange(rawScanlineBytes);
-        idatPayload.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
+        idatPayload.AddRange([0x00, 0x00, 0x00, 0x00]);
 
         WriteInt32BE(png, idatPayload.Count);
-        png.AddRange(new byte[] { 0x49, 0x44, 0x41, 0x54 });
+        png.AddRange([0x49, 0x44, 0x41, 0x54]);
         png.AddRange(idatPayload);
-        png.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
+        png.AddRange([0x00, 0x00, 0x00, 0x00]);
 
         WriteInt32BE(png, 0);
-        png.AddRange(new byte[] { 0x49, 0x45, 0x4E, 0x44 });
-        png.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
+        png.AddRange([0x49, 0x45, 0x4E, 0x44]);
+        png.AddRange([0x00, 0x00, 0x00, 0x00]);
 
-        return png.ToArray();
+        return [.. png];
     }
     CancellationToken CancellationToken => TestContext.CancellationToken;
     void LogWriteLine(string message) => TestContext.WriteLine(message);
@@ -277,9 +277,9 @@ public class MethodGeneratorTests(TestContext TestContext)
             "generator-tests",
             references: referenceList,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
-                specificDiagnosticOptions: new[] {
+                specificDiagnosticOptions: [
                     new KeyValuePair<string, ReportDiagnostic>("CS1701", ReportDiagnostic.Suppress)
-                }
+                ]
             )
         );
     }
@@ -1773,11 +1773,11 @@ public class MethodGeneratorTests(TestContext TestContext)
             }
             """;
 
-        var verticalOutputPng = BuildStoredRgbPng(1, 2, new byte[]
-        {
+        var verticalOutputPng = BuildStoredRgbPng(1, 2,
+        [
             0x00, 0xFF, 0xC0, 0xC0,
             0x00, 0xFF, 0x00, 0xFF,
-        });
+        ]);
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
             out _,
@@ -1846,10 +1846,10 @@ public class MethodGeneratorTests(TestContext TestContext)
             }
             """;
 
-        var blackPng = BuildStoredRgbPng(1, 1, new byte[]
-        {
+        var blackPng = BuildStoredRgbPng(1, 1,
+        [
             0x00, 0x00, 0x00, 0x00,
-        });
+        ]);
 
         _ = RunGeneratorsAndUpdateCompilationWithLanguageVersion(
             source,
@@ -1888,10 +1888,10 @@ public class MethodGeneratorTests(TestContext TestContext)
             }
             """;
 
-        var blackPng = BuildStoredRgbPng(1, 1, new byte[]
-        {
+        var blackPng = BuildStoredRgbPng(1, 1,
+        [
             0x00, 0x00, 0x00, 0x00,
-        });
+        ]);
 
         var driver = RunGeneratorsAndUpdateCompilationWithLanguageVersion(
             source,

@@ -58,7 +58,7 @@ public static class AsciiPietParser
     /// <summary>
     /// A set of characters usable in ASCII-PIET files, based on the official ASCII-PIET specification.
     /// </summary>
-    static readonly HashSet<byte> AsciiPietAllowed = [.. CharToColor.Keys.Select(c => (byte)c).Concat(new byte[] { (byte)'\t', (byte)'\r', (byte)'\n' })];
+    static readonly HashSet<byte> AsciiPietAllowed = [.. CharToColor.Keys.Select(c => (byte)c).Concat([(byte)'\t', (byte)'\r', (byte)'\n'])];
 
     /// <summary>
     /// Determines whether the given byte array appears to be an ascii-piet text file.

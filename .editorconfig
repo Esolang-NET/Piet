@@ -240,3 +240,5 @@ dotnet_style_parentheses_in_arithmetic_binary_operators = always_for_clarity:war
 dotnet_style_parentheses_in_other_binary_operators = always_for_clarity:warning
 dotnet_style_parentheses_in_relational_binary_operators = always_for_clarity:warning
 dotnet_style_parentheses_in_other_operators = never_if_unnecessary:warning
+
+dotnet_style_prefer_collection_expression = when_types_loosely_match:error

@@ -9,11 +9,10 @@ public sealed class PietParserTextFormatTests
         var program = new PietProgram(
             2,
             2,
-            new[]
-            {
+            [
                 PietColor.Red, PietColor.White,
                 PietColor.Black, PietColor.DarkCyan,
-            });
+            ]);
 
         var text = AsciiPietFormatter.Format(program);
 
@@ -26,11 +25,11 @@ public sealed class PietParserTextFormatTests
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.txt");
         try
         {
-            File.WriteAllLines(path, new[]
-            {
+            File.WriteAllLines(path,
+            [
                 "l_",
                 " C"
-            });
+            ]);
             var program = PietParser.Parse(path);
             Assert.AreEqual(2, program.Width);
             Assert.AreEqual(2, program.Height);
@@ -54,11 +53,10 @@ public sealed class PietParserTextFormatTests
         var original = new PietProgram(
             3,
             2,
-            new[]
-            {
+            [
                 PietColor.LightRed, PietColor.Yellow, PietColor.DarkBlue,
                 PietColor.Black, PietColor.White, PietColor.LightCyan,
-            });
+            ]);
 
         var bytes = System.Text.Encoding.ASCII.GetBytes(AsciiPietFormatter.Format(original));
 
@@ -75,14 +73,14 @@ public sealed class PietParserTextFormatTests
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.ppm");
         try
         {
-            File.WriteAllLines(path, new[]
-            {
+            File.WriteAllLines(path,
+            [
                 "P3",
                 "2 2",
                 "255",
                 "255 0 0   255 255 255",
                 "0 0 0     0 255 255"
-            });
+            ]);
             var program = PietParser.Parse(path);
             Assert.AreEqual(2, program.Width);
             Assert.AreEqual(2, program.Height);

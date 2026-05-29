@@ -25,7 +25,7 @@ public sealed class PietProcessorTests
     [TestMethod]
     public void Constructor_StoresProgram()
     {
-        var program = new PietProgram(1, 1, new[] { PietColor.White });
+        var program = new PietProgram(1, 1, [PietColor.White]);
 
         var processor = new PietProcessor(program);
 
@@ -38,11 +38,10 @@ public sealed class PietProcessorTests
         var program = new PietProgram(
             2,
             1,
-            new[]
-            {
+            [
                 PietColor.LightRed,
                 PietColor.White,
-            });
+            ]);
 
         using var output = new StringWriter();
         var processor = new PietProcessor(program, output);
@@ -55,7 +54,7 @@ public sealed class PietProcessorTests
     [TestMethod]
     public void Run_ExecutesNoOpProgramWithoutOutput()
     {
-        var program = new PietProgram(1, 1, new[] { PietColor.White });
+        var program = new PietProgram(1, 1, [PietColor.White]);
         using var output = new StringWriter();
         var processor = new PietProcessor(program, output);
 
@@ -67,7 +66,7 @@ public sealed class PietProcessorTests
     [TestMethod]
     public void RunAndOutputString_ReturnsNullWhenNoOutputIsProduced()
     {
-        var processor = new PietProcessor(new PietProgram(1, 1, new[] { PietColor.White }));
+        var processor = new PietProcessor(new PietProgram(1, 1, [PietColor.White]));
 
         var result = processor.RunAndOutputString();
 
@@ -89,7 +88,7 @@ public sealed class PietProcessorTests
     [TestMethod]
     public void RunToEnd_ReturnsZero()
     {
-        var program = new PietProgram(1, 1, new[] { PietColor.White });
+        var program = new PietProgram(1, 1, [PietColor.White]);
         var processor = new PietProcessor(program);
 
         var exitCode = processor.RunToEnd(cancellationToken: TestContext.CancellationTokenSource.Token);
@@ -100,7 +99,7 @@ public sealed class PietProcessorTests
     [TestMethod]
     public async Task RunToEndAsync_ReturnsZero()
     {
-        var program = new PietProgram(1, 1, new[] { PietColor.White });
+        var program = new PietProgram(1, 1, [PietColor.White]);
         var processor = new PietProcessor(program);
 
         var exitCode = await processor.RunToEndAsync(cancellationToken: TestContext.CancellationTokenSource.Token);
@@ -119,37 +118,37 @@ public sealed class PietProcessorTests
         CollectionAssert.AreEqual(new[] { 7 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 2, 3 });
+        stack.AddRange([2, 3]);
         InvokeExecuteCommand(3, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 5 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 9, 4 });
+        stack.AddRange([9, 4]);
         InvokeExecuteCommand(4, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 5 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 3, 4 });
+        stack.AddRange([3, 4]);
         InvokeExecuteCommand(5, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 12 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 8, 2 });
+        stack.AddRange([8, 2]);
         InvokeExecuteCommand(6, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 4 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 8, 0 });
+        stack.AddRange([8, 0]);
         InvokeExecuteCommand(6, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 8, 0 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 8, 3 });
+        stack.AddRange([8, 3]);
         InvokeExecuteCommand(7, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 2 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 8, 0 });
+        stack.AddRange([8, 0]);
         InvokeExecuteCommand(7, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 8, 0 }, stack);
 
@@ -159,7 +158,7 @@ public sealed class PietProcessorTests
         CollectionAssert.AreEqual(new[] { 1 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 5, 3 });
+        stack.AddRange([5, 3]);
         InvokeExecuteCommand(9, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 1 }, stack);
 
@@ -181,12 +180,12 @@ public sealed class PietProcessorTests
         CollectionAssert.AreEqual(new[] { 42, 42 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 1, 2, 3, 3, 1 });
+        stack.AddRange([1, 2, 3, 3, 1]);
         InvokeExecuteCommand(13, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 3, 1, 2 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 9, 0, 0 });
+        stack.AddRange([9, 0, 0]);
         InvokeExecuteCommand(13, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 9 }, stack);
 
@@ -207,7 +206,7 @@ public sealed class PietProcessorTests
         cc = (int)retryArgs[2];
         Assert.AreEqual(1, cc);
 
-        retryArgs = new object[] { 1, dp, cc };
+        retryArgs = [1, dp, cc];
         ApplyRetryMethod.Invoke(null, retryArgs);
         dp = (int)retryArgs[1];
         Assert.AreEqual(1, dp);
@@ -219,15 +218,15 @@ public sealed class PietProcessorTests
         Assert.AreEqual(1, (int)slideArgs[3]);
 
         var deadEnd = new[] { PietColor.White, PietColor.White };
-        slideArgs = new object[] { deadEnd, 2, 1, 0, 0, 0 };
+        slideArgs = [deadEnd, 2, 1, 0, 0, 0];
         slideResult = (bool)SlideWhiteMethod.Invoke(null, slideArgs)!;
         Assert.IsFalse(slideResult);
 
         var block = new List<(int x, int y)> { (0, 0), (2, 0), (1, 1) };
-        var edge0 = ((int x, int y))FindEdgeMethod.Invoke(null, new object[] { block, 0, 0 })!;
-        var edge1 = ((int x, int y))FindEdgeMethod.Invoke(null, new object[] { block, 1, 1 })!;
-        var edge2 = ((int x, int y))FindEdgeMethod.Invoke(null, new object[] { block, 2, 0 })!;
-        var edge3 = ((int x, int y))FindEdgeMethod.Invoke(null, new object[] { block, 3, 1 })!;
+        var edge0 = ((int x, int y))FindEdgeMethod.Invoke(null, [block, 0, 0])!;
+        var edge1 = ((int x, int y))FindEdgeMethod.Invoke(null, [block, 1, 1])!;
+        var edge2 = ((int x, int y))FindEdgeMethod.Invoke(null, [block, 2, 0])!;
+        var edge3 = ((int x, int y))FindEdgeMethod.Invoke(null, [block, 3, 1])!;
 
         Assert.AreEqual((2, 0), edge0);
         Assert.AreEqual((1, 1), edge1);

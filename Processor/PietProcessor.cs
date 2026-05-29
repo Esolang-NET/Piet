@@ -13,7 +13,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
     : IProcessor<PietProgram>
 {
     static readonly int[] HueTable =
-    {
+    [
         -1, -1,
         0, 0, 0,
         1, 1, 1,
@@ -21,10 +21,10 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
         3, 3, 3,
         4, 4, 4,
         5, 5, 5,
-    };
+    ];
 
     static readonly int[] LightnessTable =
-    {
+    [
         -1, -1,
         0, 1, 2,
         0, 1, 2,
@@ -32,7 +32,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
         0, 1, 2,
         0, 1, 2,
         0, 1, 2,
-    };
+    ];
 
     /// <summary>
     /// The parsed Piet program.
