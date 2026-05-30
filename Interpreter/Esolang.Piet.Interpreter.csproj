@@ -9,7 +9,6 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>dotnet-piet</ToolCommandName>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>Command-line interpreter for Piet programs.</Description>
     <PackageId>dotnet-piet</PackageId>
     <PackageTags>esolang;piet;interpreter;cli;dotnet-tool</PackageTags>

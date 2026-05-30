@@ -9,7 +9,7 @@ using System.Text;
 namespace Esolang.Piet.Generator.Tests;
 
 [TestClass]
-public class MethodGeneratorTests(TestContext TestContext)
+public class MethodGeneratorTests
 {
     // Minimal 1×1 RGB PNG with LightRed (0xFF,0xC0,0xC0). CRC fields are zeroed (not validated by decoder).
     static readonly byte[] MinimalLightRedPng =
@@ -216,11 +216,12 @@ public class MethodGeneratorTests(TestContext TestContext)
         );
     }
 
-    Compilation baseCompilation = default!;
+    readonly Compilation baseCompilation = default!;
 
-    [TestInitialize]
-    public void InitializeCompilation()
+    readonly TestContext TestContext;
+    public MethodGeneratorTests(TestContext TestContext)
     {
+        this.TestContext = TestContext;
         IEnumerable<PortableExecutableReference> references =
 #if NET10_0_OR_GREATER
             Net100.References.All;

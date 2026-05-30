@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Esolang.Piet.Interpreter;
 
-internal static class PietCommandActions
+static class PietCommandActions
 {
     public static Task<int> RunAsync(string? path, string? asciiPietText, int codelSize, bool asciiPiet, CancellationToken cancellationToken)
     {
@@ -34,7 +34,7 @@ internal static class PietCommandActions
         return WriteAsciiPietAsync(program);
     }
 
-    private static Task<int> WriteAsciiPietAsync(PietProgram program)
+    static Task<int> WriteAsciiPietAsync(PietProgram program)
     {
         Console.Out.Write(AsciiPietFormatter.Format(program));
         return Task.FromResult(0);

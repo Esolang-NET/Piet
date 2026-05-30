@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- Analyzer(Source Generator)ですという設定 -->
     <IsRoslynComponent>true</IsRoslynComponent>
     <AnalyzerLanguage>cs</AnalyzerLanguage>

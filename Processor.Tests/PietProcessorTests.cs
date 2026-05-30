@@ -1,6 +1,4 @@
 using Esolang.Piet.Parser;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
 
 namespace Esolang.Piet.Processor.Tests;
@@ -91,7 +89,7 @@ public sealed class PietProcessorTests
         var program = new PietProgram(1, 1, [PietColor.White]);
         var processor = new PietProcessor(program);
 
-        var exitCode = processor.RunToEnd(cancellationToken: TestContext.CancellationTokenSource.Token);
+        var exitCode = processor.RunToEnd(cancellationToken: TestContext.CancellationToken);
 
         Assert.AreEqual(0, exitCode);
     }
@@ -102,7 +100,7 @@ public sealed class PietProcessorTests
         var program = new PietProgram(1, 1, [PietColor.White]);
         var processor = new PietProcessor(program);
 
-        var exitCode = await processor.RunToEndAsync(cancellationToken: TestContext.CancellationTokenSource.Token);
+        var exitCode = await processor.RunToEndAsync(cancellationToken: TestContext.CancellationToken);
 
         Assert.AreEqual(0, exitCode);
     }
@@ -192,7 +190,7 @@ public sealed class PietProcessorTests
         stack.Clear();
         stack.Add(1);
         InvokeExecuteCommand(2, 0, stack, ref dp, ref cc);
-        Assert.AreEqual(0, stack.Count);
+        Assert.IsEmpty(stack);
     }
 
     [TestMethod]

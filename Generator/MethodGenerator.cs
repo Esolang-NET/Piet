@@ -3,11 +3,7 @@ using Esolang.Piet.Parser;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.IO;
-using System.Linq;
 using System.Text;
 
 namespace Esolang.Piet.Generator;
@@ -579,7 +575,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         return (new EmittedMethod(code.ToString()), generatorFeatures);
     }
 
-    private static GeneratorFeatures GetGeneratorFeatures(MethodSignatureBinding binding)
+    static GeneratorFeatures GetGeneratorFeatures(MethodSignatureBinding binding)
     {
         if (binding.IsAsyncEnumerable) return GeneratorFeatures.AsyncEnumerable;
         if (binding.IsEnumerable) return GeneratorFeatures.Enumerable;
@@ -587,7 +583,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         return GeneratorFeatures.Sync;
     }
 
-    private static void EmitBody(
+    static void EmitBody(
             StringBuilder builder,
             MethodSignatureBinding binding,
             string codelArrayExpression,
@@ -1401,17 +1397,17 @@ public partial class MethodGenerator : IIncrementalGenerator
         {
             for (var x = 0; x < width && !(mightUseOutput && mightUseInput); x++)
             {
-                var c = codels[(y * width) + x];
+                var c = codels[y * width + x];
                 if (c < 2) continue;
 
                 // Check right neighbor
                 if (x + 1 < width)
                 {
-                    var nc = codels[(y * width) + x + 1];
+                    var nc = codels[y * width + x + 1];
                     if (nc >= 2 && nc != c)
                     {
-                        var cmd = ((((sHue[nc] - sHue[c]) % 6) + 6) % 6 * 3)
-                                + ((((sLight[nc] - sLight[c]) % 3) + 3) % 3);
+                        var cmd = ((sHue[nc] - sHue[c]) % 6 + 6) % 6 * 3
+                                + ((sLight[nc] - sLight[c]) % 3 + 3) % 3;
                         if (cmd is 14 or 15) mightUseInput = true;
                         if (cmd is 16 or 17) mightUseOutput = true;
                     }
@@ -1420,11 +1416,11 @@ public partial class MethodGenerator : IIncrementalGenerator
                 // Check bottom neighbor
                 if (y + 1 < height)
                 {
-                    var nc = codels[((y + 1) * width) + x];
+                    var nc = codels[(y + 1) * width + x];
                     if (nc >= 2 && nc != c)
                     {
-                        var cmd = ((((sHue[nc] - sHue[c]) % 6) + 6) % 6 * 3)
-                                + ((((sLight[nc] - sLight[c]) % 3) + 3) % 3);
+                        var cmd = ((sHue[nc] - sHue[c]) % 6 + 6) % 6 * 3
+                                + ((sLight[nc] - sLight[c]) % 3 + 3) % 3;
                         if (cmd is 14 or 15) mightUseInput = true;
                         if (cmd is 16 or 17) mightUseOutput = true;
                     }

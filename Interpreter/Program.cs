@@ -20,7 +20,7 @@ finally
 /// <summary>
 /// Entry point for the dotnet-piet command-line tool.
 /// </summary>
-internal partial class Program
+partial class Program
 {
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {

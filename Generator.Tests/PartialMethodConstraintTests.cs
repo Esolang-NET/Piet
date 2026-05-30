@@ -1,6 +1,5 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Esolang.Piet.Generator.Tests;
 

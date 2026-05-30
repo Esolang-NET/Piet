@@ -2,9 +2,6 @@
 using Esolang.Piet;
 using System.IO.Pipelines;
 using System.Text;
-#if NET481 
-using System.Threading.Tasks;
-#endif
 
 // ascii-piet (.txt) 画像の出力例
 var asciiPiet = PietSample.RunAsciiPiet();
@@ -189,7 +186,6 @@ partial class PietSample
     /// <summary>
     /// Executes the codel-size-11 hello-world sample.
     /// </summary>
-    /// <param name="input">Optional input text for the sample program.</param>
     [GeneratePietMethod("hw1-11.gif", codelSize: 11)]
     public static partial string RunHw111Gif();
 }

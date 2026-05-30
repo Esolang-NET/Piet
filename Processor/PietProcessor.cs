@@ -86,7 +86,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
     static void ExecuteCommand(int hDiff, int lDiff, int blockSize,
         List<int> stack, ref int dp, ref int cc)
     {
-        switch ((hDiff * 3) + lDiff)
+        switch (hDiff * 3 + lDiff)
         {
             case 0:
                 break;
@@ -141,7 +141,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
                     var a = Pop(stack);
                     var b = Pop(stack);
                     if (a != 0)
-                        stack.Add(((b % a) + a) % a);
+                        stack.Add((b % a + a) % a);
                     else
                     {
                         stack.Add(b);
@@ -168,7 +168,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
                 if (stack.Count >= 1)
                 {
                     var a = Pop(stack);
-                    dp = (((dp + a) % 4) + 4) % 4;
+                    dp = ((dp + a) % 4 + 4) % 4;
                 }
                 break;
             case 11:
@@ -216,7 +216,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
 
         while (true)
         {
-            var idx = (y * width) + x;
+            var idx = y * width + x;
             if (!visited.Add(idx))
                 return false;
 
@@ -226,7 +226,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
             var nx = x + DpDx(dp);
             var ny = y + DpDy(dp);
             if (nx < 0 || nx >= width || ny < 0 || ny >= height
-                || (byte)codels[(ny * width) + nx] == (byte)PietColor.Black)
+                || (byte)codels[ny * width + nx] == (byte)PietColor.Black)
                 return false;
 
             x = nx;
@@ -244,7 +244,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
 
     static void Roll(List<int> stack, int depth, int rolls)
     {
-        rolls = ((rolls % depth) + depth) % depth;
+        rolls = (rolls % depth + depth) % depth;
         for (var i = 0; i < rolls; i++)
         {
             var top = stack[^1];
@@ -256,12 +256,12 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
     static List<(int x, int y)> FloodFill(IReadOnlyList<PietColor> codels,
         int width, int height, int x, int y)
     {
-        var color = codels[(y * width) + x];
+        var color = codels[y * width + x];
         var visited = new bool[width * height];
         var result = new List<(int x, int y)>();
         var queue = new Queue<(int x, int y)>();
 
-        visited[(y * width) + x] = true;
+        visited[y * width + x] = true;
         queue.Enqueue((x, y));
 
         while (queue.Count > 0)
@@ -297,7 +297,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
         if (nx < 0 || nx >= width || ny < 0 || ny >= height)
             return;
 
-        var idx = (ny * width) + nx;
+        var idx = ny * width + nx;
         if (visited[idx] || codels[idx] != color)
             return;
 
@@ -316,10 +316,10 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
             var by = block[i].y;
             var better = dp switch
             {
-                0 => bx > bestX || (bx == bestX && (cc == 0 ? by < bestY : by > bestY)),
-                1 => by > bestY || (by == bestY && (cc == 0 ? bx > bestX : bx < bestX)),
-                2 => bx < bestX || (bx == bestX && (cc == 0 ? by > bestY : by < bestY)),
-                3 => by < bestY || (by == bestY && (cc == 0 ? bx < bestX : bx > bestX)),
+                0 => bx > bestX || bx == bestX && (cc == 0 ? by < bestY : by > bestY),
+                1 => by > bestY || by == bestY && (cc == 0 ? bx > bestX : bx < bestX),
+                2 => bx < bestX || bx == bestX && (cc == 0 ? by > bestY : by < bestY),
+                3 => by < bestY || by == bestY && (cc == 0 ? bx < bestX : bx > bestX),
                 _ => throw new InvalidOperationException("Unexpected DP value"),
             };
 

@@ -60,10 +60,10 @@ public sealed partial class PietProcessor : IEventProcessor
 
                 if (blockColor >= 2 && nextColor >= 2)
                 {
-                    var hDiff = (((HueTable[nextColor] - HueTable[blockColor]) % 6) + 6) % 6;
-                    var lDiff = (((LightnessTable[nextColor] - LightnessTable[blockColor]) % 3) + 3) % 3;
+                    var hDiff = ((HueTable[nextColor] - HueTable[blockColor]) % 6 + 6) % 6;
+                    var lDiff = ((LightnessTable[nextColor] - LightnessTable[blockColor]) % 3 + 3) % 3;
 
-                    var commandIndex = (hDiff * 3) + lDiff;
+                    var commandIndex = hDiff * 3 + lDiff;
 
                     // Matching old mapping:
                     // 14: Input Int, 15: Input Char, 16: Output Int, 17: Output Char
@@ -120,13 +120,13 @@ public sealed partial class PietProcessor : IEventProcessor
         yield return new EndEvent(0);
     }
 
-    private sealed class PietInputCharEvent : InputCharEvent
+    sealed class PietInputCharEvent : InputCharEvent
     {
         public char? Value { get; private set; }
         public override void Write(char c) => Value = c;
     }
 
-    private sealed class PietInputIntEvent : InputIntEvent
+    sealed class PietInputIntEvent : InputIntEvent
     {
         public int? Value { get; private set; }
         public override void Write(int i) => Value = i;

@@ -63,7 +63,7 @@ public static class PietParser
                 for (var x = 0; x < codelWidth; x++)
                 {
                     // 左上ピクセルの色で代表とする（平均化したい場合はここを修正）
-                    colors[(y * codelWidth) + x] = Normalize(image[x * codelSize, y * codelSize]);
+                    colors[y * codelWidth + x] = Normalize(image[x * codelSize, y * codelSize]);
                 }
             }
             return new PietProgram(codelWidth, codelHeight, colors);
@@ -97,7 +97,7 @@ public static class PietParser
                 for (var x = 0; x < codelWidth; x++)
                 {
                     // 左上ピクセルの色で代表とする（平均化したい場合はここを修正）
-                    colors[(y * codelWidth) + x] = Normalize(image[x * codelSize, y * codelSize]);
+                    colors[y * codelWidth + x] = Normalize(image[x * codelSize, y * codelSize]);
                 }
             }
             program = new(codelWidth, codelHeight, colors);
@@ -151,7 +151,7 @@ public static class PietParser
         {
             for (var x = 0; x < codelWidth; x++)
             {
-                colors[(y * codelWidth) + x] = (PietColor)codels[(y * codelSize * width) + (x * codelSize)];
+                colors[y * codelWidth + x] = (PietColor)codels[y * codelSize * width + x * codelSize];
             }
         }
         return new PietProgram(codelWidth, codelHeight, colors);
@@ -277,7 +277,7 @@ public static class PietParser
                 if (colorIdx < 0)
                     return false;
 
-                result[(y * width) + x] = (byte)colorIdx;
+                result[y * width + x] = (byte)colorIdx;
             }
 
             Array.Copy(row, prevRow, stride);
