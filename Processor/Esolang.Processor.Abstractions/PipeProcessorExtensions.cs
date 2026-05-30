@@ -74,7 +74,7 @@ public static class PipeProcessorExtensions
                 case OutputCharEvent outputChar:
                     if (output == null)
                         throw new ArgumentNullException(nameof(output));
-                    output.Write(Encoding.UTF8.GetBytes(new[] { outputChar.Output }));
+                    output.Write(Encoding.UTF8.GetBytes([outputChar.Output]));
                     await output.FlushAsync(cancellationToken);
                     break;
                 case OutputIntEvent outputInt:
