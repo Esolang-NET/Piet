@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Immutable;
 using System.Text;
+using static Esolang.Generator.BindingError;
 
 namespace Esolang.Piet.Generator;
 
@@ -319,19 +320,15 @@ public partial class MethodGenerator : IIncrementalGenerator
             );
         }
 
-        var binding = MethodSignatureBinder.Bind(methodSymbol, types,
-            invalidReturnTypeErrorId: DiagnosticDescriptors.InvalidReturnType.Id,
-            invalidParameterErrorId: DiagnosticDescriptors.InvalidParameter.Id,
-            duplicateParameterErrorId: DiagnosticDescriptors.DuplicateParameter.Id,
-            returnOutputConflictErrorId: DiagnosticDescriptors.ReturnOutputConflict.Id);
+        var binding = MethodSignatureBinder.Bind(methodSymbol, types);
 
         if (binding is { IsValid: true, UnhandledParameters.Count: > 0 })
         {
             foreach (var parameter in binding.UnhandledParameters)
             {
-                var discriptor = DiagnosticDescriptors.InvalidParameter;
+                var descriptor = DiagnosticDescriptors.InvalidParameter;
                 var typeDisplayString = parameter.Type.ToDisplayString();
-                context.ReportDiagnostic(Diagnostic.Create(discriptor, parameter.Locations[0], typeDisplayString));
+                context.ReportDiagnostic(Diagnostic.Create(descriptor, parameter.Locations[0], typeDisplayString));
                 return EmitErrorMethod(
                     methodSymbol,
                     methodSyntax,
@@ -349,72 +346,49 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         if (!binding.IsValid)
         {
-            if (string.Equals(binding.ErrorId, DiagnosticDescriptors.InvalidReturnType.Id, StringComparison.Ordinal))
+            var error = binding.Error;
+            var location = error.Location ?? methodSyntax.Identifier.GetLocation();
+
+            var (descriptor, messageArgs) = error switch
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.InvalidReturnType,
-                    binding.Location ?? methodSyntax.Identifier.GetLocation(),
-                    methodSymbol.ReturnType.ToDisplayString()));
-                return EmitErrorMethod(
-                    methodSymbol,
-                    methodSyntax,
-                    ns,
-                    typeKeyword,
-                    resolvedImageFile,
-                    projectDirectory,
-                    codelSize,
-                    null,
-                    DiagnosticDescriptors.InvalidReturnType.Id,
-                    $"Invalid return type {methodSymbol.ReturnType.ToDisplayString()}"
-                );
-            }
+                UnsupportedReturnType e => (DiagnosticDescriptors.InvalidReturnType, new object[] { e.ReturnType.ToDisplayString() }),
+                InvalidParameterModifier e => (DiagnosticDescriptors.InvalidParameter, new object[] { e.Parameter.Name }),
+                DuplicateInput e => (
+                    e.ExistingKind switch
+                    {
+                        MethodInputKind.String when types.IsString(e.Parameter.Type, false) => DiagnosticDescriptors.DuplicateParameter,
+                        MethodInputKind.TextReader when types.IsTextReader(e.Parameter.Type) => DiagnosticDescriptors.DuplicateParameter,
+                        MethodInputKind.PipeReader when types.IsPipeReader(e.Parameter.Type) => DiagnosticDescriptors.DuplicateParameter,
+                        _ => DiagnosticDescriptors.InvalidParameter
+                    },
+                    e.ExistingKind switch
+                    {
+                        MethodInputKind.String when types.IsString(e.Parameter.Type, false) => [methodSymbol.Name],
+                        MethodInputKind.TextReader when types.IsTextReader(e.Parameter.Type) => [methodSymbol.Name],
+                        MethodInputKind.PipeReader when types.IsPipeReader(e.Parameter.Type) => [methodSymbol.Name],
+                        _ => [e.Parameter.Name]
+                    }
+                ),
+                DuplicateOutput e => (
+                    e.ExistingKind switch
+                    {
+                        MethodOutputKind.TextWriter when types.IsTextWriter(e.Parameter.Type) => DiagnosticDescriptors.DuplicateParameter,
+                        MethodOutputKind.PipeWriter when types.IsPipeWriter(e.Parameter.Type) => DiagnosticDescriptors.DuplicateParameter,
+                        _ => DiagnosticDescriptors.InvalidParameter
+                    },
+                    e.ExistingKind switch
+                    {
+                        MethodOutputKind.TextWriter when types.IsTextWriter(e.Parameter.Type) => [methodSymbol.Name],
+                        MethodOutputKind.PipeWriter when types.IsPipeWriter(e.Parameter.Type) => [methodSymbol.Name],
+                        _ => [e.Parameter.Name]
+                    }
+                ),
+                DuplicateCancellationToken or DuplicateLogger => (DiagnosticDescriptors.DuplicateParameter, new object[] { methodSymbol.Name }),
+                ReturnOutputConflict => (DiagnosticDescriptors.ReturnOutputConflict, new object[] { methodSymbol.Name }),
+                _ => (DiagnosticDescriptors.InvalidParameter, new object[] { methodSymbol.Name })
+            };
 
-            if (string.Equals(binding.ErrorId, DiagnosticDescriptors.DuplicateParameter.Id, StringComparison.Ordinal))
-            {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.DuplicateParameter,
-                    binding.Location ?? methodSyntax.Identifier.GetLocation(),
-                    methodSymbol.Name));
-                return EmitErrorMethod(
-                    methodSymbol,
-                    methodSyntax,
-                    ns,
-                    typeKeyword,
-                    resolvedImageFile,
-                    projectDirectory,
-                    codelSize,
-                    null,
-                    DiagnosticDescriptors.DuplicateParameter.Id,
-                    $"Duplicate parameter types in method {methodSymbol.Name}"
-                );
-            }
-
-            if (string.Equals(binding.ErrorId, DiagnosticDescriptors.ReturnOutputConflict.Id, StringComparison.Ordinal))
-            {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.ReturnOutputConflict,
-                    binding.Location ?? methodSyntax.Identifier.GetLocation(),
-                    methodSymbol.Name));
-                return EmitErrorMethod(
-                    methodSymbol,
-                    methodSyntax,
-                    ns,
-                    typeKeyword,
-                    resolvedImageFile,
-                    projectDirectory,
-                    codelSize,
-                    null,
-                    DiagnosticDescriptors.ReturnOutputConflict.Id,
-                    $"Return and output conflict in method {methodSymbol.Name}"
-                );
-            }
-
-            var unhandled = binding.UnhandledParameters.FirstOrDefault() ?? methodSymbol.Parameters.FirstOrDefault();
-            context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.InvalidParameter,
-                binding.Location ?? unhandled?.Locations.FirstOrDefault() ?? methodSyntax.Identifier.GetLocation(),
-                unhandled?.Name ?? methodSymbol.Name));
-
+            context.ReportDiagnostic(Diagnostic.Create(descriptor, location, messageArgs));
             return EmitErrorMethod(
                 methodSymbol,
                 methodSyntax,
@@ -424,8 +398,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                 projectDirectory,
                 codelSize,
                 null,
-                DiagnosticDescriptors.InvalidParameter.Id,
-                $"Invalid parameter in method {methodSymbol.Name}"
+                descriptor.Id,
+                string.Format(descriptor.MessageFormat.ToString(), messageArgs)
             );
         }
 
@@ -1179,8 +1153,8 @@ public partial class MethodGenerator : IIncrementalGenerator
             {
                 return null;
             }
-            var header = imagePath.Substring(dataUrlStarts.Length, bodyStartIndex - dataUrlStarts.Length);
-            var body = imagePath.Substring(bodyStartIndex + 1);
+            var header = imagePath[dataUrlStarts.Length..bodyStartIndex];
+            var body = imagePath[(bodyStartIndex + 1)..];
             var headers = header.Split(';');
             var isBase64 = false;
             var codelSize = 1;
@@ -1208,7 +1182,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 }
                 else if (text_.StartsWith("codel-size="))
                 {
-                    var sizeText = text_.Substring("codel-size=".Length);
+                    var sizeText = text_["codel-size=".Length..];
                     if (int.TryParse(sizeText, out var codelSize_))
                     {
                         codelSize = codelSize_;
@@ -1276,7 +1250,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             return false;
         }
 
-        var sizeText = firstLine.Substring(prefix.Length).Trim();
+        var sizeText = firstLine[prefix.Length..].Trim();
         if (!int.TryParse(sizeText, out codelSize))
         {
             return false;
@@ -1300,7 +1274,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             return false;
         }
 
-        var originalPath = firstLine.Substring(prefix.Length).Trim();
+        var originalPath = firstLine[prefix.Length..].Trim();
         if (string.IsNullOrWhiteSpace(originalPath))
         {
             return false;
@@ -1318,7 +1292,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             return text.Replace("\r", string.Empty);
         }
 
-        return text.Substring(0, newlineIndex).Replace("\r", string.Empty);
+        return text[..newlineIndex].Replace("\r", string.Empty);
     }
     static string GetSecondLine(string text)
     {
@@ -1335,7 +1309,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             return string.Empty;
         }
 
-        return text.Substring(secondLineStart, secondLineEnd - secondLineStart).Replace("\r", string.Empty);
+        return text[secondLineStart..secondLineEnd].Replace("\r", string.Empty);
     }
 
     static bool IsMatchingPath(string normalizedExpectedPath, string normalizedCandidatePath)
@@ -1362,7 +1336,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             return path;
         }
 
-        return path.Substring(index + 1);
+        return path[(index + 1)..];
     }
 
     static string GetExtension(string path)
@@ -1374,7 +1348,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             return string.Empty;
         }
 
-        return fileName.Substring(dotIndex);
+        return fileName[dotIndex..];
     }
 
     static string NormalizePath(string path) => path.Replace('\\', '/').Trim();

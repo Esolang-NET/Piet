@@ -11,4 +11,4 @@ dotnet test Esolang.Piet.slnx
 
 - [x] Fix `PietProcessorTests.RunAndOutputString_ParsesAndRunsHelloWorldSample` (Input/Output handling).
 - [x] Fix `PietProcessorTests.ExecuteCommand_CoversArithmeticFlowAndIoCommands` (Method invocation).
-- [x] Investigate and fix diagnostic test failures in `Piet.Generator.Tests`.
+- [x] Investigate and fix diagnostic test failures in Piet.Generator.Tests.
