@@ -42,9 +42,9 @@ public sealed class PietProcessorTests
             ]);
 
         using var output = new StringWriter();
-        var processor = new PietProcessor(program, output);
+        var processor = new PietProcessor(program);
 
-        processor.Run();
+        processor.Run(null, output);
 
         Assert.AreEqual(string.Empty, output.ToString());
     }
@@ -54,9 +54,9 @@ public sealed class PietProcessorTests
     {
         var program = new PietProgram(1, 1, [PietColor.White]);
         using var output = new StringWriter();
-        var processor = new PietProcessor(program, output);
+        var processor = new PietProcessor(program);
 
-        processor.Run();
+        processor.Run(null, output);
 
         Assert.AreEqual(string.Empty, output.ToString());
     }

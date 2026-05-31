@@ -24,8 +24,8 @@ static class PietCommandActions
 
         var output = Console.Out;
         var input = Console.In;
-        var processor = new PietProcessor(program, output, input);
-        return Task.FromResult(processor.RunToEnd(cancellationToken: cancellationToken));
+        var processor = new PietProcessor(program);
+        return Task.FromResult(processor.RunToEnd(input, output, cancellationToken));
     }
 
     public static Task<int> ParseAsync(string path, int codelSize)

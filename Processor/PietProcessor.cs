@@ -9,7 +9,7 @@ namespace Esolang.Piet.Processor;
 /// <remarks>
 /// Initializes the processor with a parsed Piet program.
 /// </remarks>
-public sealed partial class PietProcessor(PietProgram program, TextWriter? output = null, TextReader? input = null)
+public sealed partial class PietProcessor(PietProgram program)
     : IProcessor<PietProgram>
 {
     static readonly int[] HueTable =
@@ -40,24 +40,14 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
     public PietProgram Program { get; } = program;
 
     /// <summary>
-    /// Optional default input source.
-    /// </summary>
-    public TextReader? Input { get; } = input;
-
-    /// <summary>
-    /// Optional default output destination.
-    /// </summary>
-    public TextWriter? Output { get; } = output;
-
-    /// <summary>
     /// Executes the program.
     /// </summary>
-    public void Run() => RunToEnd(Input, Output);
+    public void Run() => RunToEnd(null, null);
 
     /// <summary>
     /// Executes the program with explicit I/O.
     /// </summary>
-    public void Run(TextReader? input, TextWriter? output) => RunToEnd(input ?? Input, output ?? Output);
+    public void Run(TextReader? input, TextWriter? output) => RunToEnd(input, output);
 
     /// <summary>
     /// Executes the program and collects UTF-8 output as a string.
@@ -65,7 +55,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
     public string? RunAndOutputString(TextReader? input = null)
     {
         using var writer = new StringWriter();
-        RunToEnd(input ?? Input, writer);
+        RunToEnd(input, writer);
         var result = writer.ToString().TrimEnd('\0', '\r', '\n');
         return result.Length == 0 ? null : result;
     }
@@ -73,7 +63,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
     /// <inheritdoc/>
     public int RunToEnd(TextReader? input = null, TextWriter? output = null, CancellationToken cancellationToken = default)
     {
-        var result = RunToEndAsync(input ?? Input, output ?? Output, cancellationToken);
+        var result = RunToEndAsync(input, output, cancellationToken);
         if (result.IsCompleted)
             return result.GetAwaiter().GetResult();
         return result.AsTask().GetAwaiter().GetResult();
@@ -81,7 +71,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
 
     /// <inheritdoc/>
     public ValueTask<int> RunToEndAsync(TextReader? input = null, TextWriter? output = null, CancellationToken cancellationToken = default)
-        => TextProcessorExtensions.RunToEndAsync(this, input ?? Input, output ?? Output, cancellationToken);
+        => TextProcessorExtensions.RunToEndAsync(this, input, output, cancellationToken);
 
     static void ExecuteCommand(int hDiff, int lDiff, int blockSize,
         List<int> stack, ref int dp, ref int cc)
