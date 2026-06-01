@@ -1,5 +1,4 @@
 using Esolang.Piet.Parser;
-using Esolang.Processor;
 
 namespace Esolang.Piet.Processor;
 
@@ -10,7 +9,6 @@ namespace Esolang.Piet.Processor;
 /// Initializes the processor with a parsed Piet program.
 /// </remarks>
 public sealed partial class PietProcessor(PietProgram program)
-    : IProcessor<PietProgram>
 {
     static readonly int[] HueTable =
     [
@@ -33,45 +31,6 @@ public sealed partial class PietProcessor(PietProgram program)
         0, 1, 2,
         0, 1, 2,
     ];
-
-    /// <summary>
-    /// The parsed Piet program.
-    /// </summary>
-    public PietProgram Program { get; } = program;
-
-    /// <summary>
-    /// Executes the program.
-    /// </summary>
-    public void Run() => RunToEnd(null, null);
-
-    /// <summary>
-    /// Executes the program with explicit I/O.
-    /// </summary>
-    public void Run(TextReader? input, TextWriter? output) => RunToEnd(input, output);
-
-    /// <summary>
-    /// Executes the program and collects UTF-8 output as a string.
-    /// </summary>
-    public string? RunAndOutputString(TextReader? input = null)
-    {
-        using var writer = new StringWriter();
-        RunToEnd(input, writer);
-        var result = writer.ToString().TrimEnd('\0', '\r', '\n');
-        return result.Length == 0 ? null : result;
-    }
-
-    /// <inheritdoc/>
-    public int RunToEnd(TextReader? input = null, TextWriter? output = null, CancellationToken cancellationToken = default)
-    {
-        var result = RunToEndAsync(input, output, cancellationToken);
-        if (result.IsCompleted)
-            return result.GetAwaiter().GetResult();
-        return result.AsTask().GetAwaiter().GetResult();
-    }
-
-    /// <inheritdoc/>
-    public ValueTask<int> RunToEndAsync(TextReader? input = null, TextWriter? output = null, CancellationToken cancellationToken = default)
-        => TextProcessorExtensions.RunToEndAsync(this, input, output, cancellationToken);
 
     static void ExecuteCommand(int hDiff, int lDiff, int blockSize,
         List<int> stack, ref int dp, ref int cc)

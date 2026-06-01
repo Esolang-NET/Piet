@@ -11,8 +11,8 @@ public sealed partial class PietProcessor : IEventProcessor
         const byte black = (byte)PietColor.Black;
         const byte white = (byte)PietColor.White;
 
-        var width = Program.Width;
-        var height = Program.Height;
+        var width = program.Width;
+        var height = program.Height;
 
         var dp = 0;
         var cc = 0;
@@ -22,8 +22,8 @@ public sealed partial class PietProcessor : IEventProcessor
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var blockColor = (byte)Program[cx, cy];
-            var blockCells = FloodFill(Program.Codels, width, height, cx, cy);
+            var blockColor = (byte)program[cx, cy];
+            var blockCells = FloodFill(program.Codels, width, height, cx, cy);
             var moved = false;
 
             for (var attempt = 0; attempt < 8; attempt++)
@@ -33,18 +33,18 @@ public sealed partial class PietProcessor : IEventProcessor
                 var ny = y + DpDy(dp);
 
                 if (nx < 0 || nx >= width || ny < 0 || ny >= height
-                    || (byte)Program[nx, ny] == black)
+                    || (byte)program[nx, ny] == black)
                 {
                     ApplyRetry(attempt, ref dp, ref cc);
                     continue;
                 }
 
-                var nextColor = (byte)Program[nx, ny];
+                var nextColor = (byte)program[nx, ny];
                 if (nextColor == white)
                 {
                     var wx = nx;
                     var wy = ny;
-                    if (SlideWhite(Program.Codels, width, height, ref wx, ref wy, dp))
+                    if (SlideWhite(program.Codels, width, height, ref wx, ref wy, dp))
                     {
                         cx = wx;
                         cy = wy;

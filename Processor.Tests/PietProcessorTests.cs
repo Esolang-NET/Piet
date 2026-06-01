@@ -1,4 +1,5 @@
 using Esolang.Piet.Parser;
+using Esolang.Processor;
 using System.Reflection;
 
 namespace Esolang.Piet.Processor.Tests;
@@ -27,11 +28,11 @@ public sealed class PietProcessorTests
 
         var processor = new PietProcessor(program);
 
-        Assert.AreSame(program, processor.Program);
+        Assert.AreSame(program, ((IProcessor<PietProgram>)processor).Program);
     }
 
     [TestMethod]
-    public void Run_StopsWhenSlideWhiteCannotProceed()
+    public async Task Run_StopsWhenSlideWhiteCannotProceed()
     {
         var program = new PietProgram(
             2,
@@ -44,52 +45,52 @@ public sealed class PietProcessorTests
         using var output = new StringWriter();
         var processor = new PietProcessor(program);
 
-        processor.Run(null, output);
+        await RunToEndManualAsync(processor, null, output, TestContext.CancellationToken).ConfigureAwait(false);
 
         Assert.AreEqual(string.Empty, output.ToString());
     }
 
     [TestMethod]
-    public void Run_ExecutesNoOpProgramWithoutOutput()
+    public async Task Run_ExecutesNoOpProgramWithoutOutput()
     {
         var program = new PietProgram(1, 1, [PietColor.White]);
         using var output = new StringWriter();
         var processor = new PietProcessor(program);
 
-        processor.Run(null, output);
+        await RunToEndManualAsync(processor, null, output, TestContext.CancellationToken).ConfigureAwait(false);
 
         Assert.AreEqual(string.Empty, output.ToString());
     }
 
     [TestMethod]
-    public void RunAndOutputString_ReturnsNullWhenNoOutputIsProduced()
+    public async Task RunAndOutputString_ReturnsNullWhenNoOutputIsProduced()
     {
         var processor = new PietProcessor(new PietProgram(1, 1, [PietColor.White]));
 
-        var result = processor.RunAndOutputString();
+        var result = await RunAndOutputStringAsync(processor, cancellationToken: TestContext.CancellationToken).ConfigureAwait(false);
 
         Assert.IsNull(result);
     }
 
     [TestMethod]
-    public void RunAndOutputString_ParsesAndRunsHelloWorldSample()
+    public async Task RunAndOutputString_ParsesAndRunsHelloWorldSample()
     {
         var path = FindFileInRepository("samples", "Generator.UseConsole", "samples", "hello-world.png");
         var program = PietParser.Parse(path);
         var processor = new PietProcessor(program);
 
-        var result = processor.RunAndOutputString();
+        var result = await RunAndOutputStringAsync(processor, cancellationToken: TestContext.CancellationToken).ConfigureAwait(false);
 
         Assert.AreEqual("Hello, world!", result);
     }
 
     [TestMethod]
-    public void RunToEnd_ReturnsZero()
+    public async Task RunToEnd_ReturnsZero()
     {
         var program = new PietProgram(1, 1, [PietColor.White]);
         var processor = new PietProcessor(program);
 
-        var exitCode = processor.RunToEnd(cancellationToken: TestContext.CancellationToken);
+        var exitCode = await RunToEndManualAsync(processor, null, null, TestContext.CancellationToken).ConfigureAwait(false);
 
         Assert.AreEqual(0, exitCode);
     }
@@ -100,9 +101,54 @@ public sealed class PietProcessorTests
         var program = new PietProgram(1, 1, [PietColor.White]);
         var processor = new PietProcessor(program);
 
-        var exitCode = await processor.RunToEndAsync(cancellationToken: TestContext.CancellationToken);
+        var exitCode = await RunToEndManualAsync(processor, null, null, TestContext.CancellationToken).ConfigureAwait(false);
 
         Assert.AreEqual(0, exitCode);
+    }
+
+    static async Task<string?> RunAndOutputStringAsync(PietProcessor processor, TextReader? input = null, CancellationToken cancellationToken = default)
+    {
+        using var writer = new StringWriter();
+        await RunToEndManualAsync(processor, input, writer, cancellationToken).ConfigureAwait(false);
+        var result = writer.ToString().TrimEnd('\0', '\r', '\n');
+        return result.Length == 0 ? null : result;
+    }
+
+    static async Task<int> RunToEndManualAsync(PietProcessor processor, TextReader? input, TextWriter? output, CancellationToken cancellationToken)
+    {
+        await foreach (var ioEvent in processor.RunAsyncEnumerable(cancellationToken).ConfigureAwait(false))
+        {
+            switch (ioEvent)
+            {
+                case InputCharEvent charInput:
+                    if (input != null)
+                    {
+                        var buffer = new char[1];
+                        if (await input.ReadAsync(buffer, 0, 1).ConfigureAwait(false) > 0)
+                            charInput.Write(buffer[0]);
+                    }
+                    break;
+                case InputIntEvent intInput:
+                    if (input != null)
+                    {
+                        var line = await input.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+                        if (int.TryParse(line, out var i))
+                            intInput.Write(i);
+                    }
+                    break;
+                case OutputCharEvent charOutput:
+                    if (output != null)
+                        await output.WriteAsync(charOutput.Output).ConfigureAwait(false);
+                    break;
+                case OutputIntEvent intOutput:
+                    if (output != null)
+                        await output.WriteLineAsync(intOutput.Output.ToString()).ConfigureAwait(false);
+                    break;
+                case EndEvent endEvent:
+                    return endEvent.ExitCode;
+            }
+        }
+        return 0;
     }
 
     [TestMethod]
