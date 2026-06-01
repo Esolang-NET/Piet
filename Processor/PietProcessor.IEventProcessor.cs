@@ -1,5 +1,6 @@
 using Esolang.Piet.Parser;
 using Esolang.Processor;
+using static Esolang.Processor.IOEvent;
 
 namespace Esolang.Piet.Processor;
 
@@ -69,20 +70,22 @@ public sealed partial class PietProcessor : IEventProcessor
                     // 14: Input Int, 15: Input Char, 16: Output Int, 17: Output Char
                     if (commandIndex == 14) // Input Int
                     {
-                        var ev = new PietInputIntEvent();
+                        int? value = null;
+                        var ev = InputInt(v => value = v);
                         yield return ev;
-                        if (ev.Value.HasValue)
+                        if (value.HasValue)
                         {
-                            stack.Add(ev.Value.Value);
+                            stack.Add(value.Value);
                         }
                     }
                     else if (commandIndex == 15) // Input Char
                     {
-                        var ev = new PietInputCharEvent();
+                        char? value = null;
+                        var ev = InputChar(v => value = v);
                         yield return ev;
-                        if (ev.Value.HasValue)
+                        if (value.HasValue)
                         {
-                            stack.Add(ev.Value.Value);
+                            stack.Add(value.Value);
                         }
                     }
                     else if (commandIndex == 16) // Output Int
@@ -90,7 +93,7 @@ public sealed partial class PietProcessor : IEventProcessor
                         if (stack.Count >= 1)
                         {
                             var val = Pop(stack);
-                            yield return new OutputIntEvent(val);
+                            yield return OutputInt(val);
                         }
                     }
                     else if (commandIndex == 17) // Output Char
@@ -98,7 +101,7 @@ public sealed partial class PietProcessor : IEventProcessor
                         if (stack.Count >= 1)
                         {
                             var val = Pop(stack);
-                            yield return new OutputCharEvent((char)val);
+                            yield return OutputChar((char)val);
                         }
                     }
                     else
@@ -117,18 +120,6 @@ public sealed partial class PietProcessor : IEventProcessor
                 break;
         }
 
-        yield return new EndEvent(0);
-    }
-
-    sealed class PietInputCharEvent : InputCharEvent
-    {
-        public char? Value { get; private set; }
-        public override void Write(char c) => Value = c;
-    }
-
-    sealed class PietInputIntEvent : InputIntEvent
-    {
-        public int? Value { get; private set; }
-        public override void Write(int i) => Value = i;
+        yield return End(0);
     }
 }

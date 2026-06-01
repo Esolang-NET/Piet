@@ -1,6 +1,7 @@
 using Esolang.Piet.Parser;
 using Esolang.Processor;
 using System.Reflection;
+using static Esolang.Processor.IOEvent;
 
 namespace Esolang.Piet.Processor.Tests;
 

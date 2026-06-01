@@ -1,5 +1,4 @@
 #nullable enable
-using System.Diagnostics.CodeAnalysis;
 
 namespace Esolang.Processor;
 
@@ -30,77 +29,4 @@ public interface IEventProcessor : IProcessor
     /// <returns>An asynchronous stream of I/O events.</returns>
     IAsyncEnumerable<IOEvent> RunAsyncEnumerable(
         CancellationToken cancellationToken = default);
-}
-
-/// <summary>
-/// Represents an I/O event.
-/// </summary>
-public interface IOEvent
-{
-
-}
-
-/// <summary>
-/// Represents an event requesting a character input.
-/// </summary>
-[ExcludeFromCodeCoverage]
-public abstract class InputCharEvent : IOEvent
-{
-    /// <summary>
-    /// Writes the input character to the processor.
-    /// </summary>
-    /// <param name="c">The input character.</param>
-    public abstract void Write(char c);
-}
-
-/// <summary>
-/// Represents an event requesting an integer input.
-/// </summary>
-[ExcludeFromCodeCoverage]
-public abstract class InputIntEvent : IOEvent
-{
-    /// <summary>
-    /// Writes the input integer to the processor.
-    /// </summary>
-    /// <param name="i">The input integer.</param>
-    public abstract void Write(int i);
-}
-
-/// <summary>
-/// Represents an event that outputs a character.
-/// </summary>
-/// <param name="Output">The character to output.</param>
-[ExcludeFromCodeCoverage]
-public sealed class OutputCharEvent(char Output) : IOEvent
-{
-    /// <summary>
-    /// The character to output.
-    /// </summary>
-    public char Output { get; } = Output;
-}
-
-/// <summary>
-/// Represents an event that outputs an integer.
-/// </summary>
-/// <param name="Output">The integer to output.</param>
-[ExcludeFromCodeCoverage]
-public sealed class OutputIntEvent(int Output) : IOEvent
-{
-    /// <summary>
-    /// The integer to output.
-    /// </summary>
-    public int Output { get; } = Output;
-}
-
-/// <summary>
-/// Represents an event indicating the end of execution.
-/// </summary>
-/// <param name="exitCode">The exit code.</param>
-[ExcludeFromCodeCoverage]
-public sealed class EndEvent(int exitCode) : IOEvent
-{
-    /// <summary>
-    /// The exit code.
-    /// </summary>
-    public int ExitCode { get; } = exitCode;
 }

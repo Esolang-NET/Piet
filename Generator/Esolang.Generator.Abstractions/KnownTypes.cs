@@ -229,6 +229,7 @@ public readonly struct KnownTypes(Compilation compilation)
 /// <summary>
 /// Provides utility methods for resolving types from a <see cref="Compilation"/>.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public static class TypeResolutionExtensions
 {
     /// <summary>

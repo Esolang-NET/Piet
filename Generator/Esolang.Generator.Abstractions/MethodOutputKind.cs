@@ -1,4 +1,3 @@
-#nullable enable
 namespace Esolang.Generator;
 
 /// <summary>
