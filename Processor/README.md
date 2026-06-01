@@ -15,17 +15,21 @@ dotnet add package Esolang.Piet.Processor
 ```csharp
 using Esolang.Piet.Parser;
 using Esolang.Piet.Processor;
+using Esolang.Processor;
 
 var program = PietParser.Parse("hello-world.png");
 var processor = new PietProcessor(program);
 
-processor.Run();
+await foreach (var ev in processor.RunAsyncEnumerable())
+{
+    // Handle events (OutputInt, OutputChar, etc.)
+}
 ```
 
 ## Current Status
 
 - `PietProcessor` executes parsed `PietProgram` instances.
-- `Run()` supports `TextReader`/`TextWriter` I/O, and `RunAndOutputString()` returns captured output.
+- The processor implements `IEventProcessor` and streams events via `RunAsyncEnumerable()`.
 
 ## Notes
 
