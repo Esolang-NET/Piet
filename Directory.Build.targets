@@ -6,7 +6,9 @@
     <PackageReference Update="Basic.Reference.Assemblies.Net70" Version="1.8.5" />
     <PackageReference Update="Basic.Reference.Assemblies.Net80" Version="1.8.5" />
     <PackageReference Update="Basic.Reference.Assemblies.Net90" Version="1.8.5" />
-    <PackageReference Update="Esolang.Processor.Abstractions" Version="1.0.0" />
+    <PackageReference Update="Esolang.Generator.Abstractions" Version="2.0.0" />
+    <PackageReference Update="Esolang.Interpreter.Abstractions" Version="2.0.0" />
+    <PackageReference Update="Esolang.Processor.Abstractions" Version="2.0.0" />
     <PackageReference Update="Microsoft.Bcl.HashCode" Version="6.0.0" />
     <PackageReference Update="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" />
     <PackageReference Update="Microsoft.NET.Test.Sdk" Version="18.4.0" />

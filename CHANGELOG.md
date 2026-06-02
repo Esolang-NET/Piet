@@ -6,8 +6,10 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-06-02
+
 ### Changed
-- `Esolang.Piet.Processor` and `Esolang.Piet.Interpreter`: Migrated to `Esolang.Abstractions` v2.0.0.
+- **Breaking**: Migrated `Esolang.Piet.Processor` and `Esolang.Piet.Interpreter` to `Esolang.Abstractions` v2.0.0.
 
 ### Added
 - `Esolang.Piet.Generator`: Added PT0013 diagnostic for enforcing partial method declaration.

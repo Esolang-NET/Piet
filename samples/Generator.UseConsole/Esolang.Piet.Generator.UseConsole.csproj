@@ -24,8 +24,8 @@
   <ItemGroup>
     <!-- Keep local development aligned with the packed analyzer layout: the generator is referenced once,
          while its non-analyzer dependencies are provided from the same build output folder. -->
-    <Analyzer Include="..\..\Generator\bin\$(Configuration)\netstandard2.0\Esolang.Piet.Parser.dll" />
-    <Analyzer Include="..\..\Generator\bin\$(Configuration)\netstandard2.0\SixLabors.ImageSharp.dll" />
+   <Analyzer Include="..\..\Generator\bin\$(Configuration)\netstandard2.0\*.dll" 
+             Exclude="..\..\Generator\bin\$(Configuration)\netstandard2.0\Esolang.Brainfuck.Generator.dll" />
   </ItemGroup>
 
   <!-- ProjectReference does not bring buildTransitive targets, so import local targets explicitly. -->
