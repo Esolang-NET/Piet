@@ -6,6 +6,17 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+- `Esolang.Piet.Generator` / `Esolang.Piet.Processor`: added Piet++ language support.
+- `Esolang.Piet.Parser`: added ascii-piet++ text parsing/formatting support (`.appp`, `.txt2`).
+
+### Changed
+- `Esolang.Piet.Parser`: renamed format naming from `ascii-piet2` to `ascii-piet++`.
+
+### Fixed
+- `Esolang.Piet.Generator`: fixed language detection override caused by Roslyn default attribute arguments.
+- `Esolang.Piet.Parser`: trimmed trailing Black codels in AsciiPiet and AsciiPietPlusPlus formatters.
+
 ## [2.0.0] - 2026-06-03
 
 ### Changed
