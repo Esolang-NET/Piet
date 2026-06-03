@@ -42,6 +42,7 @@
     <PietImage Include="samples\dot.gif" />
     <PietImage Include="samples\dot-codel-11.gif" />
     <PietImage Include="samples\hw1-11.gif" />
+    <PietImage Include="samples\dot.appp" Language="PietPlusPlus" />
   </ItemGroup>
 
 </Project>

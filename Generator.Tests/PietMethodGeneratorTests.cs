@@ -142,8 +142,8 @@ public class MethodGeneratorTests
         0x00, 0xFF,0xC0,0xC0, 0xFF,0xC0,0xC0
     ]);
 
-    static string MakeTransformedText(string logicalPath, byte[] pngBytes) =>
-        $"// PIET_IMAGE_PATH={logicalPath}\n// PIET_CODEL_SIZE=1\n{Convert.ToBase64String(pngBytes)}";
+    static string MakeTransformedText(string logicalPath, byte[] pngBytes, string language = "Piet") =>
+        $"// PIET_IMAGE_PATH={logicalPath}\n// PIET_CODEL_SIZE=1\n// PIET_LANGUAGE={language}\n{Convert.ToBase64String(pngBytes)}";
 
     static byte[] BuildStoredRgbPng(int width, int height, byte[] rawScanlineBytes)
     {
@@ -2074,20 +2074,22 @@ public class MethodGeneratorTests
     }
 
     [TestMethod]
-    [DataRow("hello-world.png", "samples", "Generator.UseConsole", "samples", "hello-world.png")]
-    [DataRow("ascii-piet-sample.txt", "samples", "Generator.UseConsole", "samples", "ascii-piet-sample.txt")]
-    [DataRow("ppm-sample.ppm", "samples", "Generator.UseConsole", "samples", "ppm-sample.ppm")]
-    [DataRow("dot.gif", "samples", "Generator.UseConsole", "samples", "dot.gif")]
-    [DataRow("dot-codel-11.gif", "samples", "Generator.UseConsole", "samples", "dot-codel-11.gif")]
+    [DataRow("hello-world.png", "samples", "Generator.UseConsole", "samples", "hello-world.png", "Piet")]
+    [DataRow("ascii-piet-sample.txt", "samples", "Generator.UseConsole", "samples", "ascii-piet-sample.txt", "Piet")]
+    [DataRow("ppm-sample.ppm", "samples", "Generator.UseConsole", "samples", "ppm-sample.ppm", "Piet")]
+    [DataRow("dot.gif", "samples", "Generator.UseConsole", "samples", "dot.gif", "Piet")]
+    [DataRow("dot-codel-11.gif", "samples", "Generator.UseConsole", "samples", "dot-codel-11.gif", "Piet")]
+    [DataRow("dot.appp", "samples", "Generator.UseConsole", "samples", "dot.appp", "PietPlusPlus")]
     public void Generator_WithSampleConformanceVector_GeneratesWithoutDiagnostics(
         string logicalPath,
         string p1,
         string p2,
         string p3,
-        string p4)
+        string p4,
+        string language)
     {
         var samplePath = FindFileInRepository(p1, p2, p3, p4);
-        var transformed = MakeTransformedText(logicalPath, File.ReadAllBytes(samplePath));
+        var transformed = MakeTransformedText(logicalPath, File.ReadAllBytes(samplePath), language);
         var source = $$"""
             namespace Demo;
 
@@ -2106,6 +2108,81 @@ public class MethodGeneratorTests
 
         AssertNoErrors(diagnostics, outputCompilation);
 
+    }
+
+    [TestMethod]
+    public void TryGetLanguageInt_WithPietPlusPlusHeader_Returns1()
+    {
+        var text = "// PIET_IMAGE_PATH=dot.appp\n// PIET_CODEL_SIZE=1\n// PIET_LANGUAGE=PietPlusPlus\nfnw=";
+        var result = Esolang.Piet.Generator.MethodGenerator.TryGetLanguageInt(text);
+        Assert.AreEqual(1, result, $"Expected PietPlusPlus (1) but got {result?.ToString() ?? "null"}");
+    }
+
+    [TestMethod]
+    public void TryGetLanguageInt_WithPietHeader_Returns0()
+    {
+        var text = "// PIET_IMAGE_PATH=hello.png\n// PIET_CODEL_SIZE=1\n// PIET_LANGUAGE=Piet\nabc=";
+        var result = Esolang.Piet.Generator.MethodGenerator.TryGetLanguageInt(text);
+        Assert.AreEqual(0, result, $"Expected Piet (0) but got {result?.ToString() ?? "null"}");
+    }
+
+    [TestMethod]
+    public void Generator_WithDotApppAndExplicitLanguageAttribute_GeneratesWithoutDiagnostics()
+    {
+        var samplePath = FindFileInRepository("samples", "Generator.UseConsole", "samples", "dot.appp");
+        var transformed = MakeTransformedText("dot.appp", File.ReadAllBytes(samplePath), "PietPlusPlus");
+        var source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("dot.appp", language: (Esolang.Piet.LanguageType)1)]
+                public static partial void RunDot();
+            }
+            """;
+
+        _ = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/dot.appp.piet.txt", transformed));
+
+        AssertNoErrors(diagnostics, outputCompilation);
+    }
+
+    [TestMethod]
+    public void Generator_WithDotApppHeaderLanguage_GeneratesWithPietPlusPlusRuntime()
+    {
+        var samplePath = FindFileInRepository("samples", "Generator.UseConsole", "samples", "dot.appp");
+        var transformed = MakeTransformedText("dot.appp", File.ReadAllBytes(samplePath), "PietPlusPlus");
+        var source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("dot.appp")]
+                public static partial void RunDot();
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/dot.appp.piet.txt", transformed));
+
+        var generatedTrees = driver.GetRunResult().GeneratedTrees;
+        var generatedSource = generatedTrees.Length > 0 ? string.Concat(generatedTrees.Select(t => t.ToString())) : "(no source generated)";
+        var errorCount = 0;
+        foreach (var d in diagnostics)
+            if (d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+                errorCount++;
+
+        Assert.AreEqual(0, errorCount,
+            $"Diagnostics: {string.Join(", ", diagnostics.Select(d => $"[{d.Id}: {d.GetMessage()}]"))}\nGenerated:\n{generatedSource}");
+
+        var hasPietPlusPlus = generatedSource.IndexOf("PietPlusPlus", StringComparison.Ordinal) >= 0;
+        if (!hasPietPlusPlus) throw new AssertFailedException($"Expected PietPlusPlusRuntime usage, but got:\n{generatedSource}");
     }
 
     [TestMethod]
@@ -2852,7 +2929,8 @@ public partial class Sample
     void AssertNoErrors(ImmutableArray<Diagnostic> diagnostics, Compilation? compilation = null)
     {
         var errors = diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.IsEmpty(errors, $"{errors.Length} error(s) in generator output");
+        var errorDetails = string.Join("; ", errors.Select(e => $"{e.Id}: {e.GetMessage()}"));
+        Assert.IsEmpty(errors, $"{errors.Length} error(s) in generator output: [{errorDetails}]");
         var errors2 = compilation?.GetDiagnostics(CancellationToken).Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
         Assert.IsEmpty(errors2 ?? [], $"{errors2?.Length ?? 0} error(s) in compilation");
     }

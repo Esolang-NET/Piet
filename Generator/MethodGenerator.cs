@@ -53,7 +53,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         public string Source { get; } = source;
     }
 
-    readonly struct AdditionalImageFile(string path, string? text, int? codelSize = null, string? transformedOriginalPath = null)
+    readonly struct AdditionalImageFile(string path, string? text, int? codelSize = null, string? transformedOriginalPath = null, Esolang.Piet.Parser.LanguageType? language = null)
     {
         public string Path { get; } = path;
 
@@ -62,6 +62,8 @@ public partial class MethodGenerator : IIncrementalGenerator
         public int? CodelSize { get; } = codelSize;
 
         public string? TransformedOriginalPath { get; } = transformedOriginalPath;
+
+        public Esolang.Piet.Parser.LanguageType? Language { get; } = language;
 
         public bool IsReadable => Text is not null;
         public static AdditionalImageFile Make(string path, string? text)
@@ -72,8 +74,10 @@ public partial class MethodGenerator : IIncrementalGenerator
             }
             var codelSize = TryGetCodelSize(text, out var codelSize_) ? codelSize_ : (int?)null;
             var transformedOriginalPath = TryGetTransformedOriginalImagePath(text, out var transformedImagePath) ? transformedImagePath : null;
-            var newText = string.Join("\n", text.Split('\n').Skip(2));
-            return new(path, newText, codelSize, transformedOriginalPath);
+            var hasLanguage = TryGetLanguage(text, out var language_);
+            var skipLines = hasLanguage ? 3 : 2;
+            var newText = string.Join("\n", text.Split('\n').Skip(skipLines));
+            return new(path, newText, codelSize, transformedOriginalPath, hasLanguage ? language_ : null);
         }
     }
 
@@ -314,12 +318,14 @@ public partial class MethodGenerator : IIncrementalGenerator
             }
         }
 
-        // 属性引数（3つ目）にlanguageがあれば取得
-        var language = Esolang.Piet.Parser.LanguageType.Piet;
+        // 属性引数（3つ目）にlanguageがあればそれを優先、なければ追加ファイルのPIET_LANGUAGEコメントを使う
+        // Note: Roslyn includes default parameter values in ConstructorArguments, so we only override
+        // the header-based language if the attribute value is non-default (non-Piet).
+        var language = resolvedImageFile.Language ?? Esolang.Piet.Parser.LanguageType.Piet;
         if (source.Attributes[0].ConstructorArguments.Length > 2)
         {
             var arg = source.Attributes[0].ConstructorArguments[2];
-            if (arg.Value is int langVal)
+            if (arg.Value is int langVal && langVal != (int)Esolang.Piet.Parser.LanguageType.Piet)
                 language = (Esolang.Piet.Parser.LanguageType)langVal;
         }
 
@@ -1357,6 +1363,41 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         return text[secondLineStart..secondLineEnd].Replace("\r", string.Empty);
     }
+
+    static string GetThirdLine(string text)
+    {
+        var first = text.IndexOf('\n');
+        if (first < 0) return string.Empty;
+        var second = text.IndexOf('\n', first + 1);
+        if (second < 0) return string.Empty;
+        var thirdStart = second + 1;
+        var thirdEnd = text.IndexOf('\n', thirdStart);
+        if (thirdEnd < 0) return text[thirdStart..].Replace("\r", string.Empty);
+        return text[thirdStart..thirdEnd].Replace("\r", string.Empty);
+    }
+
+    internal static bool TryGetLanguage(string text, out Esolang.Piet.Parser.LanguageType language)
+    {
+        language = Esolang.Piet.Parser.LanguageType.Piet;
+        if (text is null) return false;
+        const string prefix = "// PIET_LANGUAGE=";
+        var thirdLine = GetThirdLine(text);
+        if (!thirdLine.StartsWith(prefix, StringComparison.Ordinal))
+            return false;
+        var langText = thirdLine[prefix.Length..].Trim();
+        if (Enum.TryParse(langText, out Esolang.Piet.Parser.LanguageType parsed))
+        {
+            language = parsed;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Test helper: returns 0 (Piet), 1 (PietPlusPlus), or null (not found) from the .piet.txt header.
+    /// </summary>
+    internal static int? TryGetLanguageInt(string text)
+        => TryGetLanguage(text, out var lang) ? (int)lang : (int?)null;
 
     static bool IsMatchingPath(string normalizedExpectedPath, string normalizedCandidatePath)
     {

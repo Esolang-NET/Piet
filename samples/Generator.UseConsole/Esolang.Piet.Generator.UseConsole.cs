@@ -74,6 +74,8 @@ PietSample.RunDotCodel11Gif();
 
 Console.WriteLine($"{nameof(PietSample.RunHw111Gif)}:{PietSample.RunHw111Gif()}");
 
+PietSample.RunDotAsciiPietPlusPlus();
+
 partial class PietSample
 {
     /// <summary>
@@ -188,4 +190,10 @@ partial class PietSample
     /// </summary>
     [GeneratePietMethod("hw1-11.gif", codelSize: 11)]
     public static partial string RunHw111Gif();
+
+    /// <summary>
+    /// Executes the dot ascii-piet++ sample. Language is specified via &lt;PietImage Language="PietPlusPlus" /&gt; in the project file.
+    /// </summary>
+    [GeneratePietMethod("dot.appp")]
+    public static partial void RunDotAsciiPietPlusPlus();
 }
