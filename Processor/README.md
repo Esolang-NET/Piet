@@ -14,7 +14,7 @@ dotnet add package Esolang.Piet.Processor
 
 ### Basic Usage (Event Streaming)
 
-イベントをストリーミングして処理する場合の基本的なアプローチです。
+This is the basic approach for processing events as a stream.
 
 ```csharp
 using Esolang.Piet.Parser;
@@ -32,21 +32,21 @@ await foreach (var ev in processor.RunAsyncEnumerable())
 
 ### Simplified Execution (Extensions)
 
-`Esolang.Processor.Extensions.IO` パッケージを使用して、終了コードと出力先を指定して簡潔に実行するアプローチです。
+This approach uses the `Esolang.Processor.Extensions.IO` package to run the processor with an explicit exit code and output target.
 
 ```csharp
 using Esolang.Piet.Parser;
 using Esolang.Piet.Processor;
 using Esolang.Processor;
-using Esolang.Processor.Extensions.IO; // Esolang.Processor.Extensions.IO パッケージが必要
+using Esolang.Processor.Extensions.IO; // Requires the Esolang.Processor.Extensions.IO package
 
 var program = PietParser.Parse("hello-world.png");
 var processor = new PietProcessor(program);
 
-// 出力先を準備
+// Prepare an output sink
 using var output = new StringWriter();
 
-// 実行して終了コードを取得（出力はTextWriter引数経由）
+// Execute and get the exit code (output is written through the TextWriter argument)
 int exitCode = await processor.RunToEndAsync(output: output);
 
 Console.WriteLine($"Exit code: {exitCode}");
