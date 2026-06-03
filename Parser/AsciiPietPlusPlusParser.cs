@@ -3,7 +3,7 @@ using System.Text;
 namespace Esolang.Piet.Parser;
 
 /// <summary>
-/// Parses ascii-piet2 format text into <see cref="PietProgram"/> instances for the Piet++ language.
+/// Parses ascii-piet++ format text into <see cref="PietProgram"/> instances for the Piet++ language.
 /// </summary>
 /// <remarks>
 /// <para>Character-to-color-index mapping:</para>
@@ -16,6 +16,7 @@ namespace Esolang.Piet.Parser;
 ///   <item><description><c>'|'</c> → end-of-line marker</description></item>
 /// </list>
 /// <para>Actual newline characters (<c>\r</c>, <c>\n</c>) are ignored and may appear freely.</para>
+/// <para>Supported file extensions: <c>.appp</c>, <c>.txt2</c>.</para>
 /// </remarks>
 public static class AsciiPietPlusPlusParser
 {
@@ -53,7 +54,7 @@ public static class AsciiPietPlusPlusParser
         if (codelSize < 1)
             throw new ArgumentOutOfRangeException(nameof(codelSize), "codelSize must be 1 or greater.");
         if (bytes.Length == 0)
-            throw new InvalidDataException("ascii-piet2 file is empty.");
+            throw new InvalidDataException("ascii-piet++ file is empty.");
         var text = Encoding.ASCII.GetString(bytes).Replace("\r", "").Replace("\n", "");
         return InternalParse(text, codelSize);
     }
@@ -94,7 +95,7 @@ public static class AsciiPietPlusPlusParser
                 continue;
             }
             if (!CharToIndex.TryGetValue(ch, out var idx))
-                throw new InvalidDataException($"Unknown ascii-piet2 character: '{ch}' (0x{(int)ch:X2})");
+                throw new InvalidDataException($"Unknown ascii-piet++ character: '{ch}' (0x{(int)ch:X2})");
             (currentLine ??= []).Add(idx);
         }
         // Flush trailing row without EOL marker
@@ -102,7 +103,7 @@ public static class AsciiPietPlusPlusParser
             lineList.Add(currentLine);
 
         if (lineList.Count == 0)
-            throw new InvalidDataException("ascii-piet2 file has no content.");
+            throw new InvalidDataException("ascii-piet++ file has no content.");
 
         var width = lineList.Max(l => l.Count);
         var height = lineList.Count;

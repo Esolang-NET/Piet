@@ -98,7 +98,7 @@ public sealed class AsciiPietPlusPlusParserTests
     [TestMethod]
     public void Parse_Throws_ForInvalidChar()
     {
-        var bytes = Encoding.ASCII.GetBytes("0!|");  // '!' is not a valid ascii-piet2 char
+        var bytes = Encoding.ASCII.GetBytes("0!|");  // '!' is not a valid ascii-piet++ char
         Assert.ThrowsExactly<InvalidDataException>(() => AsciiPietPlusPlusParser.Parse(bytes));
     }
 
@@ -112,7 +112,7 @@ public sealed class AsciiPietPlusPlusParserTests
     [TestMethod]
     public void TryParse_ReturnsFalse_ForInvalidChar()
     {
-        var bytes = Encoding.ASCII.GetBytes("0!|");  // '!' is not a valid ascii-piet2 char
+        var bytes = Encoding.ASCII.GetBytes("0!|");  // '!' is not a valid ascii-piet++ char
         var ok = AsciiPietPlusPlusParser.TryParse(bytes, 1, out _);
         Assert.IsFalse(ok);
     }

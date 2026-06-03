@@ -3,12 +3,13 @@ using System.Text;
 namespace Esolang.Piet.Parser;
 
 /// <summary>
-/// Formats a <see cref="PietProgram"/> as ascii-piet2 text for the Piet++ language.
+/// Formats a <see cref="PietProgram"/> as ascii-piet++ text for the Piet++ language.
 /// </summary>
 /// <remarks>
 /// Each row of codels is written as color characters followed by the
 /// <see cref="AsciiPietPlusPlusParser.EolMarker"/> (<c>'|'</c>).
 /// No actual newline characters are inserted.
+/// Supported file extension: <c>.appp</c>, <c>.txt2</c>.
 /// </remarks>
 public static class AsciiPietPlusPlusFormatter
 {
@@ -26,11 +27,11 @@ public static class AsciiPietPlusPlusFormatter
     }
 
     /// <summary>
-    /// Converts a Piet++ program to ascii-piet2 text.
+    /// Converts a Piet++ program to ascii-piet++ text.
     /// Each row ends with <c>'|'</c>; no newline characters are inserted.
     /// </summary>
     /// <param name="program">The Piet++ program to format.</param>
-    /// <returns>An ascii-piet2 string representation of the program.</returns>
+    /// <returns>An ascii-piet++ string representation of the program.</returns>
     public static string Format(PietProgram program)
     {
         if (program is null)

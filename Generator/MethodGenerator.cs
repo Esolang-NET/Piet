@@ -1206,13 +1206,13 @@ public partial class MethodGenerator : IIncrementalGenerator
             if (headers.Length <= 0)
                 return null;
             var contentType = headers[0].Trim().ToLowerInvariant();
-            if (contentType == "text/plain")
+            if (contentType is "text/plain" or "text/ap")
                 ext = ".txt";
             // Keep legacy typo support for backward compatibility.
             else if (contentType is "text/ascii-piet" or "text/acii-piet")
-                ext = ".txt";
-            else if (contentType is "text/ascii-piet2" or "text/ascii-piet-plus-plus")
-                ext = ".txt2";
+                ext = ".ap";
+            else if (contentType is "text/ascii-piet++" or "text/ascii-piet-plus-plus" or "text/ascii-piet2" or "text/appp")
+                ext = ".appp";
             else if (contentType == "image/x-portable-pixmap")
                 ext = ".ppm";
             else

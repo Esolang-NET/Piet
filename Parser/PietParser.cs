@@ -26,7 +26,7 @@ public static class PietParser
 #endif
     out PietProgram program)
     {
-        if (ext is ".txt" or ".ascii-piet")
+        if (ext is ".txt" or ".ap" or ".ascii-piet")
             return AsciiPietParser.TryParse(bytes, codelSize, out program);
         if (AsciiPietParser.LooksLikeAsciiPiet(bytes) && AsciiPietParser.TryParse(bytes, codelSize, out program))
             return true;
@@ -48,7 +48,7 @@ public static class PietParser
     /// <exception cref="ArgumentException"></exception>
     public static PietProgram Parse(byte[] bytes, string ext, int codelSize = 1)
     {
-        if (ext is ".txt" or ".ascii-piet")
+        if (ext is ".txt" or ".ap" or ".ascii-piet")
             return AsciiPietParser.Parse(bytes, codelSize);
         if (AsciiPietParser.LooksLikeAsciiPiet(bytes) && AsciiPietParser.TryParse(bytes, codelSize, out var program))
             return program;
@@ -352,7 +352,7 @@ public static class PietParser
     {
         if (language == LanguageType.PietPlusPlus)
         {
-            if (ext is ".txt2" or ".ascii-piet2")
+            if (ext is ".txt2" or ".appp")
                 return AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program);
             if (AsciiPietPlusPlusParser.LooksLikeAsciiPietPlusPlus(bytes)
                 && AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program))
