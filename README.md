@@ -26,7 +26,7 @@ For detailed Generator signatures, patterns, and source specification (including
 
 | Attribute Argument | `partial` Method Parameters (Input) | `partial` Method Return Types (Output) |
 | :--- | :--- | :--- |
-| `string` (Path/Inline) | `byte[]?` (Image Data) | `void`, `string`, `string?`, `int`, `Task`, `ValueTask`, `IEnumerable<byte>`, `IAsyncEnumerable<byte>` |
+| `string` (Path/Inline) | `string`, `TextReader`, `PipeReader` | `void`, `int`, `Task<int>`, `ValueTask<int>`, `string`, `Task<string>`, `ValueTask<string>`, `IEnumerable<byte>`, `IAsyncEnumerable<byte>` |
 
 ## Implementation Status
 
