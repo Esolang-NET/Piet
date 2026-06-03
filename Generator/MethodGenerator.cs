@@ -618,7 +618,8 @@ public partial class MethodGenerator : IIncrementalGenerator
         var runtimeClass = language == Esolang.Piet.Parser.LanguageType.PietPlusPlus
             ? "global::Esolang.Piet.__Generated.PietPlusPlusRuntime"
             : "global::Esolang.Piet.__Generated.PietRuntime";
-        var baseFeatures = features switch {
+        var baseFeatures = features switch
+        {
             GeneratorFeatures.SyncPlusPlus => GeneratorFeatures.Sync,
             GeneratorFeatures.AsyncPlusPlus => GeneratorFeatures.Async,
             GeneratorFeatures.EnumerablePlusPlus => GeneratorFeatures.Enumerable,
@@ -1509,7 +1510,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             {
                 var c = codels[y * width + x];
                 // skip Black(0) and White(63)
-                if (c == 0 || c == 63) continue;
+                if (c is 0 or 63) continue;
 
                 void CheckNeighbor(byte nc)
                 {

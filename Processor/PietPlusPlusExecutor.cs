@@ -258,14 +258,14 @@ static class PietPlusPlusExecutor
                             }
                             break;
                         case 18: // InChar
-                        {
-                            char? value = null;
-                            var ev = InputChar(v => value = v);
-                            yield return ev;
-                            if (value.HasValue)
-                                currentStack.Add(PietPlusPlusValue.FromInt(value.Value));
-                            break;
-                        }
+                            {
+                                char? value = null;
+                                var ev = InputChar(v => value = v);
+                                yield return ev;
+                                if (value.HasValue)
+                                    currentStack.Add(PietPlusPlusValue.FromInt(value.Value));
+                                break;
+                            }
                         case 19: // Read (bitmap read - no-op)
                             break;
                         case 20: // Negate
@@ -326,14 +326,14 @@ static class PietPlusPlusExecutor
                             }
                             break;
                         case 29: // InInt
-                        {
-                            int? value = null;
-                            var ev = InputInt(v => value = v);
-                            yield return ev;
-                            if (value.HasValue)
-                                currentStack.Add(PietPlusPlusValue.FromInt(value.Value));
-                            break;
-                        }
+                            {
+                                int? value = null;
+                                var ev = InputInt(v => value = v);
+                                yield return ev;
+                                if (value.HasValue)
+                                    currentStack.Add(PietPlusPlusValue.FromInt(value.Value));
+                                break;
+                            }
                         case 30: // Depth: push nesting depth
                             currentStack.Add(PietPlusPlusValue.FromInt(parentStacks.Count));
                             break;
