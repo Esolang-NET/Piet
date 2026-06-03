@@ -18,11 +18,17 @@ env:
 
 jobs:
   build-and-test:
-    name: build-and-test-${{ matrix.os }}
+    name: build-and-test-${{ matrix.rid }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+          - os: macOS-latest
+            rid: osx-arm64
 
     steps:
       - uses: actions/checkout@v6
@@ -31,6 +37,12 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang zlib1g-dev
 
       - name: Restore
         run: dotnet restore
@@ -42,53 +54,56 @@ jobs:
         run: dotnet test --no-build --verbosity normal
 
       - name: Tool E2E (pack/install/run)
-        if: ${{ matrix.os == 'ubuntu-latest' }}
         shell: bash
         run: |
           set -euo pipefail
+          rid="${{ matrix.rid }}"
           rm -rf .artifacts/tool-e2e
           mkdir -p .artifacts/tool-e2e
 
-          dotnet pack Interpreter/Esolang.Piet.Interpreter.csproj -o .artifacts/tool-e2e
+          dotnet pack Interpreter/Esolang.Piet.Interpreter.csproj -r "$rid" -p:ToolPackageRuntimeIdentifiers= -o .artifacts/tool-e2e
 
-          nupkg_path=$(find .artifacts/tool-e2e -maxdepth 1 -type f -name 'dotnet-piet.*.nupkg' | head -n 1)
+          nupkg_path=$(find .artifacts/tool-e2e -maxdepth 1 -type f -name "dotnet-piet.*.nupkg" ! -name "*.snupkg" | head -n 1)
           if [ -z "$nupkg_path" ]; then
             echo "Failed to find dotnet-piet nupkg in .artifacts/tool-e2e"
             exit 1
           fi
-
           nupkg_name=$(basename "$nupkg_path")
           tool_version=${nupkg_name#dotnet-piet.}
           tool_version=${tool_version%.nupkg}
           echo "Detected tool version: $tool_version"
 
+          dotnet new tool-manifest --force
           dotnet tool install dotnet-piet \
-            --tool-path .artifacts/tool-e2e/path \
             --add-source .artifacts/tool-e2e \
             --version "$tool_version"
 
-          ./.artifacts/tool-e2e/path/dotnet-piet --help
+          dotnet tool run dotnet-piet -- --help
 
-          set +e
-          output=$(./.artifacts/tool-e2e/path/dotnet-piet icon.png 2>&1)
-          status=$?
-          set -e
+          # hello-world.png → "Hello, world!" を検証
+          output1=$(dotnet tool run dotnet-piet -- samples/Generator.UseConsole/samples/hello-world.png)
+          echo "$output1"
+          test "$output1" = "Hello, world!"
 
-          echo "$output"
+          # parse サブコマンドで ascii-piet テキストが出力されることを確認
+          output2=$(dotnet tool run dotnet-piet -- parse samples/Generator.UseConsole/samples/hello-world.png)
+          echo "$output2"
+          [ -n "$output2" ]
 
-          # Current bootstrap state:
-          # - parser may reject non-Piet palette colors (icon.png), or
-          # - processor may throw NotImplementedException once parsing succeeds.
-          # If execution becomes successful in the future, this step should still pass.
-          if [ "$status" -ne 0 ]; then
-            echo "$output" | grep -Eq "Unsupported Piet color|NotImplementedException"
-          fi
+          # inline ascii-piet テキストで実行
+          output3=$(dotnet tool run dotnet-piet -- --ascii-piet-text "l_ C")
+          echo "$output3"
 
-          dotnet tool uninstall dotnet-piet --tool-path .artifacts/tool-e2e/path
+          dotnet tool uninstall dotnet-piet
 
       - name: Pack
         if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: dotnet pack -o artifacts/
+        run: |
+          dotnet pack Generator/Esolang.Piet.Generator.csproj -o artifacts/
+          dotnet pack Parser/Esolang.Piet.Parser.csproj -o artifacts/
+          dotnet pack Processor/Esolang.Piet.Processor.csproj -o artifacts/
+          dotnet pack Interpreter/Esolang.Piet.Interpreter.csproj -p:ToolPackageRuntimeIdentifiers= -o artifacts/
+          dotnet pack Interpreter/Esolang.Piet.Interpreter.csproj -p:PublishAot=false -p:ToolPackageRuntimeIdentifiers="" -o artifacts/
 
       - uses: actions/upload-artifact@v7
         if: ${{ matrix.os == 'ubuntu-latest' }}
