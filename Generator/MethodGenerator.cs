@@ -1211,6 +1211,8 @@ public partial class MethodGenerator : IIncrementalGenerator
             // Keep legacy typo support for backward compatibility.
             else if (contentType is "text/ascii-piet" or "text/acii-piet")
                 ext = ".txt";
+            else if (contentType is "text/ascii-piet2" or "text/ascii-piet-plus-plus")
+                ext = ".txt2";
             else if (contentType == "image/x-portable-pixmap")
                 ext = ".ppm";
             else

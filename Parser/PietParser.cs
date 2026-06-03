@@ -352,11 +352,11 @@ public static class PietParser
     {
         if (language == LanguageType.PietPlusPlus)
         {
-            if (ext is ".txt" or ".ascii-piet")
-            {
-                program = default!;
-                return false;
-            }
+            if (ext is ".txt2" or ".ascii-piet2")
+                return AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program);
+            if (AsciiPietPlusPlusParser.LooksLikeAsciiPietPlusPlus(bytes)
+                && AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program))
+                return true;
             return TryParseInternalPietPlusPlus(bytes, codelSize, out program);
         }
         return TryParse(bytes, ext, codelSize, out program);
