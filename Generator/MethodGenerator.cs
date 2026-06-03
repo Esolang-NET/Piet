@@ -1,13 +1,11 @@
+using Esolang.Generator;
 using Esolang.Piet.Parser;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.IO;
-using System.Linq;
 using System.Text;
+using static Esolang.Generator.BindingError;
 
 namespace Esolang.Piet.Generator;
 
@@ -53,155 +51,6 @@ public partial class MethodGenerator : IIncrementalGenerator
     readonly struct EmittedMethod(string source)
     {
         public string Source { get; } = source;
-    }
-
-    enum ReturnKind
-    {
-        Void,
-        Int,
-        String,
-        Task,
-        TaskInt,
-        TaskString,
-        ValueTask,
-        ValueTaskInt,
-        ValueTaskString,
-        EnumerableByte,
-        AsyncEnumerableByte,
-        Invalid,
-    }
-
-    enum InputKind
-    {
-        None,
-        String,
-        TextReader,
-        PipeReader,
-    }
-
-    enum OutputKind
-    {
-        None,
-        TextWriter,
-        PipeWriter,
-        ReturnString,
-        ReturnEnumerable,
-        ReturnAsyncEnumerable,
-    }
-
-    readonly struct KnownTypes
-    {
-        public readonly INamedTypeSymbol? String;
-        public readonly INamedTypeSymbol? Task;
-        public readonly INamedTypeSymbol? TaskInt;
-        public readonly INamedTypeSymbol? TaskString;
-        public readonly INamedTypeSymbol? ValueTask;
-        public readonly INamedTypeSymbol? ValueTaskInt;
-        public readonly INamedTypeSymbol? ValueTaskString;
-        public readonly INamedTypeSymbol? IEnumerableByte;
-        public readonly INamedTypeSymbol? IAsyncEnumerableByte;
-        public readonly INamedTypeSymbol? TextReader;
-        public readonly INamedTypeSymbol? PipeReader;
-        public readonly INamedTypeSymbol? TextWriter;
-        public readonly INamedTypeSymbol? PipeWriter;
-        public readonly INamedTypeSymbol? CancellationToken;
-        public readonly INamedTypeSymbol? ILogger;
-        public readonly INamedTypeSymbol? ILoggerT;
-
-        public KnownTypes(Compilation compilation)
-        {
-            String = compilation.GetSpecialType(SpecialType.System_String);
-            var byteSymbol = compilation.GetSpecialType(SpecialType.System_Byte);
-            var intSymbol = compilation.GetSpecialType(SpecialType.System_Int32);
-
-            var taskGeneric = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task`1");
-            Task = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task");
-            TaskInt = taskGeneric?.Construct(intSymbol);
-            TaskString = taskGeneric?.Construct(String);
-
-            var valueTaskGeneric = compilation.GetTypeByMetadataName("System.Threading.Tasks.ValueTask`1");
-            ValueTask = compilation.GetTypeByMetadataName("System.Threading.Tasks.ValueTask");
-            ValueTaskInt = valueTaskGeneric?.Construct(intSymbol);
-            ValueTaskString = valueTaskGeneric?.Construct(String);
-
-            var enumerableGeneric = compilation.GetTypeByMetadataName("System.Collections.Generic.IEnumerable`1");
-            IEnumerableByte = enumerableGeneric?.Construct(byteSymbol);
-
-            var asyncEnumerableGeneric = compilation.GetTypeByMetadataName("System.Collections.Generic.IAsyncEnumerable`1");
-            IAsyncEnumerableByte = asyncEnumerableGeneric?.Construct(byteSymbol);
-
-            TextReader = compilation.GetTypeByMetadataName("System.IO.TextReader");
-            PipeReader = compilation.GetTypeByMetadataName("System.IO.Pipelines.PipeReader");
-            TextWriter = compilation.GetTypeByMetadataName("System.IO.TextWriter");
-            PipeWriter = compilation.GetTypeByMetadataName("System.IO.Pipelines.PipeWriter");
-            CancellationToken = compilation.GetTypeByMetadataName("System.Threading.CancellationToken");
-            ILogger = compilation.GetTypeByMetadataName("Microsoft.Extensions.Logging.ILogger");
-            ILoggerT = compilation.GetTypeByMetadataName("Microsoft.Extensions.Logging.ILogger`1");
-        }
-    }
-
-    readonly struct ExecutionBinding(
-        bool isValid,
-        ReturnKind returnKind,
-        InputKind inputKind,
-        OutputKind outputKind,
-        string inputExpression,
-        string outputExpression,
-        string? cancellationTokenName,
-        string? loggerName,
-        string? errorId,
-        Location? location = null)
-    {
-        public bool IsValid { get; } = isValid;
-
-        public ReturnKind ReturnKind { get; } = returnKind;
-
-        public InputKind InputKind { get; } = inputKind;
-
-        public OutputKind OutputKind { get; } = outputKind;
-
-        public GeneratorFeatures GeneratorFeatures => ReturnKind switch
-        {
-            ReturnKind.Void => GeneratorFeatures.Sync,
-            ReturnKind.Int => GeneratorFeatures.Sync,
-            ReturnKind.String => GeneratorFeatures.Sync,
-            ReturnKind.Task => GeneratorFeatures.Async,
-            ReturnKind.TaskInt => GeneratorFeatures.Async,
-            ReturnKind.TaskString => GeneratorFeatures.Async,
-            ReturnKind.ValueTask => GeneratorFeatures.Async,
-            ReturnKind.ValueTaskInt => GeneratorFeatures.Async,
-            ReturnKind.ValueTaskString => GeneratorFeatures.Async,
-            ReturnKind.EnumerableByte => GeneratorFeatures.Enumerable,
-            ReturnKind.AsyncEnumerableByte => GeneratorFeatures.AsyncEnumerable,
-            _ => GeneratorFeatures.None,
-        };
-
-        /// <summary>
-        /// True if the method has an explicit input mechanism (string, TextReader or PipeReader parameter).
-        /// </summary>
-        public bool HasExplicitInput { get; } = inputKind is not InputKind.None;
-
-        /// <summary>
-        /// True if the method has an explicit output mechanism (non-void return type, TextWriter or PipeWriter parameter).
-        /// </summary>
-        public bool HasExplicitOutput { get; } = outputKind is not OutputKind.None;
-
-        public string InputExpression { get; } = inputExpression;
-
-        public string OutputExpression { get; } = outputExpression;
-
-        /// <summary>
-        /// The name of the CancellationToken parameter, if present.
-        /// </summary>
-        public string? CancellationTokenName { get; } = cancellationTokenName;
-
-        /// <summary>
-        /// The name of the ILogger parameter, if present.
-        /// </summary>
-        public string? LoggerName { get; } = loggerName;
-
-        public string? ErrorId { get; } = errorId;
-        public Location? Location { get; } = location;
     }
 
     readonly struct AdditionalImageFile(string path, string? text, int? codelSize = null, string? transformedOriginalPath = null)
@@ -398,6 +247,27 @@ public partial class MethodGenerator : IIncrementalGenerator
                 "Invalid image path parameter"
             );
         }
+
+        if (!methodSymbol.IsPartialDefinition)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.MethodMustBePartial,
+                methodSyntax.Identifier.GetLocation(),
+                methodSymbol.Name));
+            return EmitErrorMethod(
+                methodSymbol,
+                methodSyntax,
+                ns,
+                typeKeyword,
+                null,
+                projectDirectory,
+                null,
+                null,
+                DiagnosticDescriptors.MethodMustBePartial.Id,
+                $"Method {methodSymbol.Name} must be declared as partial"
+            );
+        }
+
         if (TryResolveImagePath(imagePath, additionalImageFiles) is not { } resolvedImageFile)
         {
             context.ReportDiagnostic(Diagnostic.Create(
@@ -450,35 +320,15 @@ public partial class MethodGenerator : IIncrementalGenerator
             );
         }
 
-        var executionBinding = BindExecutionSignature(methodSymbol, types);
-        if (!executionBinding.IsValid)
+        var binding = MethodSignatureBinder.Bind(methodSymbol, types);
+
+        if (binding is { IsValid: true, UnhandledParameters.Count: > 0 })
         {
-            if (string.Equals(executionBinding.ErrorId, DiagnosticDescriptors.InvalidReturnType.Id, StringComparison.Ordinal))
+            foreach (var parameter in binding.UnhandledParameters)
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.InvalidReturnType,
-                    executionBinding.Location ?? methodSyntax.Identifier.GetLocation(),
-                    methodSymbol.ReturnType.ToDisplayString()));
-                return EmitErrorMethod(
-                    methodSymbol,
-                    methodSyntax,
-                    ns,
-                    typeKeyword,
-                    resolvedImageFile,
-                    projectDirectory,
-                    codelSize,
-                null,
-                    DiagnosticDescriptors.InvalidReturnType.Id,
-                    $"Invalid return type {methodSymbol.ReturnType.ToDisplayString()}"
-                );
-            }
-
-            if (string.Equals(executionBinding.ErrorId, DiagnosticDescriptors.DuplicateParameter.Id, StringComparison.Ordinal))
-            {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.DuplicateParameter,
-                    executionBinding.Location ?? methodSyntax.Identifier.GetLocation(),
-                    methodSymbol.Name));
+                var descriptor = DiagnosticDescriptors.InvalidParameter;
+                var typeDisplayString = parameter.Type.ToDisplayString();
+                context.ReportDiagnostic(Diagnostic.Create(descriptor, parameter.Locations[0], typeDisplayString));
                 return EmitErrorMethod(
                     methodSymbol,
                     methodSyntax,
@@ -488,35 +338,57 @@ public partial class MethodGenerator : IIncrementalGenerator
                     projectDirectory,
                     codelSize,
                     null,
-                    DiagnosticDescriptors.DuplicateParameter.Id,
-                    $"Duplicate parameter types in method {methodSymbol.Name}"
+                    DiagnosticDescriptors.InvalidParameter.Id,
+                    string.Format(DiagnosticDescriptors.InvalidParameter.MessageFormat.ToString(), typeDisplayString)
                 );
             }
+        }
 
-            if (string.Equals(executionBinding.ErrorId, DiagnosticDescriptors.ReturnOutputConflict.Id, StringComparison.Ordinal))
+        if (!binding.IsValid)
+        {
+            var error = binding.Error;
+            var location = error.Location ?? methodSyntax.Identifier.GetLocation();
+
+            var (descriptor, messageArgs) = error switch
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.ReturnOutputConflict,
-                    executionBinding.Location ?? methodSyntax.Identifier.GetLocation(),
-                    methodSymbol.Name));
-                return EmitErrorMethod(
-                    methodSymbol,
-                    methodSyntax,
-                    ns,
-                    typeKeyword,
-                    resolvedImageFile,
-                    projectDirectory,
-                    codelSize,
-                    null,
-                    DiagnosticDescriptors.ReturnOutputConflict.Id,
-                    $"Return and output conflict in method {methodSymbol.Name}"
-                );
-            }
+                UnsupportedReturnType e => (DiagnosticDescriptors.InvalidReturnType, new object[] { e.ReturnType.ToDisplayString() }),
+                InvalidParameterModifier e => (DiagnosticDescriptors.InvalidParameter, new object[] { e.Parameter.Name }),
+                DuplicateInput e => (
+                    e.ExistingKind switch
+                    {
+                        MethodInputKind.String when types.IsString(e.Parameter.Type, false) => DiagnosticDescriptors.DuplicateParameter,
+                        MethodInputKind.TextReader when types.IsTextReader(e.Parameter.Type) => DiagnosticDescriptors.DuplicateParameter,
+                        MethodInputKind.PipeReader when types.IsPipeReader(e.Parameter.Type) => DiagnosticDescriptors.DuplicateParameter,
+                        _ => DiagnosticDescriptors.InvalidParameter
+                    },
+                    e.ExistingKind switch
+                    {
+                        MethodInputKind.String when types.IsString(e.Parameter.Type, false) => [methodSymbol.Name],
+                        MethodInputKind.TextReader when types.IsTextReader(e.Parameter.Type) => [methodSymbol.Name],
+                        MethodInputKind.PipeReader when types.IsPipeReader(e.Parameter.Type) => [methodSymbol.Name],
+                        _ => [e.Parameter.Name]
+                    }
+                ),
+                DuplicateOutput e => (
+                    e.ExistingKind switch
+                    {
+                        MethodOutputKind.TextWriter when types.IsTextWriter(e.Parameter.Type) => DiagnosticDescriptors.DuplicateParameter,
+                        MethodOutputKind.PipeWriter when types.IsPipeWriter(e.Parameter.Type) => DiagnosticDescriptors.DuplicateParameter,
+                        _ => DiagnosticDescriptors.InvalidParameter
+                    },
+                    e.ExistingKind switch
+                    {
+                        MethodOutputKind.TextWriter when types.IsTextWriter(e.Parameter.Type) => [methodSymbol.Name],
+                        MethodOutputKind.PipeWriter when types.IsPipeWriter(e.Parameter.Type) => [methodSymbol.Name],
+                        _ => [e.Parameter.Name]
+                    }
+                ),
+                DuplicateCancellationToken or DuplicateLogger => (DiagnosticDescriptors.DuplicateParameter, new object[] { methodSymbol.Name }),
+                ReturnOutputConflict => (DiagnosticDescriptors.ReturnOutputConflict, new object[] { methodSymbol.Name }),
+                _ => (DiagnosticDescriptors.InvalidParameter, new object[] { methodSymbol.Name })
+            };
 
-            context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.InvalidParameter,
-                executionBinding.Location ?? methodSyntax.Identifier.GetLocation(),
-                methodSymbol.Name));
+            context.ReportDiagnostic(Diagnostic.Create(descriptor, location, messageArgs));
             return EmitErrorMethod(
                 methodSymbol,
                 methodSyntax,
@@ -526,8 +398,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                 projectDirectory,
                 codelSize,
                 null,
-                DiagnosticDescriptors.InvalidParameter.Id,
-                $"Invalid parameter in method {methodSymbol.Name}"
+                descriptor.Id,
+                string.Format(descriptor.MessageFormat.ToString(), messageArgs)
             );
         }
 
@@ -599,21 +471,21 @@ public partial class MethodGenerator : IIncrementalGenerator
         }
 
         var (mightUseOutput, mightUseInput) = ScanPietIoCommands(codels, imageWidth, imageHeight);
-        if (mightUseOutput && !executionBinding.HasExplicitOutput)
+        if (mightUseOutput && !binding.HasExplicitOutput)
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.RequiredOutputInterface,
                 methodSyntax.Identifier.GetLocation()));
         }
 
-        if (mightUseInput && !executionBinding.HasExplicitInput)
+        if (mightUseInput && !binding.HasExplicitInput)
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.RequiredInputInterface,
                 methodSyntax.Identifier.GetLocation()));
         }
 
-        if (!mightUseInput && executionBinding.HasExplicitInput)
+        if (!mightUseInput && binding.HasExplicitInput)
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.UnusedInputInterface,
@@ -622,17 +494,13 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         var containingTypeName = methodSymbol.ContainingType.Name;
         var staticModifier = methodSymbol.IsStatic ? " static" : string.Empty;
-        var asyncModifier = executionBinding.ReturnKind switch
-        {
-            ReturnKind.Task or ReturnKind.TaskInt or ReturnKind.TaskString or ReturnKind.ValueTask or ReturnKind.ValueTaskInt or ReturnKind.ValueTaskString or ReturnKind.AsyncEnumerableByte => " async",
-            _ => string.Empty,
-        };
+        var asyncModifier = binding.IsAsync ? " async" : string.Empty;
         var accessibility = GetAccessibility(methodSymbol.DeclaredAccessibility);
         var parameterList = string.Join(", ", methodSymbol.Parameters.Select(p =>
         {
-            if (executionBinding.ReturnKind == ReturnKind.AsyncEnumerableByte
-                && executionBinding.CancellationTokenName is not null
-                && string.Equals(p.Name, executionBinding.CancellationTokenName, StringComparison.Ordinal))
+            if (binding.IsAsyncEnumerable
+                && binding.CancellationTokenName is not null
+                && string.Equals(p.Name, binding.CancellationTokenName, StringComparison.Ordinal))
             {
                 return "[global::System.Runtime.CompilerServices.EnumeratorCancellation] " + FormatParameter(p);
             }
@@ -659,7 +527,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         EmitBody(
             code,
-            executionBinding,
+            binding,
             $"new byte[] {{ {string.Join(", ", codels)} }}",
             imageWidth.ToString(),
             imageHeight.ToString(),
@@ -673,16 +541,25 @@ public partial class MethodGenerator : IIncrementalGenerator
         {
             code.AppendLine("}");
         }
-        var generatorFeatures = executionBinding.GeneratorFeatures;
-        if (executionBinding.LoggerName is not null)
+
+        var generatorFeatures = GetGeneratorFeatures(binding);
+        if (binding.LoggerExpression is not null)
             generatorFeatures |= GeneratorFeatures.UseLogging;
 
         return (new EmittedMethod(code.ToString()), generatorFeatures);
     }
 
-    private static void EmitBody(
+    static GeneratorFeatures GetGeneratorFeatures(MethodSignatureBinding binding)
+    {
+        if (binding.IsAsyncEnumerable) return GeneratorFeatures.AsyncEnumerable;
+        if (binding.IsEnumerable) return GeneratorFeatures.Enumerable;
+        if (binding.IsAsync) return GeneratorFeatures.Async;
+        return GeneratorFeatures.Sync;
+    }
+
+    static void EmitBody(
             StringBuilder builder,
-            ExecutionBinding executionBinding,
+            MethodSignatureBinding binding,
             string codelArrayExpression,
             string widthExpression,
             string heightExpression,
@@ -690,20 +567,22 @@ public partial class MethodGenerator : IIncrementalGenerator
             bool mightUseInput
         )
     {
-        var ctName = executionBinding.CancellationTokenName ?? "default(global::System.Threading.CancellationToken)";
+        var ctName = binding.CancellationTokenName ?? "default(global::System.Threading.CancellationToken)";
         // `cancellationToken: {cName}`
         var ctParameter = $"cancellationToken: {ctName}";
-        var loggerExpr = executionBinding.LoggerName ?? "null";
+        var loggerExpr = binding.LoggerExpression ?? "null";
         // `logger: {loggerExpr}` or string.Empty
-        var logParameter = executionBinding.LoggerName is not null ? $"logger: {loggerExpr}," : string.Empty;
+        var logParameter = binding.LoggerExpression is not null ? $"logger: {loggerExpr}," : string.Empty;
+
+        var features = GetGeneratorFeatures(binding);
 
         // ------------------------------------------------------------
         // 入力デリゲート生成
         // ------------------------------------------------------------
 
-        switch (executionBinding)
+        switch (binding)
         {
-            case { InputKind: InputKind.None, GeneratorFeatures: GeneratorFeatures.Sync or GeneratorFeatures.Enumerable, HasExplicitInput: false } when mightUseInput:
+            case { InputKind: MethodInputKind.None } when features is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable && mightUseInput:
                 builder.AppendLine("""
                 int? __pietReadNumber()
                     => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
@@ -711,13 +590,13 @@ public partial class MethodGenerator : IIncrementalGenerator
                     => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
         """);
                 break;
-            case { InputKind: InputKind.None, GeneratorFeatures: GeneratorFeatures.Sync or GeneratorFeatures.Enumerable }:
+            case { InputKind: MethodInputKind.None } when features is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable:
                 builder.AppendLine("""
                 int? __pietReadNumber() => (int?)null;
                 int? __pietReadChar() => (int?)null;
         """);
                 break;
-            case { InputKind: InputKind.None, GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable, HasExplicitInput: false } when mightUseInput:
+            case { InputKind: MethodInputKind.None } when features is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable && mightUseInput:
                 builder.AppendLine("""
                 global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                     => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
@@ -726,7 +605,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                     => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
         """);
                 break;
-            case { InputKind: InputKind.None, GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable }:
+            case { InputKind: MethodInputKind.None } when features is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable:
                 builder.AppendLine("""
                 global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                     => new global::System.Threading.Tasks.ValueTask<int?>((int?)null);
@@ -735,9 +614,9 @@ public partial class MethodGenerator : IIncrementalGenerator
                     => new global::System.Threading.Tasks.ValueTask<int?>((int?)null);
         """);
                 break;
-            case { InputKind: InputKind.String, GeneratorFeatures: GeneratorFeatures.Sync or GeneratorFeatures.Enumerable }:
+            case { InputKind: MethodInputKind.String } when features is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable:
                 builder.AppendLine($$"""
-                var __pietStringReader = new global::System.IO.StringReader({{executionBinding.InputExpression}});
+                var __pietStringReader = new global::System.IO.StringReader({{binding.InputExpression}});
 
                 int? __pietReadNumber()
                 {
@@ -754,9 +633,9 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                 break;
 
-            case { InputKind: InputKind.String, GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable }:
+            case { InputKind: MethodInputKind.String } when features is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable:
                 builder.AppendLine($$"""
-                var __pietStringReader = new global::System.IO.StringReader({{executionBinding.InputExpression}});
+                var __pietStringReader = new global::System.IO.StringReader({{binding.InputExpression}});
 
                 global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                 {
@@ -773,29 +652,29 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                 break;
 
-            case { InputKind: InputKind.TextReader, GeneratorFeatures: GeneratorFeatures.Sync or GeneratorFeatures.Enumerable }:
+            case { InputKind: MethodInputKind.TextReader } when features is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable:
                 builder.AppendLine($$"""
                 int? __pietReadNumber()
                 {
-                    var __line = {{executionBinding.InputExpression}}.ReadLine();
+                    var __line = {{binding.InputExpression}}.ReadLine();
                     if (__line is null) return null;
                     return int.TryParse(__line, out var __n) ? __n : (int?)null;
                 }
 
                 int? __pietReadChar()
                 {
-                    var __ch = {{executionBinding.InputExpression}}.Read();
+                    var __ch = {{binding.InputExpression}}.Read();
                     return __ch < 0 ? (int?)null : __ch;
                 }
         """);
                 break;
 
-            case { InputKind: InputKind.TextReader, GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable }:
+            case { InputKind: MethodInputKind.TextReader } when features is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable:
                 builder.AppendLine($$"""
                 global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                 {
             #if NET7_0_OR_GREATER
-                    var __lineTask = {{executionBinding.InputExpression}}.ReadLineAsync(__ct);
+                    var __lineTask = {{binding.InputExpression}}.ReadLineAsync(__ct);
                     if (__lineTask.IsCompletedSuccessfully)
                     {
                         var __line = __lineTask.Result;
@@ -806,7 +685,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
                     async global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsyncAwaited(global::System.Threading.CancellationToken ___ct)
                     {
-                        var __line = await {{executionBinding.InputExpression}}.ReadLineAsync(___ct).ConfigureAwait(false);
+                        var __line = await {{binding.InputExpression}}.ReadLineAsync(___ct).ConfigureAwait(false);
                         if (__line is null) return null;
                         return int.TryParse(__line, out var __n) ? __n : (int?)null;
                     }
@@ -815,7 +694,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
                     async global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsyncAwaited()
                     {
-                        var __line = await {{executionBinding.InputExpression}}.ReadLineAsync().ConfigureAwait(false);
+                        var __line = await {{binding.InputExpression}}.ReadLineAsync().ConfigureAwait(false);
                         if (__line is null) return null;
                         return int.TryParse(__line, out var __n) ? __n : (int?)null;
                     }
@@ -824,26 +703,26 @@ public partial class MethodGenerator : IIncrementalGenerator
 
                 global::System.Threading.Tasks.ValueTask<int?> __pietReadCharAsync(global::System.Threading.CancellationToken __ct)
                 {
-                    var __ch = {{executionBinding.InputExpression}}.Read();
+                    var __ch = {{binding.InputExpression}}.Read();
                     return new(__ch < 0 ? (int?)null : __ch);
                 }
         """);
                 break;
 
-            case { InputKind: InputKind.PipeReader, GeneratorFeatures: GeneratorFeatures.Sync or GeneratorFeatures.Enumerable }:
+            case { InputKind: MethodInputKind.PipeReader } when features is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable:
                 builder.AppendLine($$"""
                 int? __pietReadNumber()
                 {
-                    var __result = {{executionBinding.InputExpression}}.ReadAsync({{ctName}}).AsTask().GetAwaiter().GetResult();
+                    var __result = {{binding.InputExpression}}.ReadAsync({{ctName}}).AsTask().GetAwaiter().GetResult();
                     var __buffer = __result.Buffer;
                     if (__buffer.IsEmpty)
                     {
-                        {{executionBinding.InputExpression}}.AdvanceTo(__buffer.End);
+                        {{binding.InputExpression}}.AdvanceTo(__buffer.End);
                         return null;
                     }
 
                     var __text = System.Text.Encoding.UTF8.GetString(global::System.Buffers.BuffersExtensions.ToArray(__buffer));
-                    {{executionBinding.InputExpression}}.AdvanceTo(__buffer.End);
+                    {{binding.InputExpression}}.AdvanceTo(__buffer.End);
 
                     __text = __text.Trim();
                     return int.TryParse(__text, out var __n) ? __n : (int?)null;
@@ -851,11 +730,11 @@ public partial class MethodGenerator : IIncrementalGenerator
 
                 int? __pietReadChar()
                 {
-                    var __result = {{executionBinding.InputExpression}}.ReadAsync({{ctName}}).AsTask().GetAwaiter().GetResult();
+                    var __result = {{binding.InputExpression}}.ReadAsync({{ctName}}).AsTask().GetAwaiter().GetResult();
                     var __buffer = __result.Buffer;
                     if (__buffer.IsEmpty)
                     {
-                        {{executionBinding.InputExpression}}.AdvanceTo(__buffer.End);
+                        {{binding.InputExpression}}.AdvanceTo(__buffer.End);
                         return null;
                     }
 
@@ -866,26 +745,26 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __buffer.First.Span[0];
             #endif
                     var __pos = __buffer.GetPosition(1);
-                    {{executionBinding.InputExpression}}.AdvanceTo(__pos);
+                    {{binding.InputExpression}}.AdvanceTo(__pos);
                     return __first;
                 }
         """);
                 break;
 
-            case { InputKind: InputKind.PipeReader, GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable }:
+            case { InputKind: MethodInputKind.PipeReader } when features is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable:
                 builder.AppendLine($$"""
                 async global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                 {
-                    var __result = await {{executionBinding.InputExpression}}.ReadAsync(__ct).ConfigureAwait(false);
+                    var __result = await {{binding.InputExpression}}.ReadAsync(__ct).ConfigureAwait(false);
                     var __buffer = __result.Buffer;
                     if (__buffer.IsEmpty)
                     {
-                        {{executionBinding.InputExpression}}.AdvanceTo(__buffer.End);
+                        {{binding.InputExpression}}.AdvanceTo(__buffer.End);
                         return null;
                     }
 
                     var __text = global::System.Text.Encoding.UTF8.GetString(global::System.Buffers.BuffersExtensions.ToArray(__buffer));
-                    {{executionBinding.InputExpression}}.AdvanceTo(__buffer.End);
+                    {{binding.InputExpression}}.AdvanceTo(__buffer.End);
 
                     __text = __text.Trim();
                     return int.TryParse(__text, out var __n) ? __n : (int?)null;
@@ -893,11 +772,11 @@ public partial class MethodGenerator : IIncrementalGenerator
 
                 async global::System.Threading.Tasks.ValueTask<int?> __pietReadCharAsync(global::System.Threading.CancellationToken __ct)
                 {
-                    var __result = await {{executionBinding.InputExpression}}.ReadAsync(__ct).ConfigureAwait(false);
+                    var __result = await {{binding.InputExpression}}.ReadAsync(__ct).ConfigureAwait(false);
                     var __buffer = __result.Buffer;
                     if (__buffer.IsEmpty)
                     {
-                        {{executionBinding.InputExpression}}.AdvanceTo(__buffer.End);
+                        {{binding.InputExpression}}.AdvanceTo(__buffer.End);
                         return null;
                     }
 
@@ -908,37 +787,37 @@ public partial class MethodGenerator : IIncrementalGenerator
                         __buffer.First.Span[0];
             #endif
                     var __pos = __buffer.GetPosition(1);
-                    {{executionBinding.InputExpression}}.AdvanceTo(__pos);
+                    {{binding.InputExpression}}.AdvanceTo(__pos);
                     return __first;
                 }
         """);
                 break;
         }
 
-        switch (executionBinding)
+        switch (binding)
         {
-            case { GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.Sync, OutputKind: OutputKind.ReturnString }:
+            case { OutputKind: MethodOutputKind.ReturnString } when features is GeneratorFeatures.Async or GeneratorFeatures.Sync:
                 builder.AppendLine("""
                 var __pietBytes = new global::System.Collections.Generic.List<byte>();
                 void __pietWriteByte(byte b) => __pietBytes.Add(b);
         """);
                 break;
-            case { GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.Sync, OutputKind: OutputKind.TextWriter }:
+            case { OutputKind: MethodOutputKind.TextWriter } when features is GeneratorFeatures.Async or GeneratorFeatures.Sync:
                 builder.AppendLine($$"""
-                void __pietWriteByte(byte b) => {{executionBinding.OutputExpression}}.Write((char)b);
+                void __pietWriteByte(byte b) => {{binding.OutputExpression}}.Write((char)b);
         """);
                 break;
-            case { GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.Sync, OutputKind: OutputKind.PipeWriter }:
+            case { OutputKind: MethodOutputKind.PipeWriter } when features is GeneratorFeatures.Async or GeneratorFeatures.Sync:
                 builder.AppendLine($$"""
-                void __pietWriteByte(byte b) => global::System.Buffers.BuffersExtensions.Write({{executionBinding.OutputExpression}}, [ b ]);
+                void __pietWriteByte(byte b) => global::System.Buffers.BuffersExtensions.Write({{binding.OutputExpression}}, stackalloc byte[] { b });
         """);
                 break;
-            case { GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.Sync, HasExplicitOutput: false } when mightUseOutput:
+            case { HasExplicitOutput: false } when features is GeneratorFeatures.Async or GeneratorFeatures.Sync && mightUseOutput:
                 builder.AppendLine("""
                 void __pietWriteByte(byte b) => throw new global::System.InvalidOperationException("PT0007: Required output interface not provided");
         """);
                 break;
-            case { GeneratorFeatures: GeneratorFeatures.Async or GeneratorFeatures.Sync }:
+            case { } when features is GeneratorFeatures.Async or GeneratorFeatures.Sync:
                 builder.AppendLine("""
                 void __pietWriteByte(byte b) { }
         """);
@@ -949,9 +828,9 @@ public partial class MethodGenerator : IIncrementalGenerator
         // 戻り値モードごとの本体
         // ------------------------------------------------------------
 
-        switch (executionBinding)
+        switch (binding.ReturnKind)
         {
-            case { ReturnKind: ReturnKind.Int }:
+            case MethodReturnKind.Int32:
                 {
                     builder.AppendLine($$"""
                 {
@@ -970,7 +849,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                     break;
                 }
-            case { ReturnKind: ReturnKind.Void }:
+            case MethodReturnKind.Void:
                 {
                     builder.AppendLine($$"""
                 {
@@ -989,7 +868,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                     break;
                 }
-            case { ReturnKind: ReturnKind.Task }:
+            case MethodReturnKind.Task:
                 {
                     builder.AppendLine($$"""
                 {
@@ -1007,7 +886,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                     break;
                 }
-            case { ReturnKind: ReturnKind.TaskInt }:
+            case MethodReturnKind.TaskInt32:
                 {
                     builder.AppendLine($$"""
                 {
@@ -1026,7 +905,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                     break;
                 }
-            case { ReturnKind: ReturnKind.ValueTask }:
+            case MethodReturnKind.ValueTask:
                 {
                     builder.AppendLine($$"""
                 {
@@ -1044,7 +923,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                     break;
                 }
-            case { ReturnKind: ReturnKind.ValueTaskInt }:
+            case MethodReturnKind.ValueTaskInt32:
                 {
                     builder.AppendLine($$"""
                 {
@@ -1064,7 +943,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                     break;
                 }
 
-            case { ReturnKind: ReturnKind.String }:
+            case MethodReturnKind.String or MethodReturnKind.NullableString:
                 {
                     builder.AppendLine($$"""
                 {
@@ -1094,7 +973,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 }
 
             // 2. Async: Task<string> / ValueTask<string>
-            case { ReturnKind: ReturnKind.TaskString }:
+            case MethodReturnKind.TaskString or MethodReturnKind.TaskNullableString:
                 {
                     builder.AppendLine($$"""
                 {
@@ -1125,7 +1004,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                     break;
                 }
 
-            case { ReturnKind: ReturnKind.ValueTaskString }:
+            case MethodReturnKind.ValueTaskString or MethodReturnKind.ValueTaskNullableString:
                 {
                     builder.AppendLine($$"""
                 {
@@ -1156,7 +1035,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 }
 
             // 3. Enumerable<byte>
-            case { ReturnKind: ReturnKind.EnumerableByte }:
+            case MethodReturnKind.IEnumerableByte:
                 {
                     builder.AppendLine($$"""
                 foreach (var __pietByte in global::Esolang.Piet.__Generated.PietRuntime.ExecuteEnumerable(
@@ -1175,7 +1054,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 }
 
             // 4. AsyncEnumerable<byte>
-            case { ReturnKind: ReturnKind.AsyncEnumerableByte }:
+            case MethodReturnKind.IAsyncEnumerableByte:
                 {
                     builder.AppendLine($$"""
                 await foreach (var __pietByte in global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsyncEnumerable(
@@ -1264,214 +1143,6 @@ public partial class MethodGenerator : IIncrementalGenerator
             _ => languageVersion >= LanguageVersion.CSharp8,
         };
 
-    static bool IsLoggerType(ITypeSymbol? type, KnownTypes types)
-    {
-        if (type is null) return false;
-        if (IsLoggerSymbol(type, types)) return true;
-        foreach (var iface in type.AllInterfaces)
-        {
-            if (IsLoggerSymbol(iface, types)) return true;
-        }
-        return false;
-    }
-
-    static bool IsLoggerSymbol(ITypeSymbol symbol, KnownTypes types)
-     => SymbolEqualityComparer.Default.Equals(symbol, types.ILogger)
-      || (symbol is INamedTypeSymbol named && named.IsGenericType && SymbolEqualityComparer.Default.Equals(named.ConstructedFrom, types.ILoggerT));
-
-    static string? FindLoggerField(ITypeSymbol? type, bool isStatic, KnownTypes types)
-    {
-        var currentType = type;
-        var shadowedNames = new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
-        while (currentType != null)
-        {
-            foreach (var field in currentType.GetMembers().OfType<IFieldSymbol>())
-            {
-                if (isStatic && !field.IsStatic) continue;
-
-                if (IsLoggerType(field.Type, types))
-                {
-                    return field.Name;
-                }
-                shadowedNames.Add(field.Name);
-            }
-            currentType = currentType.BaseType;
-        }
-
-        if (type is INamedTypeSymbol namedType)
-        {
-            foreach (var constructor in namedType.InstanceConstructors)
-            {
-                foreach (var parameter in constructor.Parameters)
-                {
-                    if (IsLoggerType(parameter.Type, types) && !shadowedNames.Contains(parameter.Name))
-                    {
-                        return parameter.Name;
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    private static ExecutionBinding BindExecutionSignature(IMethodSymbol method, KnownTypes types)
-    {
-        var returnType = method.ReturnType;
-
-        var returnKind = ReturnKind.Invalid;
-
-        if (returnType.SpecialType == SpecialType.System_Void) returnKind = ReturnKind.Void;
-        else if (returnType.SpecialType == SpecialType.System_Int32) returnKind = ReturnKind.Int;
-        else if (SymbolEqualityComparer.Default.Equals(returnType, types.String)) returnKind = ReturnKind.String;
-        else if (SymbolEqualityComparer.Default.Equals(returnType, types.Task)) returnKind = ReturnKind.Task;
-        else if (SymbolEqualityComparer.Default.Equals(returnType, types.TaskInt)) returnKind = ReturnKind.TaskInt;
-        else if (SymbolEqualityComparer.Default.Equals(returnType, types.TaskString)) returnKind = ReturnKind.TaskString;
-        else if (SymbolEqualityComparer.Default.Equals(returnType, types.ValueTask)) returnKind = ReturnKind.ValueTask;
-        else if (SymbolEqualityComparer.Default.Equals(returnType, types.ValueTaskInt)) returnKind = ReturnKind.ValueTaskInt;
-        else if (SymbolEqualityComparer.Default.Equals(returnType, types.ValueTaskString)) returnKind = ReturnKind.ValueTaskString;
-        else if (SymbolEqualityComparer.Default.Equals(returnType, types.IEnumerableByte)) returnKind = ReturnKind.EnumerableByte;
-        else if (SymbolEqualityComparer.Default.Equals(returnType, types.IAsyncEnumerableByte)) returnKind = ReturnKind.AsyncEnumerableByte;
-
-        if (returnKind == ReturnKind.Invalid)
-            return new(false, returnKind, InputKind.None, OutputKind.None, "", "", null, null,
-                DiagnosticDescriptors.InvalidReturnType.Id);
-
-        var outputKind = returnKind switch
-        {
-            ReturnKind.Void => OutputKind.None,
-            ReturnKind.String or ReturnKind.TaskString or ReturnKind.ValueTaskString => OutputKind.ReturnString,
-            ReturnKind.EnumerableByte => OutputKind.ReturnEnumerable,
-            ReturnKind.AsyncEnumerableByte => OutputKind.ReturnAsyncEnumerable,
-            _ => OutputKind.None
-        };
-
-        var inputKind = InputKind.None;
-        var hasCancellationToken = false;
-        var hasLogger = false;
-        string? cancellationTokenName = null;
-        string? loggerName = null;
-        var inputExpr = "";
-        var outputExpr = "";
-
-        foreach (var p in method.Parameters)
-        {
-            if (p.RefKind is not RefKind.None)
-            {
-                return new(false, returnKind, inputKind, outputKind, "", "", null, null,
-                    DiagnosticDescriptors.InvalidParameter.Id, p.Locations.ElementAt(0));
-            }
-
-            if (SymbolEqualityComparer.Default.Equals(p.Type, types.String))
-            {
-                if (inputKind is not InputKind.None)
-                    return new(false, returnKind, inputKind, outputKind, "", "", null, null,
-                        DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
-
-                inputKind = InputKind.String;
-                inputExpr = p.Name;
-                continue;
-            }
-
-            if (SymbolEqualityComparer.Default.Equals(p.Type, types.TextReader))
-            {
-                if (inputKind is not InputKind.None)
-                    return new(false, returnKind, inputKind, outputKind, "", "", null, null,
-                        DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
-
-                inputKind = InputKind.TextReader;
-                inputExpr = p.Name;
-                continue;
-            }
-
-            if (SymbolEqualityComparer.Default.Equals(p.Type, types.PipeReader))
-            {
-                if (inputKind is not InputKind.None)
-                    return new(false, returnKind, inputKind, outputKind, "", "", null, null,
-                        DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
-
-                inputKind = InputKind.PipeReader;
-                inputExpr = p.Name;
-                continue;
-            }
-
-            if (SymbolEqualityComparer.Default.Equals(p.Type, types.TextWriter))
-            {
-                if (returnKind is ReturnKind.String or ReturnKind.TaskString or ReturnKind.ValueTaskString
-                                or ReturnKind.EnumerableByte or ReturnKind.AsyncEnumerableByte)
-                {
-                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName, loggerName,
-                        DiagnosticDescriptors.ReturnOutputConflict.Id, p.Locations.ElementAt(0));
-                }
-
-                if (outputKind is not OutputKind.None)
-                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName, loggerName,
-                        DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
-
-                outputExpr = p.Name;
-                outputKind = OutputKind.TextWriter;
-                continue;
-            }
-
-            if (SymbolEqualityComparer.Default.Equals(p.Type, types.PipeWriter))
-            {
-                if (returnKind is ReturnKind.String or ReturnKind.TaskString or ReturnKind.ValueTaskString
-                                or ReturnKind.EnumerableByte or ReturnKind.AsyncEnumerableByte)
-                {
-                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName, loggerName,
-                        DiagnosticDescriptors.ReturnOutputConflict.Id);
-                }
-
-                if (outputKind is not OutputKind.None)
-                    return new(false, returnKind, inputKind, outputKind, inputExpr, p.Name, cancellationTokenName, loggerName,
-                        DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
-
-                outputExpr = p.Name;
-                outputKind = OutputKind.PipeWriter;
-                continue;
-            }
-
-            if (SymbolEqualityComparer.Default.Equals(p.Type, types.CancellationToken))
-            {
-                if (hasCancellationToken)
-                    return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName, loggerName,
-                        DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
-
-                hasCancellationToken = true;
-                cancellationTokenName = p.Name;
-                continue;
-            }
-
-            if (IsLoggerType(p.Type, types))
-            {
-                if (hasLogger)
-                    return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName, loggerName,
-                        DiagnosticDescriptors.DuplicateParameter.Id, p.Locations.ElementAt(0));
-
-                hasLogger = true;
-                loggerName = p.Name;
-                continue;
-            }
-
-            // ❌ Unsupported parameter → PT0003
-            return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName, loggerName,
-                DiagnosticDescriptors.InvalidParameter.Id);
-        }
-
-        // Return + output parameter conflict (string/enumerable returns conflict with writer params)
-        if (returnKind is ReturnKind.String or ReturnKind.TaskString or ReturnKind.ValueTaskString
-                       or ReturnKind.EnumerableByte or ReturnKind.AsyncEnumerableByte
-            && outputKind is OutputKind.TextWriter or OutputKind.PipeWriter)
-        {
-            return new(false, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName, loggerName,
-                DiagnosticDescriptors.ReturnOutputConflict.Id);
-        }
-
-        loggerName ??= FindLoggerField(method.ContainingType, method.IsStatic, types);
-
-        return new(true, returnKind, inputKind, outputKind, inputExpr, outputExpr, cancellationTokenName, loggerName, null);
-    }
-
-
     static AdditionalImageFile? TryResolveImagePath(string imagePath, ImmutableArray<AdditionalImageFile> additionalImageFiles)
     {
         const string dataUrlStarts = "data:";
@@ -1482,8 +1153,8 @@ public partial class MethodGenerator : IIncrementalGenerator
             {
                 return null;
             }
-            var header = imagePath.Substring(dataUrlStarts.Length, bodyStartIndex - dataUrlStarts.Length);
-            var body = imagePath.Substring(bodyStartIndex + 1);
+            var header = imagePath[dataUrlStarts.Length..bodyStartIndex];
+            var body = imagePath[(bodyStartIndex + 1)..];
             var headers = header.Split(';');
             var isBase64 = false;
             var codelSize = 1;
@@ -1511,7 +1182,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 }
                 else if (text_.StartsWith("codel-size="))
                 {
-                    var sizeText = text_.Substring("codel-size=".Length);
+                    var sizeText = text_["codel-size=".Length..];
                     if (int.TryParse(sizeText, out var codelSize_))
                     {
                         codelSize = codelSize_;
@@ -1579,7 +1250,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             return false;
         }
 
-        var sizeText = firstLine.Substring(prefix.Length).Trim();
+        var sizeText = firstLine[prefix.Length..].Trim();
         if (!int.TryParse(sizeText, out codelSize))
         {
             return false;
@@ -1603,7 +1274,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             return false;
         }
 
-        var originalPath = firstLine.Substring(prefix.Length).Trim();
+        var originalPath = firstLine[prefix.Length..].Trim();
         if (string.IsNullOrWhiteSpace(originalPath))
         {
             return false;
@@ -1621,7 +1292,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             return text.Replace("\r", string.Empty);
         }
 
-        return text.Substring(0, newlineIndex).Replace("\r", string.Empty);
+        return text[..newlineIndex].Replace("\r", string.Empty);
     }
     static string GetSecondLine(string text)
     {
@@ -1638,7 +1309,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             return string.Empty;
         }
 
-        return text.Substring(secondLineStart, secondLineEnd - secondLineStart).Replace("\r", string.Empty);
+        return text[secondLineStart..secondLineEnd].Replace("\r", string.Empty);
     }
 
     static bool IsMatchingPath(string normalizedExpectedPath, string normalizedCandidatePath)
@@ -1665,7 +1336,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             return path;
         }
 
-        return path.Substring(index + 1);
+        return path[(index + 1)..];
     }
 
     static string GetExtension(string path)
@@ -1677,7 +1348,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             return string.Empty;
         }
 
-        return fileName.Substring(dotIndex);
+        return fileName[dotIndex..];
     }
 
     static string NormalizePath(string path) => path.Replace('\\', '/').Trim();
@@ -1700,17 +1371,17 @@ public partial class MethodGenerator : IIncrementalGenerator
         {
             for (var x = 0; x < width && !(mightUseOutput && mightUseInput); x++)
             {
-                var c = codels[(y * width) + x];
+                var c = codels[y * width + x];
                 if (c < 2) continue;
 
                 // Check right neighbor
                 if (x + 1 < width)
                 {
-                    var nc = codels[(y * width) + x + 1];
+                    var nc = codels[y * width + x + 1];
                     if (nc >= 2 && nc != c)
                     {
-                        var cmd = ((((sHue[nc] - sHue[c]) % 6) + 6) % 6 * 3)
-                                + ((((sLight[nc] - sLight[c]) % 3) + 3) % 3);
+                        var cmd = ((sHue[nc] - sHue[c]) % 6 + 6) % 6 * 3
+                                + ((sLight[nc] - sLight[c]) % 3 + 3) % 3;
                         if (cmd is 14 or 15) mightUseInput = true;
                         if (cmd is 16 or 17) mightUseOutput = true;
                     }
@@ -1719,11 +1390,11 @@ public partial class MethodGenerator : IIncrementalGenerator
                 // Check bottom neighbor
                 if (y + 1 < height)
                 {
-                    var nc = codels[((y + 1) * width) + x];
+                    var nc = codels[(y + 1) * width + x];
                     if (nc >= 2 && nc != c)
                     {
-                        var cmd = ((((sHue[nc] - sHue[c]) % 6) + 6) % 6 * 3)
-                                + ((((sLight[nc] - sLight[c]) % 3) + 3) % 3);
+                        var cmd = ((sHue[nc] - sHue[c]) % 6 + 6) % 6 * 3
+                                + ((sLight[nc] - sLight[c]) % 3 + 3) % 3;
                         if (cmd is 14 or 15) mightUseInput = true;
                         if (cmd is 16 or 17) mightUseOutput = true;
                     }

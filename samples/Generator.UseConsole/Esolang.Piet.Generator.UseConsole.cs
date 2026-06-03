@@ -2,9 +2,6 @@
 using Esolang.Piet;
 using System.IO.Pipelines;
 using System.Text;
-#if NET481 
-using System.Threading.Tasks;
-#endif
 
 // ascii-piet (.txt) 画像の出力例
 var asciiPiet = PietSample.RunAsciiPiet();
@@ -37,13 +34,13 @@ Console.WriteLine($"RunToValueTaskString: {valueTaskString}");
 
 // IEnumerable<byte> return
 var bytes = new List<byte>(PietSample.RunToEnumerableBytes());
-Console.WriteLine($"RunToEnumerableBytes: {Encoding.UTF8.GetString(bytes.ToArray())}");
+Console.WriteLine($"RunToEnumerableBytes: {Encoding.UTF8.GetString([.. bytes])}");
 
 // IAsyncEnumerable<byte> return
 var asyncBytes = new List<byte>();
 await foreach (var b in PietSample.RunToAsyncEnumerableBytes(CancellationToken.None))
     asyncBytes.Add(b);
-Console.WriteLine($"RunToAsyncEnumerableBytes: {Encoding.UTF8.GetString(asyncBytes.ToArray())}");
+Console.WriteLine($"RunToAsyncEnumerableBytes: {Encoding.UTF8.GetString([.. asyncBytes])}");
 
 // string input parameter
 var withStringInput = PietSample.RunWithStringInput("123");
@@ -189,7 +186,6 @@ partial class PietSample
     /// <summary>
     /// Executes the codel-size-11 hello-world sample.
     /// </summary>
-    /// <param name="input">Optional input text for the sample program.</param>
     [GeneratePietMethod("hw1-11.gif", codelSize: 11)]
     public static partial string RunHw111Gif();
 }

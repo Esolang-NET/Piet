@@ -398,18 +398,19 @@ For a concrete sample project and runnable examples, see [samples/Generator.UseC
 
 | ID | Meaning |
 | --- | --- |
-| PT0001 | Invalid image path parameter on attribute. |
-| PT0002 | Unsupported return type. |
-| PT0003 | Unsupported parameter type. |
-| PT0004 | Duplicate parameter kind (for input, output, or cancellation token). |
-| PT0005 | Image file not found. |
-| PT0006 | Invalid image format. |
-| PT0007 | Required output interface not provided. |
-| PT0008 | Required input interface not provided. |
-| PT0009 | Duplicate image path mapping. |
-| PT0010 | Input interface provided but not required (Hidden). |
-| PT0011 | String or byte-sequence return type conflicts with explicit output parameter (`TextWriter`/`PipeWriter`). |
-| PT0012 | Consumer language version may be too low (C# 8.0 or later is recommended). |
+| [PT0001](Rules/PT0001.md) | Invalid image path parameter on attribute. |
+| [PT0002](Rules/PT0002.md) | Unsupported return type. |
+| [PT0003](Rules/PT0003.md) | Unsupported parameter type. |
+| [PT0004](Rules/PT0004.md) | Duplicate parameter kind (for input, output, or cancellation token). |
+| [PT0005](Rules/PT0005.md) | Image file not found. |
+| [PT0006](Rules/PT0006.md) | Invalid image format. |
+| [PT0007](Rules/PT0007.md) | Required output interface not provided. |
+| [PT0008](Rules/PT0008.md) | Required input interface not provided. |
+| [PT0009](Rules/PT0009.md) | Duplicate image path mapping. |
+| [PT0010](Rules/PT0010.md) | Input interface provided but not required (Hidden). |
+| [PT0011](Rules/PT0011.md) | String or byte-sequence return type conflicts with explicit output parameter (`TextWriter`/`PipeWriter`). |
+| [PT0012](Rules/PT0012.md) | Consumer language version may be too low (C# 8.0 or later is recommended). |
+| [PT0013](Rules/PT0013.md) | Method must be partial. |
 
 ## See also
 

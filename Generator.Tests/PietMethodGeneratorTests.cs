@@ -9,7 +9,7 @@ using System.Text;
 namespace Esolang.Piet.Generator.Tests;
 
 [TestClass]
-public class MethodGeneratorTests(TestContext TestContext)
+public class MethodGeneratorTests
 {
     // Minimal 1×1 RGB PNG with LightRed (0xFF,0xC0,0xC0). CRC fields are zeroed (not validated by decoder).
     static readonly byte[] MinimalLightRedPng =
@@ -156,14 +156,14 @@ public class MethodGeneratorTests(TestContext TestContext)
         }
 
         var png = new List<byte>();
-        png.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+        png.AddRange([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
 
         WriteInt32BE(png, 13);
-        png.AddRange(new byte[] { 0x49, 0x48, 0x44, 0x52 });
+        png.AddRange([0x49, 0x48, 0x44, 0x52]);
         WriteInt32BE(png, width);
         WriteInt32BE(png, height);
-        png.AddRange(new byte[] { 0x08, 0x02, 0x00, 0x00, 0x00 });
-        png.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
+        png.AddRange([0x08, 0x02, 0x00, 0x00, 0x00]);
+        png.AddRange([0x00, 0x00, 0x00, 0x00]);
 
         var idatPayload = new List<byte>
         {
@@ -175,18 +175,18 @@ public class MethodGeneratorTests(TestContext TestContext)
             (byte)((~rawScanlineBytes.Length >> 8) & 0xFF),
         };
         idatPayload.AddRange(rawScanlineBytes);
-        idatPayload.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
+        idatPayload.AddRange([0x00, 0x00, 0x00, 0x00]);
 
         WriteInt32BE(png, idatPayload.Count);
-        png.AddRange(new byte[] { 0x49, 0x44, 0x41, 0x54 });
+        png.AddRange([0x49, 0x44, 0x41, 0x54]);
         png.AddRange(idatPayload);
-        png.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
+        png.AddRange([0x00, 0x00, 0x00, 0x00]);
 
         WriteInt32BE(png, 0);
-        png.AddRange(new byte[] { 0x49, 0x45, 0x4E, 0x44 });
-        png.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
+        png.AddRange([0x49, 0x45, 0x4E, 0x44]);
+        png.AddRange([0x00, 0x00, 0x00, 0x00]);
 
-        return png.ToArray();
+        return [.. png];
     }
     CancellationToken CancellationToken => TestContext.CancellationToken;
     void LogWriteLine(string message) => TestContext.WriteLine(message);
@@ -216,11 +216,12 @@ public class MethodGeneratorTests(TestContext TestContext)
         );
     }
 
-    Compilation baseCompilation = default!;
+    readonly Compilation baseCompilation = default!;
 
-    [TestInitialize]
-    public void InitializeCompilation()
+    readonly TestContext TestContext;
+    public MethodGeneratorTests(TestContext TestContext)
     {
+        this.TestContext = TestContext;
         IEnumerable<PortableExecutableReference> references =
 #if NET10_0_OR_GREATER
             Net100.References.All;
@@ -277,9 +278,9 @@ public class MethodGeneratorTests(TestContext TestContext)
             "generator-tests",
             references: referenceList,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
-                specificDiagnosticOptions: new[] {
+                specificDiagnosticOptions: [
                     new KeyValuePair<string, ReportDiagnostic>("CS1701", ReportDiagnostic.Suppress)
-                }
+                ]
             )
         );
     }
@@ -316,8 +317,8 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsTrue(
-                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
+            Assert.Contains(
+                tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()"), runResult.GeneratedTrees,
                 "Expected generated method implementation was not found.");
         }
         catch (Exception e) when (e is AssertFailedException or InvalidOperationException)
@@ -345,8 +346,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0001"),
+        Assert.Contains(
+            static x => x.Id == "PT0001", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -367,8 +368,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0005"),
+        Assert.Contains(
+            static x => x.Id == "PT0005", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -393,8 +394,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0006"),
+        Assert.Contains(
+            static x => x.Id == "PT0006", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -423,12 +424,12 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsTrue(
-                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
+            Assert.Contains(
+                tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()"), runResult.GeneratedTrees,
                 "Expected generated method implementation was not found.");
 
-            Assert.IsFalse(
-                outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            Assert.DoesNotContain(
+                static x => x.Severity == DiagnosticSeverity.Error, outputCompilation.GetDiagnostics(CancellationToken),
                 "Compilation contains errors after running generator.\n"
                 + string.Join("\n", outputCompilation.GetDiagnostics(CancellationToken).Select(static x => x.ToString())));
         }
@@ -464,8 +465,8 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsTrue(
-                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("return")),
+            Assert.Contains(
+                tree => tree.GetText(CancellationToken).ToString().Contains("return"), runResult.GeneratedTrees,
                 "Expected generated string return path was not found.");
 
             Assert.IsFalse(
@@ -506,16 +507,16 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsTrue(
-                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run(global::System.IO.TextReader input, global::System.IO.TextWriter output)")),
+            Assert.Contains(
+                tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run(global::System.IO.TextReader input, global::System.IO.TextWriter output)"), runResult.GeneratedTrees,
                 "Expected generated method implementation with TextReader/TextWriter parameters was not found.");
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id is "PT0007" or "PT0008"),
+            Assert.DoesNotContain(
+                static x => x.Id is "PT0007" or "PT0008", generatorDiagnostics,
                 string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
 
-            Assert.IsFalse(
-                outputCompilation.GetDiagnostics(CancellationToken).Any(static x => x.Severity == DiagnosticSeverity.Error),
+            Assert.DoesNotContain(
+                static x => x.Severity == DiagnosticSeverity.Error, outputCompilation.GetDiagnostics(CancellationToken),
                 "Compilation contains errors after running generator.\n"
                 + string.Join("\n", outputCompilation.GetDiagnostics(CancellationToken).Select(static x => x.ToString())));
         }
@@ -548,9 +549,9 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0003"),
-            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+        Assert.Contains(static x => x.Id == "PT0003",
+            generatorDiagnostics,
+            string.Join("\n", string.Join("\n", generatorDiagnostics.Select(static x => x.ToString()))));
     }
 
     [TestMethod]
@@ -575,8 +576,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0004"),
+        Assert.Contains(static x => x.Id == "PT0003",
+            generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -602,8 +603,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+        Assert.Contains(static x => x.Id == "PT0011",
+            generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -633,8 +634,9 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+
+            Assert.DoesNotContain(
+                static x => x.Id == "PT0011", generatorDiagnostics,
                 "PT0011 should not be reported for Task return + TextWriter parameter.");
         }
         catch (Exception e) when (e is AssertFailedException or InvalidOperationException)
@@ -670,8 +672,8 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            Assert.DoesNotContain(
+                static x => x.Id == "PT0011", generatorDiagnostics,
                 "PT0011 should not be reported for Task return + PipeWriter parameter.");
         }
         catch (Exception e) when (e is AssertFailedException or InvalidOperationException)
@@ -708,8 +710,8 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            Assert.DoesNotContain(static x => x.Id == "PT0011",
+                generatorDiagnostics,
                 "PT0011 should not be reported for ValueTask return + TextWriter parameter.");
         }
         catch (Exception e) when (e is AssertFailedException or InvalidOperationException)
@@ -745,8 +747,8 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            Assert.DoesNotContain(static x => x.Id == "PT0011",
+                generatorDiagnostics,
                 "PT0011 should not be reported for ValueTask return + PipeWriter parameter.");
         }
         catch (Exception e) when (e is AssertFailedException or InvalidOperationException)
@@ -778,8 +780,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0006"),
+        Assert.Contains(
+            static x => x.Id == "PT0006", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -806,8 +808,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0007"),
+        Assert.Contains(
+            static x => x.Id == "PT0007", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -834,9 +836,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0007"),
-            "PT0007 should not be reported when the method has a string return type.");
+        Assert.DoesNotContain(static x => x.Id == "PT0007",
+            generatorDiagnostics, "PT0007 should not be reported when the method has a string return type.");
     }
 
     [TestMethod]
@@ -862,8 +863,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0008"),
+        Assert.Contains(
+            static x => x.Id == "PT0008", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -890,8 +891,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0008"),
+        Assert.DoesNotContain(static x => x.Id == "PT0008",
+            generatorDiagnostics,
             "PT0008 should not be reported when the method has a PipeReader parameter.");
     }
 
@@ -917,8 +918,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0008"),
+        Assert.DoesNotContain(static x => x.Id == "PT0008",
+            generatorDiagnostics,
             "PT0008 should not be reported when the method has a TextReader parameter.");
     }
 
@@ -944,8 +945,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0008"),
+        Assert.DoesNotContain(static x => x.Id == "PT0008",
+            generatorDiagnostics,
             "PT0008 should not be reported when the method has a string parameter.");
     }
 
@@ -978,9 +979,9 @@ public class MethodGeneratorTests(TestContext TestContext)
                 .Select(tree => tree.GetText(CancellationToken).ToString())
                 .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
-            Assert.IsTrue(generatedText.Contains("new global::System.IO.StringReader(input)"),
+            Assert.Contains("new global::System.IO.StringReader(input)", generatedText,
                 "Expected StringReader adapter was not found in generated code.");
-            Assert.IsTrue(generatedText.Contains("global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync"),
+            Assert.Contains("global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync", generatedText,
                 "Expected async input delegate for string input was not found.");
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
@@ -1020,9 +1021,9 @@ public class MethodGeneratorTests(TestContext TestContext)
                 .Select(tree => tree.GetText(CancellationToken).ToString())
                 .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
-            Assert.IsTrue(generatedText.Contains("ReadLineAsync(__ct)"),
+            Assert.Contains("ReadLineAsync(__ct)", generatedText,
                 "Expected TextReader.ReadLineAsync path was not found in generated code.");
-            Assert.IsTrue(generatedText.Contains("__pietReadNumberAsyncAwaited"),
+            Assert.Contains("__pietReadNumberAsyncAwaited", generatedText,
                 "Expected async awaited fallback path for TextReader input was not found.");
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
@@ -1062,9 +1063,9 @@ public class MethodGeneratorTests(TestContext TestContext)
                 .Select(tree => tree.GetText(CancellationToken).ToString())
                 .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
-            Assert.IsTrue(generatedText.Contains("ReadAsync(default(global::System.Threading.CancellationToken)).AsTask().GetAwaiter().GetResult();"),
+            Assert.Contains("ReadAsync(default(global::System.Threading.CancellationToken)).AsTask().GetAwaiter().GetResult();", generatedText,
                 "Expected synchronous PipeReader.ReadAsync bridge path was not found in generated code.");
-            Assert.IsTrue(generatedText.Contains("global::System.Buffers.BuffersExtensions.ToArray(__buffer)"),
+            Assert.Contains("global::System.Buffers.BuffersExtensions.ToArray(__buffer)", generatedText,
                 "Expected PipeReader number-read conversion path was not found in generated code.");
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
@@ -1103,11 +1104,11 @@ public class MethodGeneratorTests(TestContext TestContext)
                 .Select(tree => tree.GetText(CancellationToken).ToString())
                 .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
-            Assert.IsTrue(generatedText.Contains("async global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync"),
+            Assert.Contains("async global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync", generatedText,
                 "Expected async PipeReader number-read delegate was not found in generated code.");
-            Assert.IsTrue(generatedText.Contains("await input.ReadAsync(__ct).ConfigureAwait(false);"),
+            Assert.Contains("await input.ReadAsync(__ct).ConfigureAwait(false);", generatedText,
                 "Expected PipeReader.ReadAsync await path was not found in generated code.");
-            Assert.IsTrue(generatedText.Contains("global::System.Buffers.BuffersExtensions.ToArray(__buffer)"),
+            Assert.Contains("global::System.Buffers.BuffersExtensions.ToArray(__buffer)", generatedText,
                 "Expected PipeReader buffer conversion path was not found in generated code.");
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
@@ -1139,8 +1140,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsFalse(
-            generatorDiagnostics.Any(static x => x.Id == "PT0007"),
+        Assert.DoesNotContain(static x => x.Id == "PT0007",
+            generatorDiagnostics,
             "PT0007 should not be reported when the method has a TextWriter parameter.");
     }
 
@@ -1168,12 +1169,12 @@ public class MethodGeneratorTests(TestContext TestContext)
             var runResult = driver.GetRunResult();
             var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-            Assert.IsTrue(
-                generatorDiagnostics.Any(static x => x.Id == "PT0010" && x.Severity == DiagnosticSeverity.Hidden),
+            Assert.Contains(
+                static x => x.Id == "PT0010" && x.Severity == DiagnosticSeverity.Hidden, generatorDiagnostics,
                 string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
 
-            Assert.IsTrue(
-                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run(global::System.IO.Pipelines.PipeReader input)")),
+            Assert.Contains(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run(global::System.IO.Pipelines.PipeReader input)"),
+                runResult.GeneratedTrees,
                 "Expected generated method implementation was not found.");
 
             AssertNoErrors(diagnostics, outputCompilation);
@@ -1217,7 +1218,7 @@ public class MethodGeneratorTests(TestContext TestContext)
             Assert.Contains("public async partial global::System.Threading.Tasks.Task<string> Run(", generated,
                 "Expected async Task<string> signature was not found.");
 
-            Assert.IsTrue(generated.Contains("PietRuntime.ExecuteAsync("),
+            Assert.Contains("PietRuntime.ExecuteAsync(", generated,
                 "Expected async runtime call was not found.");
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
@@ -1252,8 +1253,8 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsTrue(
-                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("yield return")),
+            Assert.Contains(tree => tree.GetText(CancellationToken).ToString().Contains("yield return"),
+                runResult.GeneratedTrees,
                 "Expected yield return byte path was not found.");
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
@@ -1288,8 +1289,8 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsTrue(
-                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("CancellationToken ct")),
+            Assert.Contains(tree => tree.GetText(CancellationToken).ToString().Contains("CancellationToken ct"),
+                runResult.GeneratedTrees,
                 "Expected CancellationToken parameter was not found in generated code.");
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
@@ -1311,8 +1312,8 @@ public class MethodGeneratorTests(TestContext TestContext)
 
         AssertNoErrors(diagnostics, outputCompilation);
 
-        Assert.IsFalse(generatedHints.Contains(MethodGenerator.GeneratedMethodsFileName, StringComparer.Ordinal));
-        Assert.IsFalse(generatedHints.Contains(MethodGenerator.GeneratePietRuntimeFileName, StringComparer.Ordinal));
+        Assert.DoesNotContain(MethodGenerator.GeneratedMethodsFileName, generatedHints, StringComparer.Ordinal);
+        Assert.DoesNotContain(MethodGenerator.GeneratePietRuntimeFileName, generatedHints, StringComparer.Ordinal);
 
 
     }
@@ -1339,8 +1340,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0002"),
+        Assert.Contains(
+            static x => x.Id == "PT0002", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -1369,8 +1370,7 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsTrue(
-                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial int Run()")),
+            Assert.Contains(tree => tree.GetText(CancellationToken).ToString().Contains("public partial int Run()"), runResult.GeneratedTrees,
                 "Expected generated int return method implementation was not found.");
 
 
@@ -1415,10 +1415,10 @@ public class MethodGeneratorTests(TestContext TestContext)
 
 
             var generatedText = string.Join("\n", runResult.GeneratedTrees.Select(tree => tree.GetText(CancellationToken).ToString()));
-            Assert.IsTrue(generatedText.Contains("RunInt("), "Expected RunInt method was not found.");
-            Assert.IsTrue(generatedText.Contains("RunTaskInt("), "Expected RunTaskInt method was not found.");
-            Assert.IsTrue(generatedText.Contains("RunValueTaskInt("), "Expected RunValueTaskInt method was not found.");
-            Assert.IsTrue(generatedText.Contains("return 0;"), "Expected exit-code return statement was not found.");
+            Assert.Contains("RunInt(", generatedText, "Expected RunInt method was not found.");
+            Assert.Contains("RunTaskInt(", generatedText, "Expected RunTaskInt method was not found.");
+            Assert.Contains("RunValueTaskInt(", generatedText, "Expected RunValueTaskInt method was not found.");
+            Assert.Contains("return 0;", generatedText, "Expected exit-code return statement was not found.");
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
         {
@@ -1449,8 +1449,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0003"),
+        Assert.Contains(
+            static x => x.Id == "PT0003", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -1476,8 +1476,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0003"),
+        Assert.Contains(
+            static x => x.Id == "PT0003", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -1503,8 +1503,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0004"),
+        Assert.Contains(
+            static x => x.Id == "PT0004", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -1530,9 +1530,9 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0004"),
-            string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
+        Assert.Contains(
+            static x => x.Id == "PT0003", generatorDiagnostics,
+            "PT0003 should be reported for multiple input kinds.");
     }
 
     [TestMethod]
@@ -1557,8 +1557,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0004"),
+        Assert.Contains(
+            static x => x.Id == "PT0004", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -1584,8 +1584,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0004"),
+        Assert.Contains(
+            static x => x.Id == "PT0004", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -1616,8 +1616,8 @@ public class MethodGeneratorTests(TestContext TestContext)
                 .Select(tree => tree.GetText(CancellationToken).ToString())
                 .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
-            Assert.IsTrue(generatedMethod.Contains("public static partial"), "Expected static modifier was not found.");
-            Assert.IsFalse(generatedMethod.Contains("namespace "), "Global namespace method should not emit a namespace declaration.");
+            Assert.Contains("public static partial", generatedMethod, "Expected static modifier was not found.");
+            Assert.DoesNotContain("namespace ", generatedMethod, "Global namespace method should not emit a namespace declaration.");
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
         {
@@ -1648,8 +1648,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-                generatorDiagnostics.Any(static x => x.Id == "PT0005"),
+        Assert.Contains(
+            static x => x.Id == "PT0005", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -1675,8 +1675,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-                generatorDiagnostics.Any(static x => x.Id == "PT0005"),
+        Assert.Contains(
+            static x => x.Id == "PT0005", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -1702,8 +1702,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-                generatorDiagnostics.Any(static x => x.Id == "PT0005"),
+        Assert.Contains(
+            static x => x.Id == "PT0005", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -1729,8 +1729,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0006"),
+        Assert.Contains(
+            static x => x.Id == "PT0006", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -1756,8 +1756,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0006"),
+        Assert.Contains(
+            static x => x.Id == "PT0006", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -1774,11 +1774,11 @@ public class MethodGeneratorTests(TestContext TestContext)
             }
             """;
 
-        var verticalOutputPng = BuildStoredRgbPng(1, 2, new byte[]
-        {
+        var verticalOutputPng = BuildStoredRgbPng(1, 2,
+        [
             0x00, 0xFF, 0xC0, 0xC0,
             0x00, 0xFF, 0x00, 0xFF,
-        });
+        ]);
         var driver = RunGeneratorsAndUpdateCompilation(
             source,
             out _,
@@ -1788,8 +1788,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0007"),
+        Assert.Contains(
+            static x => x.Id == "PT0007", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -1823,8 +1823,8 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsTrue(
-                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()")),
+            Assert.Contains(
+                tree => tree.GetText(CancellationToken).ToString().Contains("public partial void Run()"), runResult.GeneratedTrees,
                 "Expected generated method implementation was not found.");
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
@@ -1847,10 +1847,10 @@ public class MethodGeneratorTests(TestContext TestContext)
             }
             """;
 
-        var blackPng = BuildStoredRgbPng(1, 1, new byte[]
-        {
+        var blackPng = BuildStoredRgbPng(1, 1,
+        [
             0x00, 0x00, 0x00, 0x00,
-        });
+        ]);
 
         _ = RunGeneratorsAndUpdateCompilationWithLanguageVersion(
             source,
@@ -1864,8 +1864,8 @@ public class MethodGeneratorTests(TestContext TestContext)
             AssertNoErrors(diagnostics, outputCompilation);
 
             var diagnostics2 = outputCompilation.GetDiagnostics(CancellationToken);
-            Assert.IsFalse(
-                diagnostics2.Any(static x => x.Severity == DiagnosticSeverity.Error),
+            Assert.DoesNotContain(
+                static x => x.Severity == DiagnosticSeverity.Error, diagnostics2,
                 "Compilation contains errors after running generator with C#12 parse options.\r\n"
                 + string.Join("\r\n", diagnostics2.Select(v => v.ToString())));
         }
@@ -1889,10 +1889,10 @@ public class MethodGeneratorTests(TestContext TestContext)
             }
             """;
 
-        var blackPng = BuildStoredRgbPng(1, 1, new byte[]
-        {
+        var blackPng = BuildStoredRgbPng(1, 1,
+        [
             0x00, 0x00, 0x00, 0x00,
-        });
+        ]);
 
         var driver = RunGeneratorsAndUpdateCompilationWithLanguageVersion(
             source,
@@ -1904,8 +1904,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0012" && x.Severity == DiagnosticSeverity.Warning),
+        Assert.Contains(
+            static x => x.Id == "PT0012" && x.Severity == DiagnosticSeverity.Warning, generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -1934,10 +1934,10 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsTrue(
-                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("public async partial global::System.Threading.Tasks.ValueTask<string> Run()"))
-                && runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("return __pietString;")),
-                "Expected ValueTask<string> return path was not found.");
+            Assert.Contains(
+                tree => tree.GetText(CancellationToken).ToString().Contains("public async partial global::System.Threading.Tasks.ValueTask<string> Run()"), runResult.GeneratedTrees);
+            Assert.Contains(
+                tree => tree.GetText(CancellationToken).ToString().Contains("return __pietString;"), runResult.GeneratedTrees);
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
         {
@@ -2053,8 +2053,8 @@ public class MethodGeneratorTests(TestContext TestContext)
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsTrue(
-                runResult.GeneratedTrees.Any(tree => tree.GetText(CancellationToken).ToString().Contains("global::System.Buffers.BuffersExtensions.Write(output, ")),
+            Assert.Contains(
+                tree => tree.GetText(CancellationToken).ToString().Contains("global::System.Buffers.BuffersExtensions.Write(output, "), runResult.GeneratedTrees,
                 "Expected PipeWriter.WriteAsync() was not found in generated code.");
 
             var pipeWriterErrors = outputCompilation.GetDiagnostics(CancellationToken)
@@ -2132,8 +2132,8 @@ public class MethodGeneratorTests(TestContext TestContext)
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0008"),
+        Assert.Contains(
+            static x => x.Id == "PT0008", generatorDiagnostics,
             string.Join("\n", generatorDiagnostics.Select(static x => x.ToString())));
     }
 
@@ -2274,23 +2274,14 @@ public class MethodGeneratorTests(TestContext TestContext)
     {
         using var ms = new MemoryStream();
         var result = compilation.Emit(ms, cancellationToken: cancellationToken);
-        if (!result.Success)
-        {
-            foreach (var d in compilation.GetDiagnostics(cancellationToken))
-                LogWriteLine($"Diag: {d}");
-            foreach (var d in result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error))
-                LogWriteLine(d.ToString());
-            foreach (var t in compilation.SyntaxTrees)
-                LogWriteLine($"// {t.FilePath}\n{t}");
-            Assert.Fail("Compilation emit failed");
-        }
+        Assert.IsTrue(result.Success, "Compilation emit failed");
         ms.Seek(0, SeekOrigin.Begin);
 
-#if NET48
-        return Assembly.Load(ms.ToArray());
-#else
+#if NET
         var ctx = new System.Runtime.Loader.AssemblyLoadContext(nameof(MethodGeneratorTests), isCollectible: true);
         return ctx.LoadFromStream(ms);
+#else
+        return Assembly.Load(ms.ToArray());
 #endif
     }
 
@@ -2376,7 +2367,7 @@ public partial class Sample
             // 生成コードにcodelSize=2が反映されているか（例: 配列長やコメント等で判定）
             var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
             Assert.IsNotNull(generated, "Method not generated");
-            Assert.IsTrue(generated.Contains("codelSize: 2"), "codelSize=2 not reflected in generated code");
+            Assert.Contains("codelSize: 2", generated, "codelSize=2 not reflected in generated code");
             AssertNoErrors(diagnostics, outputCompilation);
 
         }
@@ -2414,7 +2405,7 @@ public partial class Sample
                 string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
             var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
             Assert.IsNotNull(generated, "Method not generated");
-            Assert.IsTrue(generated.Contains("codelSize: 2"), "codelSize=2 not reflected in generated code");
+            Assert.Contains("codelSize: 2", generated, "codelSize=2 not reflected in generated code");
             AssertNoErrors(diagnostics, outputCompilation);
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
@@ -2449,7 +2440,7 @@ public partial class Sample
                 string.Join("\n", runResult.Diagnostics.Select(static x => x.ToString())));
             var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
             Assert.IsNotNull(generated, "Method not generated");
-            Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize=1 not reflected in generated code");
+            Assert.Contains("codelSize: 1", generated, "codelSize=1 not reflected in generated code");
             AssertNoErrors(diagnostics, outputCompilation);
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
@@ -2485,7 +2476,7 @@ public partial class Sample
 
             var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
             Assert.IsNotNull(generated, "Method not generated");
-            Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize=1 not reflected in generated code");
+            Assert.Contains("codelSize: 1", generated, "codelSize=1 not reflected in generated code");
             AssertNoErrors(diagnostics, outputCompilation);
 
         }
@@ -2522,7 +2513,7 @@ public partial class Sample
 
             var generated = runResult.GeneratedTrees.Select(t => t.GetText(CancellationToken).ToString()).FirstOrDefault(x => x.Contains("partial void Run"));
             Assert.IsNotNull(generated, "Method not generated");
-            Assert.IsTrue(generated.Contains("codelSize: 1"), "codelSize fallback to default(1) was not reflected in generated code");
+            Assert.Contains("codelSize: 1", generated, "codelSize fallback to default(1) was not reflected in generated code");
             AssertNoErrors(diagnostics, outputCompilation);
 
         }
@@ -2551,10 +2542,10 @@ public partial class Sample
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0005"));
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree =>
-                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0005")),
+        Assert.Contains(x => x.Id == "PT0005", generatorDiagnostics);
+        Assert.Contains(
+            tree => tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0005"),
+            runResult.GeneratedTrees,
             "Expected throw for PT0005 was not generated.");
     }
 
@@ -2576,12 +2567,12 @@ public partial class Sample
 
         // PT0001 が出る
         var generatorDiagnostics = runResult.Results.SelectMany(r => r.Diagnostics).ToImmutableArray();
-        Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0001"));
+        Assert.Contains(static x => x.Id == "PT0001", generatorDiagnostics);
 
         // 生成コードに throw が含まれる
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree =>
-                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0001")),
+        Assert.Contains(
+            tree => tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0001"),
+            runResult.GeneratedTrees,
             "Expected throw for PT0001 was not generated.");
     }
 
@@ -2602,11 +2593,11 @@ public partial class Sample
         var runResult = driver.GetRunResult();
 
         var generatorDiagnostics = runResult.Results.SelectMany(r => r.Diagnostics).ToImmutableArray();
-        Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0005"));
+        Assert.Contains(static x => x.Id == "PT0005", generatorDiagnostics);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree =>
-                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0005")),
+        Assert.Contains(
+            tree => tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0005"),
+            runResult.GeneratedTrees,
             "Expected throw for PT0005 was not generated.");
     }
 
@@ -2632,11 +2623,11 @@ public partial class Sample
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0006"));
+        Assert.Contains(static x => x.Id == "PT0006", generatorDiagnostics);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree =>
-                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0006")),
+        Assert.Contains(
+            tree => tree.GetText(CancellationToken).ToString().Contains("throw new global::System.NotImplementedException(\"PT0006"),
+            runResult.GeneratedTrees,
             "Expected throw for PT0006 was not generated.");
     }
 
@@ -2663,11 +2654,11 @@ public partial class Sample
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0007"));
+        Assert.Contains(static x => x.Id == "PT0007", generatorDiagnostics);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree =>
-                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.InvalidOperationException(\"PT0007")),
+        Assert.Contains(
+            tree => tree.GetText(CancellationToken).ToString().Contains("throw new global::System.InvalidOperationException(\"PT0007"),
+            runResult.GeneratedTrees,
             "Expected throw for PT0007 was not generated.");
     }
 
@@ -2694,11 +2685,11 @@ public partial class Sample
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(generatorDiagnostics.Any(x => x.Id == "PT0008"));
+        Assert.Contains(static x => x.Id == "PT0008", generatorDiagnostics);
 
-        Assert.IsTrue(
-            runResult.GeneratedTrees.Any(tree =>
-                tree.GetText(CancellationToken).ToString().Contains("throw new global::System.InvalidOperationException(\"PT0008")),
+        Assert.Contains(
+            tree => tree.GetText(CancellationToken).ToString().Contains("throw new global::System.InvalidOperationException(\"PT0008"),
+            runResult.GeneratedTrees,
             "Expected throw for PT0008 was not generated.");
     }
 
@@ -2728,8 +2719,8 @@ public partial class Sample
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            Assert.DoesNotContain(
+                static x => x.Id == "PT0011", generatorDiagnostics,
                 "PT0011 should not be reported for Task return + TextWriter parameter.");
 
 
@@ -2767,8 +2758,8 @@ public partial class Sample
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            Assert.DoesNotContain(
+                static x => x.Id == "PT0011", generatorDiagnostics,
                 "PT0011 should not be reported for Task return + PipeWriter parameter.");
 
 
@@ -2806,8 +2797,8 @@ public partial class Sample
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            Assert.DoesNotContain(
+                static x => x.Id == "PT0011", generatorDiagnostics,
                 "PT0011 should not be reported for ValueTask return + TextWriter parameter.");
 
 
@@ -2845,8 +2836,8 @@ public partial class Sample
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            Assert.DoesNotContain(
+                static x => x.Id == "PT0011", generatorDiagnostics,
                 "PT0011 should not be reported for ValueTask return + PipeWriter parameter.");
 
 
@@ -2897,8 +2888,8 @@ public partial class Sample
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            Assert.DoesNotContain(
+                static x => x.Id == "PT0011", generatorDiagnostics,
                 "PT0011 should not be reported for int return + TextWriter parameter.");
 
 
@@ -2936,8 +2927,8 @@ public partial class Sample
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            Assert.DoesNotContain(
+                static x => x.Id == "PT0011", generatorDiagnostics,
                 "PT0011 should not be reported for int return + PipeWriter parameter.");
 
 
@@ -2975,8 +2966,8 @@ public partial class Sample
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            Assert.DoesNotContain(
+                static x => x.Id == "PT0011", generatorDiagnostics,
                 "PT0011 should not be reported for Task<int> return + TextWriter parameter.");
 
 
@@ -3014,8 +3005,8 @@ public partial class Sample
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            Assert.DoesNotContain(
+                static x => x.Id == "PT0011", generatorDiagnostics,
                 "PT0011 should not be reported for Task<int> return + PipeWriter parameter.");
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
@@ -3051,8 +3042,8 @@ public partial class Sample
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            Assert.DoesNotContain(
+                static x => x.Id == "PT0011", generatorDiagnostics,
                 "PT0011 should not be reported for ValueTask<int> return + TextWriter parameter.");
 
 
@@ -3090,8 +3081,8 @@ public partial class Sample
 
             AssertNoErrors(diagnostics, outputCompilation);
 
-            Assert.IsFalse(
-                generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+            Assert.DoesNotContain(
+                static x => x.Id == "PT0011", generatorDiagnostics,
                 "PT0011 should not be reported for ValueTask<int> return + PipeWriter parameter.");
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
@@ -3123,8 +3114,8 @@ public partial class Sample
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+        Assert.Contains(
+            static x => x.Id == "PT0011", generatorDiagnostics,
             "PT0011 should be reported for string return + PipeWriter parameter.");
     }
 
@@ -3150,8 +3141,8 @@ public partial class Sample
         var runResult = driver.GetRunResult();
         var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
 
-        Assert.IsTrue(
-            generatorDiagnostics.Any(static x => x.Id == "PT0011"),
+        Assert.Contains(
+            static x => x.Id == "PT0011", generatorDiagnostics,
             "PT0011 should be reported for IEnumerable<byte> return + TextWriter parameter.");
     }
 }

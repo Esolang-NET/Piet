@@ -1,5 +1,4 @@
 using Esolang.Piet.Parser;
-using Esolang.Processor;
 
 namespace Esolang.Piet.Processor;
 
@@ -9,11 +8,10 @@ namespace Esolang.Piet.Processor;
 /// <remarks>
 /// Initializes the processor with a parsed Piet program.
 /// </remarks>
-public sealed partial class PietProcessor(PietProgram program, TextWriter? output = null, TextReader? input = null)
-    : ITextProcessor<PietProgram>
+public sealed partial class PietProcessor(PietProgram program)
 {
     static readonly int[] HueTable =
-    {
+    [
         -1, -1,
         0, 0, 0,
         1, 1, 1,
@@ -21,10 +19,10 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
         3, 3, 3,
         4, 4, 4,
         5, 5, 5,
-    };
+    ];
 
     static readonly int[] LightnessTable =
-    {
+    [
         -1, -1,
         0, 1, 2,
         0, 1, 2,
@@ -32,131 +30,12 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
         0, 1, 2,
         0, 1, 2,
         0, 1, 2,
-    };
-
-    /// <summary>
-    /// The parsed Piet program.
-    /// </summary>
-    public PietProgram Program { get; } = program;
-
-    /// <summary>
-    /// Optional default input source used by <see cref="Run()"/>.
-    /// </summary>
-    public TextReader? Input { get; } = input;
-
-    /// <summary>
-    /// Optional default output destination used by <see cref="Run()"/>.
-    /// </summary>
-    public TextWriter? Output { get; } = output;
-
-    /// <summary>
-    /// Executes the program.
-    /// </summary>
-    public void Run() => Run(Input, Output);
-
-    /// <summary>
-    /// Executes the program with explicit I/O.
-    /// </summary>
-    public void Run(TextReader? input, TextWriter? output)
-    {
-        const byte black = (byte)PietColor.Black;
-        const byte white = (byte)PietColor.White;
-
-        var width = Program.Width;
-        var height = Program.Height;
-        var codels = Program.Codels;
-
-        var reader = input ?? TextReader.Null;
-        var writer = output ?? TextWriter.Null;
-
-        var dp = 0;
-        var cc = 0;
-        var cx = 0;
-        var cy = 0;
-        var stack = new List<int>();
-
-        while (true)
-        {
-            var blockColor = (byte)Program[cx, cy];
-            var blockCells = FloodFill(Program.Codels, width, height, cx, cy);
-            var moved = false;
-
-            for (var attempt = 0; attempt < 8; attempt++)
-            {
-                var (x, y) = FindEdge(blockCells, dp, cc);
-                var nx = x + DpDx(dp);
-                var ny = y + DpDy(dp);
-
-                if (nx < 0 || nx >= width || ny < 0 || ny >= height
-                    || Program[nx, ny] == black)
-                {
-                    ApplyRetry(attempt, ref dp, ref cc);
-                    continue;
-                }
-
-                var nextColor = (byte)Program[nx, ny];
-                if (nextColor == white)
-                {
-                    var wx = nx;
-                    var wy = ny;
-                    if (SlideWhite(Program.Codels, width, height, ref wx, ref wy, dp))
-                    {
-                        cx = wx;
-                        cy = wy;
-                        moved = true;
-                    }
-                    else
-                    {
-                        ApplyRetry(attempt, ref dp, ref cc);
-                    }
-
-                    break;
-                }
-
-                if (blockColor >= 2 && nextColor >= 2)
-                {
-                    var hDiff = (((HueTable[nextColor] - HueTable[blockColor]) % 6) + 6) % 6;
-                    var lDiff = (((LightnessTable[nextColor] - LightnessTable[blockColor]) % 3) + 3) % 3;
-                    ExecuteCommand(hDiff, lDiff, blockCells.Count, stack, ref dp, ref cc, reader, writer);
-                }
-
-                cx = nx;
-                cy = ny;
-                moved = true;
-                break;
-            }
-
-            if (!moved)
-                return;
-        }
-    }
-
-    /// <summary>
-    /// Executes the program and collects UTF-8 output as a string.
-    /// </summary>
-    public string? RunAndOutputString(TextReader? input = null)
-    {
-        using var writer = new StringWriter();
-        Run(input ?? Input, writer);
-        var result = writer.ToString().TrimEnd('\0', '\r', '\n');
-        return result.Length == 0 ? null : result;
-    }
-
-    /// <inheritdoc/>
-    public int RunToEnd(TextReader? input = null, TextWriter? output = null, CancellationToken cancellationToken = default)
-    {
-        Run(input ?? Input, output ?? Output);
-        return 0;
-    }
-
-    /// <inheritdoc/>
-    public ValueTask<int> RunToEndAsync(TextReader? input = null, TextWriter? output = null, CancellationToken cancellationToken = default)
-        => ValueTask.FromResult(RunToEnd(input, output, cancellationToken));
+    ];
 
     static void ExecuteCommand(int hDiff, int lDiff, int blockSize,
-        List<int> stack, ref int dp, ref int cc, TextReader input, TextWriter output)
+        List<int> stack, ref int dp, ref int cc)
     {
-        switch ((hDiff * 3) + lDiff)
+        switch (hDiff * 3 + lDiff)
         {
             case 0:
                 break;
@@ -211,7 +90,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
                     var a = Pop(stack);
                     var b = Pop(stack);
                     if (a != 0)
-                        stack.Add(((b % a) + a) % a);
+                        stack.Add((b % a + a) % a);
                     else
                     {
                         stack.Add(b);
@@ -238,7 +117,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
                 if (stack.Count >= 1)
                 {
                     var a = Pop(stack);
-                    dp = (((dp + a) % 4) + 4) % 4;
+                    dp = ((dp + a) % 4 + 4) % 4;
                 }
                 break;
             case 11:
@@ -263,26 +142,10 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
                 }
                 break;
             case 14:
-                {
-                    var s = input.ReadLine();
-                    if (int.TryParse(s, out var n))
-                        stack.Add(n);
-                }
-                break;
             case 15:
-                {
-                    var ch = input.Read();
-                    if (ch >= 0)
-                        stack.Add(ch);
-                }
-                break;
             case 16:
-                if (stack.Count >= 1)
-                    output.Write(Pop(stack));
-                break;
             case 17:
-                if (stack.Count >= 1)
-                    output.Write((char)Pop(stack));
+                // Handled in IEventProcessor
                 break;
         }
     }
@@ -302,7 +165,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
 
         while (true)
         {
-            var idx = (y * width) + x;
+            var idx = y * width + x;
             if (!visited.Add(idx))
                 return false;
 
@@ -312,7 +175,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
             var nx = x + DpDx(dp);
             var ny = y + DpDy(dp);
             if (nx < 0 || nx >= width || ny < 0 || ny >= height
-                || (byte)codels[(ny * width) + nx] == (byte)PietColor.Black)
+                || (byte)codels[ny * width + nx] == (byte)PietColor.Black)
                 return false;
 
             x = nx;
@@ -330,7 +193,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
 
     static void Roll(List<int> stack, int depth, int rolls)
     {
-        rolls = ((rolls % depth) + depth) % depth;
+        rolls = (rolls % depth + depth) % depth;
         for (var i = 0; i < rolls; i++)
         {
             var top = stack[^1];
@@ -342,12 +205,12 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
     static List<(int x, int y)> FloodFill(IReadOnlyList<PietColor> codels,
         int width, int height, int x, int y)
     {
-        var color = codels[(y * width) + x];
+        var color = codels[y * width + x];
         var visited = new bool[width * height];
         var result = new List<(int x, int y)>();
         var queue = new Queue<(int x, int y)>();
 
-        visited[(y * width) + x] = true;
+        visited[y * width + x] = true;
         queue.Enqueue((x, y));
 
         while (queue.Count > 0)
@@ -383,7 +246,7 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
         if (nx < 0 || nx >= width || ny < 0 || ny >= height)
             return;
 
-        var idx = (ny * width) + nx;
+        var idx = ny * width + nx;
         if (visited[idx] || codels[idx] != color)
             return;
 
@@ -402,10 +265,10 @@ public sealed partial class PietProcessor(PietProgram program, TextWriter? outpu
             var by = block[i].y;
             var better = dp switch
             {
-                0 => bx > bestX || (bx == bestX && (cc == 0 ? by < bestY : by > bestY)),
-                1 => by > bestY || (by == bestY && (cc == 0 ? bx > bestX : bx < bestX)),
-                2 => bx < bestX || (bx == bestX && (cc == 0 ? by > bestY : by < bestY)),
-                3 => by < bestY || (by == bestY && (cc == 0 ? bx < bestX : bx > bestX)),
+                0 => bx > bestX || bx == bestX && (cc == 0 ? by < bestY : by > bestY),
+                1 => by > bestY || by == bestY && (cc == 0 ? bx > bestX : bx < bestX),
+                2 => bx < bestX || bx == bestX && (cc == 0 ? by > bestY : by < bestY),
+                3 => by < bestY || by == bestY && (cc == 0 ? bx < bestX : bx > bestX),
                 _ => throw new InvalidOperationException("Unexpected DP value"),
             };
 

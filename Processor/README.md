@@ -12,20 +12,51 @@ dotnet add package Esolang.Piet.Processor
 
 ## Usage
 
+### Basic Usage (Event Streaming)
+
+イベントをストリーミングして処理する場合の基本的なアプローチです。
+
 ```csharp
 using Esolang.Piet.Parser;
 using Esolang.Piet.Processor;
+using Esolang.Processor;
 
 var program = PietParser.Parse("hello-world.png");
 var processor = new PietProcessor(program);
 
-processor.Run();
+await foreach (var ev in processor.RunAsyncEnumerable())
+{
+    // Handle events (OutputInt, OutputChar, etc.)
+}
+```
+
+### Simplified Execution (Extensions)
+
+`Esolang.Processor.Extensions.IO` パッケージを使用して、終了コードと出力先を指定して簡潔に実行するアプローチです。
+
+```csharp
+using Esolang.Piet.Parser;
+using Esolang.Piet.Processor;
+using Esolang.Processor;
+using Esolang.Processor.Extensions.IO; // Esolang.Processor.Extensions.IO パッケージが必要
+
+var program = PietParser.Parse("hello-world.png");
+var processor = new PietProcessor(program);
+
+// 出力先を準備
+using var output = new StringWriter();
+
+// 実行して終了コードを取得（出力はTextWriter引数経由）
+int exitCode = await processor.RunToEndAsync(output: output);
+
+Console.WriteLine($"Exit code: {exitCode}");
+Console.WriteLine($"Output: {output}");
 ```
 
 ## Current Status
 
 - `PietProcessor` executes parsed `PietProgram` instances.
-- `Run()` supports `TextReader`/`TextWriter` I/O, and `RunAndOutputString()` returns captured output.
+- The processor implements `IEventProcessor` and streams events via `RunAsyncEnumerable()`.
 
 ## Notes
 

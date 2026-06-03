@@ -11,7 +11,7 @@ public static class AsciiPietParser
     /// <summary>
     /// Character-to-PietColor mapping based on the official ascii-piet specification (both regular and end-of-line markers map to the same color).
     /// </summary>
-    private static readonly Dictionary<char, (PietColor Color, bool IsEndOfLine)> CharToColor = new()
+    static readonly Dictionary<char, (PietColor Color, bool IsEndOfLine)> CharToColor = new()
     {
         // Black
          {' ', (PietColor.Black, false) }, { '@', (PietColor.Black, true) },
@@ -58,7 +58,7 @@ public static class AsciiPietParser
     /// <summary>
     /// A set of characters usable in ASCII-PIET files, based on the official ASCII-PIET specification.
     /// </summary>
-    static readonly HashSet<byte> AsciiPietAllowed = [.. CharToColor.Keys.Select(c => (byte)c).Concat(new byte[] { (byte)'\t', (byte)'\r', (byte)'\n' })];
+    static readonly HashSet<byte> AsciiPietAllowed = [.. CharToColor.Keys.Select(c => (byte)c).Concat([(byte)'\t', (byte)'\r', (byte)'\n'])];
 
     /// <summary>
     /// Determines whether the given byte array appears to be an ascii-piet text file.
@@ -160,7 +160,7 @@ public static class AsciiPietParser
             {
                 for (x = 0; x < codelWidth; x++)
                 {
-                    colors[(y * codelWidth) + x] = (PietColor)codels[(y * codelSize * width) + (x * codelSize)];
+                    colors[y * codelWidth + x] = (PietColor)codels[y * codelSize * width + x * codelSize];
                 }
             }
             return new PietProgram(codelWidth, codelHeight, colors);

@@ -67,7 +67,7 @@ public static class PietInterpreterExtensions
         return rootCommand;
     }
 
-    private static Command BuildParseCommand(Option<int> codelSizeOption)
+    static Command BuildParseCommand(Option<int> codelSizeOption)
     {
         var inputArgument = new Argument<string>("path")
         {

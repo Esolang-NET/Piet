@@ -1,12 +1,13 @@
+using Esolang.Interpreter;
 using Esolang.Piet.Parser;
 using Esolang.Piet.Processor;
 using System.Text;
 
 namespace Esolang.Piet.Interpreter;
 
-internal static class PietCommandActions
+static class PietCommandActions
 {
-    public static Task<int> RunAsync(string? path, string? asciiPietText, int codelSize, bool asciiPiet, CancellationToken cancellationToken)
+    public static async Task<int> RunAsync(string? path, string? asciiPietText, int codelSize, bool asciiPiet, CancellationToken cancellationToken)
     {
         PietProgram program;
         if (!string.IsNullOrWhiteSpace(asciiPietText))
@@ -20,12 +21,10 @@ internal static class PietCommandActions
         }
 
         if (asciiPiet)
-            return WriteAsciiPietAsync(program);
+            return await WriteAsciiPietAsync(program);
 
-        var output = Console.Out;
-        var input = Console.In;
-        var processor = new PietProcessor(program, output, input);
-        return Task.FromResult(processor.RunToEnd(cancellationToken: cancellationToken));
+        var processor = new PietProcessor(program);
+        return await processor.RunToConsoleAsync(cancellationToken);
     }
 
     public static Task<int> ParseAsync(string path, int codelSize)
@@ -34,7 +33,7 @@ internal static class PietCommandActions
         return WriteAsciiPietAsync(program);
     }
 
-    private static Task<int> WriteAsciiPietAsync(PietProgram program)
+    static Task<int> WriteAsciiPietAsync(PietProgram program)
     {
         Console.Out.Write(AsciiPietFormatter.Format(program));
         return Task.FromResult(0);

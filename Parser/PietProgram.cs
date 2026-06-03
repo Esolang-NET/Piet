@@ -27,5 +27,5 @@ public sealed class PietProgram(int width, int height, IReadOnlyList<PietColor> 
     /// <summary>
     /// Returns the codel at the specified coordinates.
     /// </summary>
-    public PietColor this[int x, int y] => Codels[(y * Width) + x];
+    public PietColor this[int x, int y] => Codels[y * Width + x];
 }

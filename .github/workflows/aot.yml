@@ -1,0 +1,61 @@
+name: native-aot-ci
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Interpreter/**'
+      - 'Processor/**'
+      - '.github/workflows/aot.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'Interpreter/**'
+      - 'Processor/**'
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  PROJECT_PATH: 'Interpreter/Esolang.Piet.Interpreter.csproj'
+
+jobs:
+  build:
+    name: build-aot-${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: macos-latest
+            rid: osx-x64
+          - os: macos-latest
+            rid: osx-arm64
+          - os: ubuntu-latest
+            rid: any
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux' && matrix.rid != 'any'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang zlib1g-dev
+
+      - name: Pack
+        run: |
+          dotnet pack ${{ env.PROJECT_PATH }} -r ${{ matrix.rid }} -c Release -o artifacts/
+
+      - name: Upload Artifact (CI)
+        uses: actions/upload-artifact@v7
+        with:
+          name: nupkg-ci-${{ matrix.rid }}
+          path: artifacts/*
+          retention-days: 1

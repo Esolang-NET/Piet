@@ -7,7 +7,7 @@ namespace Esolang.Piet.Parser;
 /// </summary>
 public static class AsciiPietFormatter
 {
-    private static readonly Dictionary<PietColor, (char Regular, char EndOfLine)> ColorToChar = new()
+    static readonly Dictionary<PietColor, (char Regular, char EndOfLine)> ColorToChar = new()
     {
         { PietColor.Black, (' ', '@') },
         { PietColor.DarkBlue, ('a', 'A') },

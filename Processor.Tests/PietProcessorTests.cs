@@ -1,7 +1,7 @@
 using Esolang.Piet.Parser;
-using System.Collections.Generic;
-using System.IO;
+using Esolang.Processor;
 using System.Reflection;
+using static Esolang.Processor.IOEvent;
 
 namespace Esolang.Piet.Processor.Tests;
 
@@ -25,74 +25,73 @@ public sealed class PietProcessorTests
     [TestMethod]
     public void Constructor_StoresProgram()
     {
-        var program = new PietProgram(1, 1, new[] { PietColor.White });
+        var program = new PietProgram(1, 1, [PietColor.White]);
 
         var processor = new PietProcessor(program);
 
-        Assert.AreSame(program, processor.Program);
+        Assert.AreSame(program, ((IProcessor<PietProgram>)processor).Program);
     }
 
     [TestMethod]
-    public void Run_StopsWhenSlideWhiteCannotProceed()
+    public async Task Run_StopsWhenSlideWhiteCannotProceed()
     {
         var program = new PietProgram(
             2,
             1,
-            new[]
-            {
+            [
                 PietColor.LightRed,
                 PietColor.White,
-            });
+            ]);
 
         using var output = new StringWriter();
-        var processor = new PietProcessor(program, output);
+        var processor = new PietProcessor(program);
 
-        processor.Run();
+        await RunToEndManualAsync(processor, null, output, TestContext.CancellationToken).ConfigureAwait(false);
 
         Assert.AreEqual(string.Empty, output.ToString());
     }
 
     [TestMethod]
-    public void Run_ExecutesNoOpProgramWithoutOutput()
+    public async Task Run_ExecutesNoOpProgramWithoutOutput()
     {
-        var program = new PietProgram(1, 1, new[] { PietColor.White });
+        var program = new PietProgram(1, 1, [PietColor.White]);
         using var output = new StringWriter();
-        var processor = new PietProcessor(program, output);
+        var processor = new PietProcessor(program);
 
-        processor.Run();
+        await RunToEndManualAsync(processor, null, output, TestContext.CancellationToken).ConfigureAwait(false);
 
         Assert.AreEqual(string.Empty, output.ToString());
     }
 
     [TestMethod]
-    public void RunAndOutputString_ReturnsNullWhenNoOutputIsProduced()
+    public async Task RunAndOutputString_ReturnsNullWhenNoOutputIsProduced()
     {
-        var processor = new PietProcessor(new PietProgram(1, 1, new[] { PietColor.White }));
+        var processor = new PietProcessor(new PietProgram(1, 1, [PietColor.White]));
 
-        var result = processor.RunAndOutputString();
+        var result = await RunAndOutputStringAsync(processor, cancellationToken: TestContext.CancellationToken).ConfigureAwait(false);
 
         Assert.IsNull(result);
     }
 
     [TestMethod]
-    public void RunAndOutputString_ParsesAndRunsHelloWorldSample()
+    public async Task RunAndOutputString_ParsesAndRunsHelloWorldSample()
     {
         var path = FindFileInRepository("samples", "Generator.UseConsole", "samples", "hello-world.png");
         var program = PietParser.Parse(path);
         var processor = new PietProcessor(program);
 
-        var result = processor.RunAndOutputString();
+        var result = await RunAndOutputStringAsync(processor, cancellationToken: TestContext.CancellationToken).ConfigureAwait(false);
 
         Assert.AreEqual("Hello, world!", result);
     }
 
     [TestMethod]
-    public void RunToEnd_ReturnsZero()
+    public async Task RunToEnd_ReturnsZero()
     {
-        var program = new PietProgram(1, 1, new[] { PietColor.White });
+        var program = new PietProgram(1, 1, [PietColor.White]);
         var processor = new PietProcessor(program);
 
-        var exitCode = processor.RunToEnd(cancellationToken: TestContext.CancellationTokenSource.Token);
+        var exitCode = await RunToEndManualAsync(processor, null, null, TestContext.CancellationToken).ConfigureAwait(false);
 
         Assert.AreEqual(0, exitCode);
     }
@@ -100,117 +99,145 @@ public sealed class PietProcessorTests
     [TestMethod]
     public async Task RunToEndAsync_ReturnsZero()
     {
-        var program = new PietProgram(1, 1, new[] { PietColor.White });
+        var program = new PietProgram(1, 1, [PietColor.White]);
         var processor = new PietProcessor(program);
 
-        var exitCode = await processor.RunToEndAsync(cancellationToken: TestContext.CancellationTokenSource.Token);
+        var exitCode = await RunToEndManualAsync(processor, null, null, TestContext.CancellationToken).ConfigureAwait(false);
 
         Assert.AreEqual(0, exitCode);
+    }
+
+    static async Task<string?> RunAndOutputStringAsync(PietProcessor processor, TextReader? input = null, CancellationToken cancellationToken = default)
+    {
+        using var writer = new StringWriter();
+        await RunToEndManualAsync(processor, input, writer, cancellationToken).ConfigureAwait(false);
+        var result = writer.ToString().TrimEnd('\0', '\r', '\n');
+        return result.Length == 0 ? null : result;
+    }
+
+    static async Task<int> RunToEndManualAsync(PietProcessor processor, TextReader? input, TextWriter? output, CancellationToken cancellationToken)
+    {
+        await foreach (var ioEvent in processor.RunAsyncEnumerable(cancellationToken).ConfigureAwait(false))
+        {
+            switch (ioEvent)
+            {
+                case InputCharEvent charInput:
+                    if (input != null)
+                    {
+                        var buffer = new char[1];
+                        if (await input.ReadAsync(buffer, 0, 1).ConfigureAwait(false) > 0)
+                            charInput.Write(buffer[0]);
+                    }
+                    break;
+                case InputIntEvent intInput:
+                    if (input != null)
+                    {
+                        var line = await input.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+                        if (int.TryParse(line, out var i))
+                            intInput.Write(i);
+                    }
+                    break;
+                case OutputCharEvent charOutput:
+                    if (output != null)
+                        await output.WriteAsync(charOutput.Output).ConfigureAwait(false);
+                    break;
+                case OutputIntEvent intOutput:
+                    if (output != null)
+                        await output.WriteLineAsync(intOutput.Output.ToString()).ConfigureAwait(false);
+                    break;
+                case EndEvent endEvent:
+                    return endEvent.ExitCode;
+            }
+        }
+        return 0;
     }
 
     [TestMethod]
     public void ExecuteCommand_CoversArithmeticFlowAndIoCommands()
     {
         var stack = new List<int>();
-        var reader = new StringReader("123\nZ");
-        using var writer = new StringWriter();
         var dp = 0;
         var cc = 0;
 
-        InvokeExecuteCommand(1, 7, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(1, 7, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 7 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 2, 3 });
-        InvokeExecuteCommand(3, 0, stack, ref dp, ref cc, reader, writer);
+        stack.AddRange([2, 3]);
+        InvokeExecuteCommand(3, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 5 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 9, 4 });
-        InvokeExecuteCommand(4, 0, stack, ref dp, ref cc, reader, writer);
+        stack.AddRange([9, 4]);
+        InvokeExecuteCommand(4, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 5 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 3, 4 });
-        InvokeExecuteCommand(5, 0, stack, ref dp, ref cc, reader, writer);
+        stack.AddRange([3, 4]);
+        InvokeExecuteCommand(5, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 12 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 8, 2 });
-        InvokeExecuteCommand(6, 0, stack, ref dp, ref cc, reader, writer);
+        stack.AddRange([8, 2]);
+        InvokeExecuteCommand(6, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 4 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 8, 0 });
-        InvokeExecuteCommand(6, 0, stack, ref dp, ref cc, reader, writer);
+        stack.AddRange([8, 0]);
+        InvokeExecuteCommand(6, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 8, 0 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 8, 3 });
-        InvokeExecuteCommand(7, 0, stack, ref dp, ref cc, reader, writer);
+        stack.AddRange([8, 3]);
+        InvokeExecuteCommand(7, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 2 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 8, 0 });
-        InvokeExecuteCommand(7, 0, stack, ref dp, ref cc, reader, writer);
+        stack.AddRange([8, 0]);
+        InvokeExecuteCommand(7, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 8, 0 }, stack);
 
         stack.Clear();
         stack.Add(0);
-        InvokeExecuteCommand(8, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(8, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 1 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 5, 3 });
-        InvokeExecuteCommand(9, 0, stack, ref dp, ref cc, reader, writer);
+        stack.AddRange([5, 3]);
+        InvokeExecuteCommand(9, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 1 }, stack);
 
         stack.Clear();
         stack.Add(-1);
         dp = 0;
-        InvokeExecuteCommand(10, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(10, 0, stack, ref dp, ref cc);
         Assert.AreEqual(3, dp);
 
         stack.Clear();
         stack.Add(3);
         cc = 0;
-        InvokeExecuteCommand(11, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(11, 0, stack, ref dp, ref cc);
         Assert.AreEqual(1, cc);
 
         stack.Clear();
         stack.Add(42);
-        InvokeExecuteCommand(12, 0, stack, ref dp, ref cc, reader, writer);
+        InvokeExecuteCommand(12, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 42, 42 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 1, 2, 3, 3, 1 });
-        InvokeExecuteCommand(13, 0, stack, ref dp, ref cc, reader, writer);
+        stack.AddRange([1, 2, 3, 3, 1]);
+        InvokeExecuteCommand(13, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 3, 1, 2 }, stack);
 
         stack.Clear();
-        stack.AddRange(new[] { 9, 0, 0 });
-        InvokeExecuteCommand(13, 0, stack, ref dp, ref cc, reader, writer);
+        stack.AddRange([9, 0, 0]);
+        InvokeExecuteCommand(13, 0, stack, ref dp, ref cc);
         CollectionAssert.AreEqual(new[] { 9 }, stack);
 
         stack.Clear();
-        InvokeExecuteCommand(14, 0, stack, ref dp, ref cc, reader, writer);
-        CollectionAssert.AreEqual(new[] { 123 }, stack);
-
-        InvokeExecuteCommand(15, 0, stack, ref dp, ref cc, reader, writer);
-        CollectionAssert.AreEqual(new[] { 123, (int)'Z' }, stack);
-
-        stack.Clear();
-        stack.Add(99);
-        InvokeExecuteCommand(16, 0, stack, ref dp, ref cc, reader, writer);
-
-        stack.Add((int)'A');
-        InvokeExecuteCommand(17, 0, stack, ref dp, ref cc, reader, writer);
-        Assert.AreEqual("99A", writer.ToString());
-
-        stack.Clear();
         stack.Add(1);
-        InvokeExecuteCommand(2, 0, stack, ref dp, ref cc, reader, writer);
-        Assert.AreEqual(0, stack.Count);
+        InvokeExecuteCommand(2, 0, stack, ref dp, ref cc);
+        Assert.IsEmpty(stack);
     }
 
     [TestMethod]
@@ -224,7 +251,7 @@ public sealed class PietProcessorTests
         cc = (int)retryArgs[2];
         Assert.AreEqual(1, cc);
 
-        retryArgs = new object[] { 1, dp, cc };
+        retryArgs = [1, dp, cc];
         ApplyRetryMethod.Invoke(null, retryArgs);
         dp = (int)retryArgs[1];
         Assert.AreEqual(1, dp);
@@ -236,15 +263,15 @@ public sealed class PietProcessorTests
         Assert.AreEqual(1, (int)slideArgs[3]);
 
         var deadEnd = new[] { PietColor.White, PietColor.White };
-        slideArgs = new object[] { deadEnd, 2, 1, 0, 0, 0 };
+        slideArgs = [deadEnd, 2, 1, 0, 0, 0];
         slideResult = (bool)SlideWhiteMethod.Invoke(null, slideArgs)!;
         Assert.IsFalse(slideResult);
 
         var block = new List<(int x, int y)> { (0, 0), (2, 0), (1, 1) };
-        var edge0 = ((int x, int y))FindEdgeMethod.Invoke(null, new object[] { block, 0, 0 })!;
-        var edge1 = ((int x, int y))FindEdgeMethod.Invoke(null, new object[] { block, 1, 1 })!;
-        var edge2 = ((int x, int y))FindEdgeMethod.Invoke(null, new object[] { block, 2, 0 })!;
-        var edge3 = ((int x, int y))FindEdgeMethod.Invoke(null, new object[] { block, 3, 1 })!;
+        var edge0 = ((int x, int y))FindEdgeMethod.Invoke(null, [block, 0, 0])!;
+        var edge1 = ((int x, int y))FindEdgeMethod.Invoke(null, [block, 1, 1])!;
+        var edge2 = ((int x, int y))FindEdgeMethod.Invoke(null, [block, 2, 0])!;
+        var edge3 = ((int x, int y))FindEdgeMethod.Invoke(null, [block, 3, 1])!;
 
         Assert.AreEqual((2, 0), edge0);
         Assert.AreEqual((1, 1), edge1);
@@ -253,11 +280,11 @@ public sealed class PietProcessorTests
     }
 
     static void InvokeExecuteCommand(int commandIndex, int blockSize, List<int> stack,
-        ref int dp, ref int cc, TextReader input, TextWriter output)
+        ref int dp, ref int cc)
     {
         var hDiff = commandIndex / 3;
         var lDiff = commandIndex % 3;
-        var args = new object[] { hDiff, lDiff, blockSize, stack, dp, cc, input, output };
+        var args = new object[] { hDiff, lDiff, blockSize, stack, dp, cc };
         ExecuteCommandMethod.Invoke(null, args);
         dp = (int)args[4];
         cc = (int)args[5];
