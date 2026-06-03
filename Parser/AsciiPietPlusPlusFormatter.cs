@@ -44,7 +44,13 @@ public static class AsciiPietPlusPlusFormatter
         var sb = new StringBuilder(program.Width * program.Height + program.Height);
         for (var y = 0; y < program.Height; y++)
         {
-            for (var x = 0; x < program.Width; x++)
+            // Find the last non-Black (non-zero) codel in the row to enable trailing-Black trimming.
+            var lastNonBlack = -1;
+            for (var x = program.Width - 1; x >= 0; x--)
+            {
+                if ((int)program[x, y] != 0) { lastNonBlack = x; break; }
+            }
+            for (var x = 0; x <= lastNonBlack; x++)
             {
                 var idx = (int)program[x, y];
                 if ((uint)idx >= 64u)

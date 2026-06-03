@@ -49,13 +49,27 @@ public static class AsciiPietFormatter
         var builder = new StringBuilder(expectedCount);
         for (var y = 0; y < program.Height; y++)
         {
-            for (var x = 0; x < program.Width; x++)
+            // Find the last non-Black codel in the row to enable trailing-Black trimming.
+            var lastNonBlack = -1;
+            for (var x = program.Width - 1; x >= 0; x--)
             {
-                var codel = program[x, y];
-                if (!ColorToChar.TryGetValue(codel, out var chars))
-                    throw new ArgumentOutOfRangeException(nameof(program), $"Unsupported Piet color: {codel}.");
+                if (program[x, y] != PietColor.Black) { lastNonBlack = x; break; }
+            }
 
-                builder.Append(x == program.Width - 1 ? chars.EndOfLine : chars.Regular);
+            if (lastNonBlack < 0)
+            {
+                // All-Black row: emit the Black EndOfLine marker.
+                builder.Append('@');
+            }
+            else
+            {
+                for (var x = 0; x <= lastNonBlack; x++)
+                {
+                    var codel = program[x, y];
+                    if (!ColorToChar.TryGetValue(codel, out var chars))
+                        throw new ArgumentOutOfRangeException(nameof(program), $"Unsupported Piet color: {codel}.");
+                    builder.Append(x == lastNonBlack ? chars.EndOfLine : chars.Regular);
+                }
             }
         }
 

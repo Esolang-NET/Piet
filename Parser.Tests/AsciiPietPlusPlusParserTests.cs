@@ -161,6 +161,37 @@ public sealed class AsciiPietPlusPlusFormatterTests
     }
 
     [TestMethod]
+    public void Format_TrailingBlackTrimmed()
+    {
+        // Row: [1, 0, 0] — trailing Blacks should be trimmed → "0|"
+        var program = new PietProgram(3, 1, [(PietColor)1, (PietColor)0, (PietColor)0]);
+        var result = AsciiPietPlusPlusFormatter.Format(program);
+        Assert.AreEqual("0|", result);
+    }
+
+    [TestMethod]
+    public void Format_AllBlackRow_EmitsJustPipe()
+    {
+        // Row: [0, 0] — all Black → "|"
+        var program = new PietProgram(2, 1, [(PietColor)0, (PietColor)0]);
+        var result = AsciiPietPlusPlusFormatter.Format(program);
+        Assert.AreEqual("|", result);
+    }
+
+    [TestMethod]
+    public void Format_TrailingBlack_RoundTrips()
+    {
+        // Format trims trailing Blacks, so parsed width shrinks to last non-Black.
+        // [1, 0, 0] → "0|" → parsed as width=1 [(PietColor)1].
+        var original = new PietProgram(3, 1, [(PietColor)1, (PietColor)0, (PietColor)0]);
+        var text = AsciiPietPlusPlusFormatter.Format(original);
+        var parsed = AsciiPietPlusPlusParser.Parse(Encoding.ASCII.GetBytes(text));
+        Assert.AreEqual(1, parsed.Width);
+        Assert.AreEqual(1, parsed.Height);
+        Assert.AreEqual((PietColor)1, parsed.Codels[0]);
+    }
+
+    [TestMethod]
     public void Format_Throws_ForNull()
         => Assert.ThrowsExactly<ArgumentNullException>(() => AsciiPietPlusPlusFormatter.Format(null!));
 
