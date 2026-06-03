@@ -6,7 +6,7 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-06-02
+## [2.0.0] - 2026-06-03
 
 ### Changed
 - **Breaking**: Migrated `Esolang.Piet.Processor` and `Esolang.Piet.Interpreter` to `Esolang.Abstractions` v2.0.0.
