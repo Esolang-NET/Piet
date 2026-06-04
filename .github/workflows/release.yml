@@ -96,7 +96,7 @@ jobs:
 
       - name: Pack Libraries
         run: |
-          dotnet pack Interpreter/Esolang.Piet.Interpreter.csproj -c Release -o artifacts/aot --no-build
+          dotnet pack Interpreter/Esolang.Piet.Interpreter.csproj -c Release -o artifacts/aot -p:ToolPackageRuntimeIdentifiers=""
           dotnet pack Generator/Esolang.Piet.Generator.csproj -c Release -o artifacts/nuget --no-build
           dotnet pack Parser/Esolang.Piet.Parser.csproj -c Release -o artifacts/nuget --no-build
           dotnet pack Processor/Esolang.Piet.Processor.csproj -c Release -o artifacts/nuget --no-build
