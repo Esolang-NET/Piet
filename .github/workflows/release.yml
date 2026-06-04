@@ -1,4 +1,4 @@
-name: release
+﻿name: release
 
 on:
   push:
@@ -112,33 +112,46 @@ jobs:
             exit 1
           fi
           shopt -s nullglob
-          push_pair() {
+          push_nupkg() {
             local pkg="$1"
             dotnet nuget push "$pkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          }
+          push_snupkg() {
+            local pkg="$1"
             local snupkg="${pkg%.nupkg}.snupkg"
             if [ -f "$snupkg" ]; then
               dotnet nuget push "$snupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
             fi
           }
+          # Collect nupkg files in order:
           # 1. RID-specific AOT packages (win-x64, linux-x64, osx-*, etc.)
+          # 2. any/portable package
+          # 3. no-RID meta package (the main dotnet-piet tool entry point)
+          # 4. Library packages (Generator, Parser, Processor)
+          ordered_nupkgs=()
           for pkg in artifacts/aot/*.nupkg; do
             [[ "$pkg" =~ \.(win|linux|osx|freebsd|android|ios)- ]] || continue
-            push_pair "$pkg"
+            ordered_nupkgs+=("$pkg")
           done
-          # 2. any/portable package
           for pkg in artifacts/aot/*.nupkg; do
             [[ "$pkg" == *".any."* ]] || continue
-            push_pair "$pkg"
+            ordered_nupkgs+=("$pkg")
           done
-          # 3. no-RID meta package (the main dotnet-piet tool entry point)
           for pkg in artifacts/aot/*.nupkg; do
             [[ "$pkg" =~ \.(win|linux|osx|freebsd|android|ios)- ]] && continue
             [[ "$pkg" == *".any."* ]] && continue
-            push_pair "$pkg"
+            ordered_nupkgs+=("$pkg")
           done
-          # 4. Library packages (Generator, Parser, Processor)
           for pkg in artifacts/nuget/*.nupkg; do
-            push_pair "$pkg"
+            ordered_nupkgs+=("$pkg")
+          done
+          # Upload all nupkg files first
+          for pkg in "${ordered_nupkgs[@]}"; do
+            push_nupkg "$pkg"
+          done
+          # Then upload all snupkg files
+          for pkg in "${ordered_nupkgs[@]}"; do
+            push_snupkg "$pkg"
           done
 
       - name: Publish to GitHub Packages
