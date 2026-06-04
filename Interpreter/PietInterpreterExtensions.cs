@@ -30,15 +30,22 @@ public static class PietInterpreterExtensions
         {
             Description = "Inline ascii-piet text to execute directly (path can be omitted).",
         };
+        var pietPlusPlusOption = new Option<bool>("--piet-plus-plus")
+        {
+            Description = "Use ascii-piet++ format: interpret --ascii-piet-text as ascii-piet++, and write ascii-piet++ output when --ascii-piet is specified.",
+        };
 
         var parseCommand = BuildParseCommand(codelSizeOption);
+        var colorsCommand = BuildColorsCommand();
         var rootCommand = new RootCommand("Run Piet programs from image files.")
         {
             inputArgument,
             codelSizeOption,
             asciiPietOption,
             asciiPietTextOption,
+            pietPlusPlusOption,
             parseCommand,
+            colorsCommand,
         };
         rootCommand.Validators.Add(parseResult =>
         {
@@ -62,7 +69,8 @@ public static class PietInterpreterExtensions
             var codelSize = parseResult.GetValue(codelSizeOption);
             var asciiPiet = parseResult.GetValue(asciiPietOption);
             var asciiPietText = parseResult.GetValue(asciiPietTextOption);
-            return PietCommandActions.RunAsync(path, asciiPietText, codelSize, asciiPiet, cancellationToken);
+            var pietPlusPlus = parseResult.GetValue(pietPlusPlusOption);
+            return PietCommandActions.RunAsync(path, asciiPietText, codelSize, asciiPiet, pietPlusPlus, cancellationToken);
         });
         return rootCommand;
     }
@@ -73,20 +81,47 @@ public static class PietInterpreterExtensions
         {
             Description = "Path to a Piet image file.",
         };
+        var pietPlusPlusOption = new Option<bool>("--piet-plus-plus")
+        {
+            Description = "Write the parsed program as ascii-piet++ text instead of ascii-piet.",
+        };
 
-        var parseCommand = new Command("parse", "Parse a Piet source and write ascii-piet text without a trailing newline.")
+        var parseCommand = new Command("parse", "Parse a Piet source and write ascii-piet (or ascii-piet++) text without a trailing newline.")
         {
             inputArgument,
             codelSizeOption,
+            pietPlusPlusOption,
         };
 
         parseCommand.SetAction(parseResult =>
         {
             var path = parseResult.GetValue(inputArgument);
             var codelSize = parseResult.GetValue(codelSizeOption);
-            return PietCommandActions.ParseAsync(path!, codelSize);
+            var pietPlusPlus = parseResult.GetValue(pietPlusPlusOption);
+            return PietCommandActions.ParseAsync(path!, codelSize, pietPlusPlus);
         });
 
         return parseCommand;
+    }
+
+    static Command BuildColorsCommand()
+    {
+        var pietPlusPlusOption = new Option<bool>("--piet-plus-plus")
+        {
+            Description = "Show the ascii-piet++ character encoding table instead of ascii-piet.",
+        };
+
+        var colorsCommand = new Command("colors", "Show the ascii-piet (or ascii-piet++) character encoding table.")
+        {
+            pietPlusPlusOption,
+        };
+
+        colorsCommand.SetAction(parseResult =>
+        {
+            var pietPlusPlus = parseResult.GetValue(pietPlusPlusOption);
+            return PietCommandActions.ColorsAsync(pietPlusPlus);
+        });
+
+        return colorsCommand;
     }
 }
