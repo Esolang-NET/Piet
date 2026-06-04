@@ -9,7 +9,7 @@ The format is based on Keep a Changelog.
 ## [2.0.1] - 2026-06-04
 
 ### Added
-- `Esolang.Piet.Generator` / `Esolang.Piet.Processor`: added Piet++ language support.
+- `Esolang.Piet.Generator`/ `Esolang.Piet.Processor`: added Piet++ language support.
 - `Esolang.Piet.Parser`: added ascii-piet++ text parsing/formatting support (`.appp`, `.txt2`).
 - `dotnet-piet` (`Esolang.Piet.Interpreter`): added `colors` subcommand to display the ascii-piet color/character table.
 - `dotnet-piet` (`Esolang.Piet.Interpreter`): added `--piet-plus-plus` flag to the `colors` subcommand to display the ascii-piet++ color/character table instead.
