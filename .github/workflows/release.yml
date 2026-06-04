@@ -1,4 +1,4 @@
-﻿name: release
+name: release
 
 on:
   push:
@@ -37,12 +37,12 @@ jobs:
             rid: any
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -57,7 +57,7 @@ jobs:
           dotnet pack Interpreter/Esolang.Piet.Interpreter.csproj -r ${{ matrix.rid }} -c Release -o artifacts/
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: nupkg-${{ matrix.rid }}
           path: artifacts/*
@@ -68,13 +68,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -149,8 +149,15 @@ jobs:
           for pkg in "${ordered_nupkgs[@]}"; do
             push_nupkg "$pkg"
           done
-          # Then upload all snupkg files
-          for pkg in "${ordered_nupkgs[@]}"; do
+          # Wait for NuGet.org to index nupkgs before pushing snupkgs
+          sleep 60
+          # Push snupkgs for managed packages only (any/portable + library packages)
+          # RID-specific AOT packages contain native binaries and have no valid snupkg
+          for pkg in artifacts/aot/*.nupkg; do
+            [[ "$pkg" == *".any."* ]] || continue
+            push_snupkg "$pkg"
+          done
+          for pkg in artifacts/nuget/*.nupkg; do
             push_snupkg "$pkg"
           done
 
