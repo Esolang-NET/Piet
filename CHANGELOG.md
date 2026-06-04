@@ -6,9 +6,14 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-06-04
+
 ### Added
 - `Esolang.Piet.Generator` / `Esolang.Piet.Processor`: added Piet++ language support.
 - `Esolang.Piet.Parser`: added ascii-piet++ text parsing/formatting support (`.appp`, `.txt2`).
+- `dotnet-piet` (`Esolang.Piet.Interpreter`): added `colors` subcommand to display the ascii-piet color/character table.
+- `dotnet-piet` (`Esolang.Piet.Interpreter`): added `--piet-plus-plus` flag to the `colors` subcommand to display the ascii-piet++ color/character table instead.
+- `dotnet-piet` (`Esolang.Piet.Interpreter`): added `--piet-plus-plus` flag to the `parse` subcommand and the root command to parse/run programs as ascii-piet++.
 
 ### Changed
 - `Esolang.Piet.Parser`: renamed format naming from `ascii-piet2` to `ascii-piet++`.
@@ -109,7 +114,8 @@ The format is based on Keep a Changelog.
 - Initial repository structure for Piet support.
 - Parser, processor, and interpreter package skeletons.
 
-[Unreleased]: https://github.com/Esolang-NET/Piet/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/Esolang-NET/Piet/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/Esolang-NET/Piet/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/Esolang-NET/Piet/tree/v2.0.0
 [1.1.2]: https://github.com/Esolang-NET/Piet/tree/v1.1.2
 [1.1.1]: https://github.com/Esolang-NET/Piet/tree/v1.1.1
