@@ -9,6 +9,13 @@ public sealed partial class PietProcessor : IEventProcessor
     /// <inheritdoc/>
     public async IAsyncEnumerable<IOEvent> RunAsyncEnumerable([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        if (language == LanguageType.PietPlusPlus)
+        {
+            await foreach (var ev in PietPlusPlusExecutor.RunAsyncEnumerable(program, cancellationToken).ConfigureAwait(false))
+                yield return ev;
+            yield break;
+        }
+
         const byte black = (byte)PietColor.Black;
         const byte white = (byte)PietColor.White;
 

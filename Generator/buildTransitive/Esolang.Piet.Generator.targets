@@ -7,6 +7,7 @@
       <OutputFile Required="true" ParameterType="System.String" />
       <LogicalPath Required="true" ParameterType="System.String" />
       <CodelSize Required="false" ParameterType="System.String" />
+      <Language Required="false" ParameterType="System.String" />
     </ParameterGroup>
     <Task>
       <Using Namespace="System" />
@@ -21,11 +22,13 @@
             Directory.CreateDirectory(outputDirectory);
         }
         var imagePath = LogicalPath;
+        var lang = string.IsNullOrEmpty(Language) ? "Piet" : Language;
 
         File.WriteAllText(
           OutputFile,
           "// PIET_IMAGE_PATH=" + imagePath + "\n" +
           "// PIET_CODEL_SIZE=" + CodelSize + "\n" +
+          "// PIET_LANGUAGE=" + lang + "\n" +
           base64);
       ]]></Code>
     </Task>
@@ -45,6 +48,8 @@
         <LogicalPath Condition="'%(PietImage.PietLogicalPath)' != ''">%(PietImage.PietLogicalPath)</LogicalPath>
         <CodelSize Condition="'%(PietImage.CodelSize)' == ''">1</CodelSize>
         <CodelSize Condition="'%(PietImage.CodelSize)' != ''">%(PietImage.CodelSize)</CodelSize>
+        <Language Condition="'%(PietImage.Language)' == ''">Piet</Language>
+        <Language Condition="'%(PietImage.Language)' != ''">%(PietImage.Language)</Language>
       </_PietGeneratedFile>
     </ItemGroup>
 
@@ -52,7 +57,8 @@
       InputFile="%(_PietGeneratedFile.FullPath)"
       OutputFile="%(_PietGeneratedFile.GeneratedPath)"
       LogicalPath="%(_PietGeneratedFile.LogicalPath)"
-      CodelSize="%(_PietGeneratedFile.CodelSize)" />
+      CodelSize="%(_PietGeneratedFile.CodelSize)"
+      Language="%(_PietGeneratedFile.Language)" />
 
     <ItemGroup>
       <AdditionalFiles Include="%(_PietGeneratedFile.GeneratedPath)" />

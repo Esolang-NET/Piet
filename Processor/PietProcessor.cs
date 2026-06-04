@@ -8,7 +8,7 @@ namespace Esolang.Piet.Processor;
 /// <remarks>
 /// Initializes the processor with a parsed Piet program.
 /// </remarks>
-public sealed partial class PietProcessor(PietProgram program)
+public sealed partial class PietProcessor(PietProgram program, LanguageType language = LanguageType.Piet)
 {
     static readonly int[] HueTable =
     [
@@ -150,7 +150,7 @@ public sealed partial class PietProcessor(PietProgram program)
         }
     }
 
-    static void ApplyRetry(int attempt, ref int dp, ref int cc)
+    internal static void ApplyRetry(int attempt, ref int dp, ref int cc)
     {
         if (attempt % 2 == 0)
             cc ^= 1;
@@ -202,7 +202,7 @@ public sealed partial class PietProcessor(PietProgram program)
         }
     }
 
-    static List<(int x, int y)> FloodFill(IReadOnlyList<PietColor> codels,
+    internal static List<(int x, int y)> FloodFill(IReadOnlyList<PietColor> codels,
         int width, int height, int x, int y)
     {
         var color = codels[y * width + x];
@@ -254,7 +254,7 @@ public sealed partial class PietProcessor(PietProgram program)
         queue.Enqueue((nx, ny));
     }
 
-    static (int x, int y) FindEdge(List<(int x, int y)> block, int dp, int cc)
+    internal static (int x, int y) FindEdge(List<(int x, int y)> block, int dp, int cc)
     {
         var bestX = block[0].x;
         var bestY = block[0].y;
@@ -282,7 +282,7 @@ public sealed partial class PietProcessor(PietProgram program)
         return (bestX, bestY);
     }
 
-    static int DpDx(int dp) => dp switch { 0 => 1, 2 => -1, _ => 0 };
+    internal static int DpDx(int dp) => dp switch { 0 => 1, 2 => -1, _ => 0 };
 
-    static int DpDy(int dp) => dp switch { 1 => 1, 3 => -1, _ => 0 };
+    internal static int DpDy(int dp) => dp switch { 1 => 1, 3 => -1, _ => 0 };
 }

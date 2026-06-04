@@ -44,7 +44,7 @@
   </ItemGroup>
   
   <ItemGroup>    
-    <InternalsVisibleTo Include="Esolang.Piet.Generator.Tests" />
+    <InternalsVisibleTo Include="Piet.Generator.Tests" />
   </ItemGroup>
 
   <ItemGroup>

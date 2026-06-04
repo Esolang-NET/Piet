@@ -26,7 +26,9 @@ public static class PietParser
 #endif
     out PietProgram program)
     {
-        if (ext is ".txt" or ".ascii-piet")
+        if (ext is ".appp" or ".txt2")
+            return AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program);
+        if (ext is ".txt" or ".ap" or ".ascii-piet")
             return AsciiPietParser.TryParse(bytes, codelSize, out program);
         if (AsciiPietParser.LooksLikeAsciiPiet(bytes) && AsciiPietParser.TryParse(bytes, codelSize, out program))
             return true;
@@ -48,7 +50,9 @@ public static class PietParser
     /// <exception cref="ArgumentException"></exception>
     public static PietProgram Parse(byte[] bytes, string ext, int codelSize = 1)
     {
-        if (ext is ".txt" or ".ascii-piet")
+        if (ext is ".appp" or ".txt2")
+            return AsciiPietPlusPlusParser.Parse(bytes, codelSize);
+        if (ext is ".txt" or ".ap" or ".ascii-piet")
             return AsciiPietParser.Parse(bytes, codelSize);
         if (AsciiPietParser.LooksLikeAsciiPiet(bytes) && AsciiPietParser.TryParse(bytes, codelSize, out var program))
             return program;
@@ -340,6 +344,61 @@ public static class PietParser
             return b;
         return c;
     }
+
+    /// <summary>
+    /// Parses a Piet program from raw image bytes, selecting the parser based on the specified language variant.
+    /// </summary>
+    public static bool TryParse(byte[] bytes, string ext, int codelSize, LanguageType language,
+#if NETSTANDARD2_1_OR_GREATER
+    [NotNullWhen(true)]
+#endif
+    out PietProgram program)
+    {
+        if (language == LanguageType.PietPlusPlus)
+        {
+            if (ext is ".txt2" or ".appp")
+                return AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program);
+            if (AsciiPietPlusPlusParser.LooksLikeAsciiPietPlusPlus(bytes)
+                && AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program))
+                return true;
+            return TryParseInternalPietPlusPlus(bytes, codelSize, out program);
+        }
+        return TryParse(bytes, ext, codelSize, out program);
+    }
+
+    internal static bool TryParseInternalPietPlusPlus(byte[] bytes, int codelSize,
+#if NETSTANDARD2_1_OR_GREATER
+    [NotNullWhen(true)]
+#endif
+    out PietProgram program)
+    {
+        program = default!;
+        if (bytes.Length <= 0 || codelSize < 1) return false;
+        try
+        {
+            using var image = Image.Load<Rgba32>(bytes);
+            var cw = image.Width / codelSize;
+            var ch = image.Height / codelSize;
+            var colors = new PietColor[cw * ch];
+            for (var y = 0; y < ch; y++)
+                for (var x = 0; x < cw; x++)
+                {
+                    var px = image[x * codelSize, y * codelSize];
+                    var idx = MapToPietPlusPlusColor(px.R, px.G, px.B);
+                    if (idx < 0) return false;
+                    colors[y * cw + x] = (PietColor)idx;
+                }
+            program = new(cw, ch, colors);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Maps an RGB triplet to a Piet++ color index (0–63). Returns -1 for invalid Piet++ colors.
+    /// </summary>
+    public static int MapToPietPlusPlusColor(byte r, byte g, byte b)
+        => PietPlusPlusColorMapper.MapToPietPlusPlusColor(r, g, b);
 
     /// <summary>
     /// Converts an RGB value to a PietColor index. Returns -1 for unsupported colors.

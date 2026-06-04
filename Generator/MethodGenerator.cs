@@ -53,7 +53,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         public string Source { get; } = source;
     }
 
-    readonly struct AdditionalImageFile(string path, string? text, int? codelSize = null, string? transformedOriginalPath = null)
+    readonly struct AdditionalImageFile(string path, string? text, int? codelSize = null, string? transformedOriginalPath = null, Esolang.Piet.Parser.LanguageType? language = null)
     {
         public string Path { get; } = path;
 
@@ -62,6 +62,8 @@ public partial class MethodGenerator : IIncrementalGenerator
         public int? CodelSize { get; } = codelSize;
 
         public string? TransformedOriginalPath { get; } = transformedOriginalPath;
+
+        public Esolang.Piet.Parser.LanguageType? Language { get; } = language;
 
         public bool IsReadable => Text is not null;
         public static AdditionalImageFile Make(string path, string? text)
@@ -72,8 +74,10 @@ public partial class MethodGenerator : IIncrementalGenerator
             }
             var codelSize = TryGetCodelSize(text, out var codelSize_) ? codelSize_ : (int?)null;
             var transformedOriginalPath = TryGetTransformedOriginalImagePath(text, out var transformedImagePath) ? transformedImagePath : null;
-            var newText = string.Join("\n", text.Split('\n').Skip(2));
-            return new(path, newText, codelSize, transformedOriginalPath);
+            var hasLanguage = TryGetLanguage(text, out var language_);
+            var skipLines = hasLanguage ? 3 : 2;
+            var newText = string.Join("\n", text.Split('\n').Skip(skipLines));
+            return new(path, newText, codelSize, transformedOriginalPath, hasLanguage ? language_ : null);
         }
     }
 
@@ -89,6 +93,17 @@ public partial class MethodGenerator : IIncrementalGenerator
                 using System;
                 using System.Diagnostics;
                 namespace {{NameSpaceName}} {
+                    /// <summary>
+                    /// Specifies the Piet language variant used for code generation.
+                    /// </summary>
+                    internal enum LanguageType
+                    {
+                        /// <summary>Standard Piet language.</summary>
+                        Piet = 0,
+                        /// <summary>Piet++ language extension.</summary>
+                        PietPlusPlus = 1,
+                    }
+
                     [Conditional("COMPILE_TIME_ONLY")]
                     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
                     internal sealed class {{ClassNamePietAttribution}} : Attribute
@@ -98,7 +113,8 @@ public partial class MethodGenerator : IIncrementalGenerator
                         /// </summary>
                         /// <param name="imagePath">Path to the Piet image file.</param>
                         /// <param name="codelSize">Optional codel size for the Piet image.</param>
-                        internal {{ClassNamePietAttribution}}(string imagePath, int codelSize = 0) { }
+                        /// <param name="language">Optional language variant (Piet or PietPlusPlus).</param>
+                        internal {{ClassNamePietAttribution}}(string imagePath, int codelSize = 0, LanguageType language = LanguageType.Piet) { }
                     }
 
                     /// <summary>
@@ -183,6 +199,8 @@ public partial class MethodGenerator : IIncrementalGenerator
             }
             if (TryMakePietRuntimeSource(features, out var runtimeFileName, out var runtimeSource))
                 context.AddSource(runtimeFileName, runtimeSource);
+            if (TryMakePietPlusPlusRuntimeSource(features, out var ppRuntimeFileName, out var ppRuntimeSource))
+                context.AddSource(ppRuntimeFileName, ppRuntimeSource);
         });
     }
 
@@ -298,6 +316,17 @@ public partial class MethodGenerator : IIncrementalGenerator
             {
                 codelSize = attrCodelSize;
             }
+        }
+
+        // 属性引数（3つ目）にlanguageがあればそれを優先、なければ追加ファイルのPIET_LANGUAGEコメントを使う
+        // Note: Roslyn includes default parameter values in ConstructorArguments, so we only override
+        // the header-based language if the attribute value is non-default (non-Piet).
+        var language = resolvedImageFile.Language ?? Esolang.Piet.Parser.LanguageType.Piet;
+        if (source.Attributes[0].ConstructorArguments.Length > 2)
+        {
+            var arg = source.Attributes[0].ConstructorArguments[2];
+            if (arg.Value is int langVal && langVal != (int)Esolang.Piet.Parser.LanguageType.Piet)
+                language = (Esolang.Piet.Parser.LanguageType)langVal;
         }
 
         if (methodSymbol.TypeParameters.Length > 0)
@@ -427,7 +456,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 $"The image file {imagePath} has an unsupported format or is not readable"
             );
         }
-        if (!PietParser.TryParse(bytes, extension, codelSize, out var program))
+        if (!PietParser.TryParse(bytes, extension, codelSize, language, out var program))
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.InvalidImageFormat,
@@ -470,7 +499,9 @@ public partial class MethodGenerator : IIncrementalGenerator
             );
         }
 
-        var (mightUseOutput, mightUseInput) = ScanPietIoCommands(codels, imageWidth, imageHeight);
+        var (mightUseOutput, mightUseInput) = language == Esolang.Piet.Parser.LanguageType.PietPlusPlus
+            ? ScanPietPlusPlusIoCommands(codels, imageWidth, imageHeight)
+            : ScanPietIoCommands(codels, imageWidth, imageHeight);
         if (mightUseOutput && !binding.HasExplicitOutput)
         {
             context.ReportDiagnostic(Diagnostic.Create(
@@ -532,7 +563,8 @@ public partial class MethodGenerator : IIncrementalGenerator
             imageWidth.ToString(),
             imageHeight.ToString(),
             mightUseOutput,
-            mightUseInput
+            mightUseInput,
+            language
         );
 
         code.AppendLine("    }");
@@ -542,15 +574,22 @@ public partial class MethodGenerator : IIncrementalGenerator
             code.AppendLine("}");
         }
 
-        var generatorFeatures = GetGeneratorFeatures(binding);
+        var generatorFeatures = GetGeneratorFeatures(binding, language);
         if (binding.LoggerExpression is not null)
             generatorFeatures |= GeneratorFeatures.UseLogging;
 
         return (new EmittedMethod(code.ToString()), generatorFeatures);
     }
 
-    static GeneratorFeatures GetGeneratorFeatures(MethodSignatureBinding binding)
+    static GeneratorFeatures GetGeneratorFeatures(MethodSignatureBinding binding, Esolang.Piet.Parser.LanguageType language = Esolang.Piet.Parser.LanguageType.Piet)
     {
+        if (language == Esolang.Piet.Parser.LanguageType.PietPlusPlus)
+        {
+            if (binding.IsAsyncEnumerable) return GeneratorFeatures.AsyncEnumerablePlusPlus;
+            if (binding.IsEnumerable) return GeneratorFeatures.EnumerablePlusPlus;
+            if (binding.IsAsync) return GeneratorFeatures.AsyncPlusPlus;
+            return GeneratorFeatures.SyncPlusPlus;
+        }
         if (binding.IsAsyncEnumerable) return GeneratorFeatures.AsyncEnumerable;
         if (binding.IsEnumerable) return GeneratorFeatures.Enumerable;
         if (binding.IsAsync) return GeneratorFeatures.Async;
@@ -564,7 +603,8 @@ public partial class MethodGenerator : IIncrementalGenerator
             string widthExpression,
             string heightExpression,
             bool mightUseOutput,
-            bool mightUseInput
+            bool mightUseInput,
+            Esolang.Piet.Parser.LanguageType language = Esolang.Piet.Parser.LanguageType.Piet
         )
     {
         var ctName = binding.CancellationTokenName ?? "default(global::System.Threading.CancellationToken)";
@@ -574,7 +614,18 @@ public partial class MethodGenerator : IIncrementalGenerator
         // `logger: {loggerExpr}` or string.Empty
         var logParameter = binding.LoggerExpression is not null ? $"logger: {loggerExpr}," : string.Empty;
 
-        var features = GetGeneratorFeatures(binding);
+        var features = GetGeneratorFeatures(binding, language);
+        var runtimeClass = language == Esolang.Piet.Parser.LanguageType.PietPlusPlus
+            ? "global::Esolang.Piet.__Generated.PietPlusPlusRuntime"
+            : "global::Esolang.Piet.__Generated.PietRuntime";
+        var baseFeatures = features switch
+        {
+            GeneratorFeatures.SyncPlusPlus => GeneratorFeatures.Sync,
+            GeneratorFeatures.AsyncPlusPlus => GeneratorFeatures.Async,
+            GeneratorFeatures.EnumerablePlusPlus => GeneratorFeatures.Enumerable,
+            GeneratorFeatures.AsyncEnumerablePlusPlus => GeneratorFeatures.AsyncEnumerable,
+            _ => features
+        };
 
         // ------------------------------------------------------------
         // 入力デリゲート生成
@@ -582,7 +633,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         switch (binding)
         {
-            case { InputKind: MethodInputKind.None } when features is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable && mightUseInput:
+            case { InputKind: MethodInputKind.None } when baseFeatures is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable && mightUseInput:
                 builder.AppendLine("""
                 int? __pietReadNumber()
                     => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
@@ -590,13 +641,13 @@ public partial class MethodGenerator : IIncrementalGenerator
                     => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
         """);
                 break;
-            case { InputKind: MethodInputKind.None } when features is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable:
+            case { InputKind: MethodInputKind.None } when baseFeatures is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable:
                 builder.AppendLine("""
                 int? __pietReadNumber() => (int?)null;
                 int? __pietReadChar() => (int?)null;
         """);
                 break;
-            case { InputKind: MethodInputKind.None } when features is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable && mightUseInput:
+            case { InputKind: MethodInputKind.None } when baseFeatures is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable && mightUseInput:
                 builder.AppendLine("""
                 global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                     => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
@@ -605,7 +656,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                     => throw new global::System.InvalidOperationException("PT0008: Required input interface not provided");
         """);
                 break;
-            case { InputKind: MethodInputKind.None } when features is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable:
+            case { InputKind: MethodInputKind.None } when baseFeatures is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable:
                 builder.AppendLine("""
                 global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                     => new global::System.Threading.Tasks.ValueTask<int?>((int?)null);
@@ -614,7 +665,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                     => new global::System.Threading.Tasks.ValueTask<int?>((int?)null);
         """);
                 break;
-            case { InputKind: MethodInputKind.String } when features is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable:
+            case { InputKind: MethodInputKind.String } when baseFeatures is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable:
                 builder.AppendLine($$"""
                 var __pietStringReader = new global::System.IO.StringReader({{binding.InputExpression}});
 
@@ -633,7 +684,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                 break;
 
-            case { InputKind: MethodInputKind.String } when features is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable:
+            case { InputKind: MethodInputKind.String } when baseFeatures is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable:
                 builder.AppendLine($$"""
                 var __pietStringReader = new global::System.IO.StringReader({{binding.InputExpression}});
 
@@ -652,7 +703,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                 break;
 
-            case { InputKind: MethodInputKind.TextReader } when features is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable:
+            case { InputKind: MethodInputKind.TextReader } when baseFeatures is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable:
                 builder.AppendLine($$"""
                 int? __pietReadNumber()
                 {
@@ -669,7 +720,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                 break;
 
-            case { InputKind: MethodInputKind.TextReader } when features is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable:
+            case { InputKind: MethodInputKind.TextReader } when baseFeatures is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable:
                 builder.AppendLine($$"""
                 global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                 {
@@ -709,7 +760,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                 break;
 
-            case { InputKind: MethodInputKind.PipeReader } when features is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable:
+            case { InputKind: MethodInputKind.PipeReader } when baseFeatures is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable:
                 builder.AppendLine($$"""
                 int? __pietReadNumber()
                 {
@@ -751,7 +802,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         """);
                 break;
 
-            case { InputKind: MethodInputKind.PipeReader } when features is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable:
+            case { InputKind: MethodInputKind.PipeReader } when baseFeatures is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable:
                 builder.AppendLine($$"""
                 async global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                 {
@@ -796,28 +847,28 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         switch (binding)
         {
-            case { OutputKind: MethodOutputKind.ReturnString } when features is GeneratorFeatures.Async or GeneratorFeatures.Sync:
+            case { OutputKind: MethodOutputKind.ReturnString } when baseFeatures is GeneratorFeatures.Async or GeneratorFeatures.Sync:
                 builder.AppendLine("""
                 var __pietBytes = new global::System.Collections.Generic.List<byte>();
                 void __pietWriteByte(byte b) => __pietBytes.Add(b);
         """);
                 break;
-            case { OutputKind: MethodOutputKind.TextWriter } when features is GeneratorFeatures.Async or GeneratorFeatures.Sync:
+            case { OutputKind: MethodOutputKind.TextWriter } when baseFeatures is GeneratorFeatures.Async or GeneratorFeatures.Sync:
                 builder.AppendLine($$"""
                 void __pietWriteByte(byte b) => {{binding.OutputExpression}}.Write((char)b);
         """);
                 break;
-            case { OutputKind: MethodOutputKind.PipeWriter } when features is GeneratorFeatures.Async or GeneratorFeatures.Sync:
+            case { OutputKind: MethodOutputKind.PipeWriter } when baseFeatures is GeneratorFeatures.Async or GeneratorFeatures.Sync:
                 builder.AppendLine($$"""
                 void __pietWriteByte(byte b) => global::System.Buffers.BuffersExtensions.Write({{binding.OutputExpression}}, stackalloc byte[] { b });
         """);
                 break;
-            case { HasExplicitOutput: false } when features is GeneratorFeatures.Async or GeneratorFeatures.Sync && mightUseOutput:
+            case { HasExplicitOutput: false } when baseFeatures is GeneratorFeatures.Async or GeneratorFeatures.Sync && mightUseOutput:
                 builder.AppendLine("""
                 void __pietWriteByte(byte b) => throw new global::System.InvalidOperationException("PT0007: Required output interface not provided");
         """);
                 break;
-            case { } when features is GeneratorFeatures.Async or GeneratorFeatures.Sync:
+            case { } when baseFeatures is GeneratorFeatures.Async or GeneratorFeatures.Sync:
                 builder.AppendLine("""
                 void __pietWriteByte(byte b) { }
         """);
@@ -834,7 +885,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 {
                     builder.AppendLine($$"""
                 {
-                    global::Esolang.Piet.__Generated.PietRuntime.Execute(
+                    {{runtimeClass}}.Execute(
                         {{codelArrayExpression}},
                         {{widthExpression}},
                         {{heightExpression}},
@@ -853,7 +904,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 {
                     builder.AppendLine($$"""
                 {
-                    global::Esolang.Piet.__Generated.PietRuntime.Execute(
+                    {{runtimeClass}}.Execute(
                         {{codelArrayExpression}},
                         {{widthExpression}},
                         {{heightExpression}},
@@ -872,7 +923,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 {
                     builder.AppendLine($$"""
                 {
-                    await global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsync(
+                    await {{runtimeClass}}.ExecuteAsync(
                         {{codelArrayExpression}},
                         {{widthExpression}},
                         {{heightExpression}},
@@ -890,7 +941,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 {
                     builder.AppendLine($$"""
                 {
-                    await global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsync(
+                    await {{runtimeClass}}.ExecuteAsync(
                         {{codelArrayExpression}},
                         {{widthExpression}},
                         {{heightExpression}},
@@ -909,7 +960,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 {
                     builder.AppendLine($$"""
                 {
-                    await global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsync(
+                    await {{runtimeClass}}.ExecuteAsync(
                         {{codelArrayExpression}},
                         {{widthExpression}},
                         {{heightExpression}},
@@ -927,7 +978,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 {
                     builder.AppendLine($$"""
                 {
-                    await global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsync(
+                    await {{runtimeClass}}.ExecuteAsync(
                         {{codelArrayExpression}},
                         {{widthExpression}},
                         {{heightExpression}},
@@ -947,7 +998,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 {
                     builder.AppendLine($$"""
                 {
-                    global::Esolang.Piet.__Generated.PietRuntime.Execute(
+                    {{runtimeClass}}.Execute(
                         {{codelArrayExpression}},
                         {{widthExpression}},
                         {{heightExpression}},
@@ -977,7 +1028,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 {
                     builder.AppendLine($$"""
                 {
-                    await global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsync(
+                    await {{runtimeClass}}.ExecuteAsync(
                         {{codelArrayExpression}},
                         {{widthExpression}},
                         {{heightExpression}},
@@ -1008,7 +1059,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 {
                     builder.AppendLine($$"""
                 {
-                    await global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsync(
+                    await {{runtimeClass}}.ExecuteAsync(
                         {{codelArrayExpression}},
                         {{widthExpression}},
                         {{heightExpression}},
@@ -1038,7 +1089,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             case MethodReturnKind.IEnumerableByte:
                 {
                     builder.AppendLine($$"""
-                foreach (var __pietByte in global::Esolang.Piet.__Generated.PietRuntime.ExecuteEnumerable(
+                foreach (var __pietByte in {{runtimeClass}}.ExecuteEnumerable(
                     {{codelArrayExpression}},
                     {{widthExpression}},
                     {{heightExpression}},
@@ -1057,7 +1108,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             case MethodReturnKind.IAsyncEnumerableByte:
                 {
                     builder.AppendLine($$"""
-                await foreach (var __pietByte in global::Esolang.Piet.__Generated.PietRuntime.ExecuteAsyncEnumerable(
+                await foreach (var __pietByte in {{runtimeClass}}.ExecuteAsyncEnumerable(
                     {{codelArrayExpression}},
                     {{widthExpression}},
                     {{heightExpression}},
@@ -1162,11 +1213,13 @@ public partial class MethodGenerator : IIncrementalGenerator
             if (headers.Length <= 0)
                 return null;
             var contentType = headers[0].Trim().ToLowerInvariant();
-            if (contentType == "text/plain")
+            if (contentType is "text/plain" or "text/ap")
                 ext = ".txt";
             // Keep legacy typo support for backward compatibility.
             else if (contentType is "text/ascii-piet" or "text/acii-piet")
-                ext = ".txt";
+                ext = ".ap";
+            else if (contentType is "text/ascii-piet++" or "text/ascii-piet-plus-plus" or "text/ascii-piet2" or "text/appp")
+                ext = ".appp";
             else if (contentType == "image/x-portable-pixmap")
                 ext = ".ppm";
             else
@@ -1312,6 +1365,41 @@ public partial class MethodGenerator : IIncrementalGenerator
         return text[secondLineStart..secondLineEnd].Replace("\r", string.Empty);
     }
 
+    static string GetThirdLine(string text)
+    {
+        var first = text.IndexOf('\n');
+        if (first < 0) return string.Empty;
+        var second = text.IndexOf('\n', first + 1);
+        if (second < 0) return string.Empty;
+        var thirdStart = second + 1;
+        var thirdEnd = text.IndexOf('\n', thirdStart);
+        if (thirdEnd < 0) return text[thirdStart..].Replace("\r", string.Empty);
+        return text[thirdStart..thirdEnd].Replace("\r", string.Empty);
+    }
+
+    internal static bool TryGetLanguage(string text, out Esolang.Piet.Parser.LanguageType language)
+    {
+        language = Esolang.Piet.Parser.LanguageType.Piet;
+        if (text is null) return false;
+        const string prefix = "// PIET_LANGUAGE=";
+        var thirdLine = GetThirdLine(text);
+        if (!thirdLine.StartsWith(prefix, StringComparison.Ordinal))
+            return false;
+        var langText = thirdLine[prefix.Length..].Trim();
+        if (Enum.TryParse(langText, out Esolang.Piet.Parser.LanguageType parsed))
+        {
+            language = parsed;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Test helper: returns 0 (Piet), 1 (PietPlusPlus), or null (not found) from the .piet.txt header.
+    /// </summary>
+    internal static int? TryGetLanguageInt(string text)
+        => TryGetLanguage(text, out var lang) ? (int)lang : (int?)null;
+
     static bool IsMatchingPath(string normalizedExpectedPath, string normalizedCandidatePath)
     {
         if (string.Equals(normalizedExpectedPath, normalizedCandidatePath, StringComparison.OrdinalIgnoreCase))
@@ -1399,6 +1487,44 @@ public partial class MethodGenerator : IIncrementalGenerator
                         if (cmd is 16 or 17) mightUseOutput = true;
                     }
                 }
+            }
+        }
+
+        return (mightUseOutput, mightUseInput);
+    }
+
+    /// <summary>
+    /// Scans all adjacent codel pairs in a Piet++ image and detects whether it may produce output
+    /// (cmd 22=OutInt, 26=OutChar) or require input (cmd 18=InChar, 29=InInt).
+    /// cmd = DG*16 + DR*4 + DB, where DR=(R2-R1+4)%4, DG=(G2-G1+2)%2, DB=(B2-B1+4)%4.
+    /// Black=0, White=63.
+    /// </summary>
+    static (bool mightUseOutput, bool mightUseInput) ScanPietPlusPlusIoCommands(byte[] codels, int width, int height)
+    {
+        var mightUseOutput = false;
+        var mightUseInput = false;
+
+        for (var y = 0; y < height && !(mightUseOutput && mightUseInput); y++)
+        {
+            for (var x = 0; x < width && !(mightUseOutput && mightUseInput); x++)
+            {
+                var c = codels[y * width + x];
+                // skip Black(0) and White(63)
+                if (c is 0 or 63) continue;
+
+                void CheckNeighbor(byte nc)
+                {
+                    if (nc == 0 || nc == 63 || nc == c) return;
+                    var dr = (((nc >> 4) & 3) - ((c >> 4) & 3) + 4) % 4;
+                    var dg = (((nc >> 2) & 3) - ((c >> 2) & 3) + 2) % 2;
+                    var db = ((nc & 3) - (c & 3) + 4) % 4;
+                    var cmd = dg * 16 + dr * 4 + db;
+                    if (cmd is 18 or 29) mightUseInput = true;
+                    if (cmd is 22 or 26) mightUseOutput = true;
+                }
+
+                if (x + 1 < width) CheckNeighbor(codels[y * width + x + 1]);
+                if (y + 1 < height) CheckNeighbor(codels[(y + 1) * width + x]);
             }
         }
 

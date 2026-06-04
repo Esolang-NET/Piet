@@ -13,6 +13,9 @@ partial class PietSample
 {
     [GeneratePietMethod("Programs/hello.png")]
     public static partial string HelloWorld();
+
+    [GeneratePietMethod("Programs/hello.appp", language: LanguageType.PietPlusPlus)]
+    public static partial string HelloWorldPietPlusPlus();
 }
 ```
 
@@ -36,6 +39,7 @@ For detailed Generator signatures, patterns, and source specification (including
 | Image processing (codel size) | ✅ |
 | Runtime execution | ✅ |
 | Piet specific instructions | ✅ |
+| Piet++ language support | ✅ |
 
 ## Install
 
@@ -50,10 +54,15 @@ dotnet tool install -g dotnet-piet
 
 | Want to do | Package |
 |---|---|
-| Generate C# methods from Piet at compile time | Esolang.Piet.Generator |
+| Generate C# methods from Piet/Piet++ at compile time | Esolang.Piet.Generator |
 | Parse source into a Piet program | Esolang.Piet.Parser |
-| Execute Piet in-process | Esolang.Piet.Processor |
-| Run Piet from CLI | dotnet-piet |
+| Execute Piet/Piet++ in-process | Esolang.Piet.Processor |
+| Run Piet/Piet++ from CLI | dotnet-piet |
+
+## Piet++ Formats
+
+- `ascii-piet++` text: `.appp`, `.txt2`
+- With Generator, pass `language: LanguageType.PietPlusPlus` when using Piet++ sources.
 
 ## License
 

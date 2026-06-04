@@ -40,6 +40,31 @@ Or with a dedicated parse command:
 dotnet-piet parse path/to/program.png
 ```
 
+To output in ascii-piet++ format instead of ascii-piet:
+
+```bash
+dotnet-piet parse path/to/program.png --piet-plus-plus
+dotnet-piet path/to/program.png --ascii-piet --piet-plus-plus
+```
+
+To run an inline ascii-piet++ program directly:
+
+```bash
+dotnet-piet --ascii-piet-text "~|" --piet-plus-plus
+```
+
+To show the ascii-piet character encoding table:
+
+```bash
+dotnet-piet colors
+```
+
+To show the ascii-piet++ character encoding table:
+
+```bash
+dotnet-piet colors --piet-plus-plus
+```
+
 Or with the included launch profile in this repository:
 
 ```bash
