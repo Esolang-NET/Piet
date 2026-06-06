@@ -1617,7 +1617,12 @@ public class MethodGeneratorTests
                 .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
 
             Assert.Contains("public static partial", generatedMethod, "Expected static modifier was not found.");
-            Assert.DoesNotContain("namespace ", generatedMethod, "Global namespace method should not emit a namespace declaration.");
+            // The runtime is appended after the method code in the combined file; extract only the method section.
+            const string runtimeSeparator = "\nnamespace Esolang.Piet.__Generated";
+            var methodSection = generatedMethod.Contains(runtimeSeparator)
+                ? generatedMethod[..generatedMethod.IndexOf(runtimeSeparator, StringComparison.Ordinal)]
+                : generatedMethod;
+            Assert.DoesNotContain("namespace ", methodSection, "Global namespace method should not emit a namespace declaration.");
         }
         catch (Exception e) when (e is AssertFailedException or TargetInvocationException)
         {
