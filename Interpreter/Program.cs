@@ -30,7 +30,7 @@ partial class Program
     /// <param name="writer"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    public static async Task<int> RunAsync(string[] args, TextReader? reader = null, TextWriter? writer = null,CancellationToken cancellationToken = default)
+    public static async Task<int> RunAsync(string[] args, TextReader? reader = null, TextWriter? writer = null, CancellationToken cancellationToken = default)
     {
         TextReader? originalReader = null;
         TextWriter? originalWriter = null;
@@ -44,11 +44,13 @@ partial class Program
             originalWriter = Console.Out;
             Console.SetOut(writer);
         }
-        try {
+        try
+        {
 
             var rootCommand = PietInterpreterExtensions.BuildRootCommand();
             return await rootCommand.Parse(args).InvokeAsync(cancellationToken: cancellationToken);
-        } finally
+        }
+        finally
         {
             if (originalReader is not null)
                 Console.SetIn(originalReader);
