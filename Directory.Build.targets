@@ -12,10 +12,6 @@
     <PackageReference Update="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" />
     <PackageReference Update="Microsoft.NET.Test.Sdk" Version="18.4.0" />
     <PackageReference Update="Microsoft.Extensions.Logging" Version="6.0.1" />
-    <PackageReference Update="Microsoft.Testing.Extensions.CodeCoverage" Version="18.6.2" />
-    <PackageReference Update="Microsoft.Testing.Platform.MSBuild" Version="2.2.3" />
-    <PackageReference Update="MSTest.TestAdapter" Version="4.2.1" />
-    <PackageReference Update="MSTest.TestFramework" Version="4.2.1" />
     <PackageReference Update="PolySharp" Version="1.16.0" />
     <PackageReference Update="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Update="System.CommandLine" Version="2.0.6" />

@@ -257,7 +257,6 @@ public partial class MethodGenerator : IIncrementalGenerator
                 methodSymbol.Name));
             return EmitErrorMethod(
                 methodSymbol,
-                methodSyntax,
                 ns,
                 typeKeyword,
                 null,
@@ -277,7 +276,6 @@ public partial class MethodGenerator : IIncrementalGenerator
                 methodSymbol.Name));
             return EmitErrorMethod(
                 methodSymbol,
-                methodSyntax,
                 ns,
                 typeKeyword,
                 null,
@@ -297,7 +295,6 @@ public partial class MethodGenerator : IIncrementalGenerator
                 imagePath));
             return EmitErrorMethod(
                 methodSymbol,
-                methodSyntax,
                 ns,
                 typeKeyword,
                 null,
@@ -340,7 +337,6 @@ public partial class MethodGenerator : IIncrementalGenerator
                 methodSymbol.Name));
             return EmitErrorMethod(
                 methodSymbol,
-                methodSyntax,
                 ns,
                 typeKeyword,
                 resolvedImageFile,
@@ -363,7 +359,6 @@ public partial class MethodGenerator : IIncrementalGenerator
                 context.ReportDiagnostic(Diagnostic.Create(descriptor, parameter.Locations[0], typeDisplayString));
                 return EmitErrorMethod(
                     methodSymbol,
-                    methodSyntax,
                     ns,
                     typeKeyword,
                     resolvedImageFile,
@@ -423,7 +418,6 @@ public partial class MethodGenerator : IIncrementalGenerator
             context.ReportDiagnostic(Diagnostic.Create(descriptor, location, messageArgs));
             return EmitErrorMethod(
                 methodSymbol,
-                methodSyntax,
                 ns,
                 typeKeyword,
                 resolvedImageFile,
@@ -448,7 +442,6 @@ public partial class MethodGenerator : IIncrementalGenerator
                 imagePath));
             return EmitErrorMethod(
                 methodSymbol,
-                methodSyntax,
                 ns,
                 typeKeyword,
                 resolvedImageFile,
@@ -467,7 +460,6 @@ public partial class MethodGenerator : IIncrementalGenerator
                 imagePath));
             return EmitErrorMethod(
                 methodSymbol,
-                methodSyntax,
                 ns,
                 typeKeyword,
                 resolvedImageFile,
@@ -490,7 +482,6 @@ public partial class MethodGenerator : IIncrementalGenerator
                 imagePath));
             return EmitErrorMethod(
                 methodSymbol,
-                methodSyntax,
                 ns,
                 typeKeyword,
                 resolvedImageFile,
@@ -1546,7 +1537,6 @@ public partial class MethodGenerator : IIncrementalGenerator
 
     static (EmittedMethod, GeneratorFeatures) EmitErrorMethod(
         IMethodSymbol methodSymbol,
-        MethodDeclarationSyntax methodSyntax,
         string? ns,
         string typeKeyword,
         AdditionalImageFile? additionalImageFile,

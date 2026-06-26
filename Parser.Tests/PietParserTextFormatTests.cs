@@ -1,10 +1,11 @@
+using TUnit.Assertions.Enums;
+
 namespace Esolang.Piet.Parser.Tests;
 
-[TestClass]
 public sealed class PietParserTextFormatTests
 {
-    [TestMethod]
-    public void Format_AsciiPiet_WorksWithoutNewlines()
+    [Test]
+    public async Task Format_AsciiPiet_WorksWithoutNewlines()
     {
         var program = new PietProgram(
             2,
@@ -16,30 +17,30 @@ public sealed class PietParserTextFormatTests
 
         var text = AsciiPietFormatter.Format(program);
 
-        Assert.AreEqual("l_ C", text);
+        await Assert.That(text).IsEqualTo("l_ C");
     }
 
-    [TestMethod]
-    public void Parse_AsciiPiet_Works()
+    [Test]
+    public async Task Parse_AsciiPiet_Works(CancellationToken CancellationToken)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.txt");
         try
         {
-            File.WriteAllLines(path,
+            await File.WriteAllLinesAsync(path,
             [
                 "l_",
                 " C"
-            ]);
+            ], CancellationToken);
             var program = PietParser.Parse(path);
-            Assert.AreEqual(2, program.Width);
-            Assert.AreEqual(2, program.Height);
-            CollectionAssert.AreEqual(
-                new[]
-                {
-                    PietColor.Red, PietColor.White,
-                    PietColor.Black, PietColor.DarkCyan
-                },
-                program.Codels.ToArray());
+            await Assert.That(program.Width).IsEqualTo(2);
+            await Assert.That(program.Height).IsEqualTo(2);
+            await Assert.That(program.Codels)
+                .IsEquivalentTo((PietColor[])[
+                    PietColor.Red,
+                    PietColor.White,
+                    PietColor.Black,
+                    PietColor.DarkCyan,
+                ], CollectionOrdering.Matching);
         }
         finally
         {
@@ -47,8 +48,8 @@ public sealed class PietParserTextFormatTests
         }
     }
 
-    [TestMethod]
-    public void Format_ThenParse_AsciiPiet_RoundTrips()
+    [Test]
+    public async Task Format_ThenParse_AsciiPiet_RoundTrips()
     {
         var original = new PietProgram(
             3,
@@ -62,35 +63,32 @@ public sealed class PietParserTextFormatTests
 
         var parsed = AsciiPietParser.Parse(bytes);
 
-        Assert.AreEqual(original.Width, parsed.Width);
-        Assert.AreEqual(original.Height, parsed.Height);
-        CollectionAssert.AreEqual(original.Codels.ToArray(), parsed.Codels.ToArray());
+        await Assert.That(parsed.Width).IsEqualTo(original.Width);
+        await Assert.That(parsed.Height).IsEqualTo(original.Height);
+        await Assert.That(parsed.Codels).IsEquivalentTo(original.Codels, CollectionOrdering.Matching);
     }
 
-    [TestMethod]
-    public void Parse_PpmPiet_Works()
+    [Test]
+    public async Task Parse_PpmPiet_Works(CancellationToken CancellationToken)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.ppm");
         try
         {
-            File.WriteAllLines(path,
+            await File.WriteAllLinesAsync(path,
             [
                 "P3",
                 "2 2",
                 "255",
                 "255 0 0   255 255 255",
                 "0 0 0     0 255 255"
-            ]);
+            ], CancellationToken);
             var program = PietParser.Parse(path);
-            Assert.AreEqual(2, program.Width);
-            Assert.AreEqual(2, program.Height);
-            CollectionAssert.AreEqual(
-                new[]
-                {
+            await Assert.That(program.Width).IsEqualTo(2);
+            await Assert.That(program.Height).IsEqualTo(2);
+            await Assert.That(program.Codels).IsEquivalentTo((PietColor[])[
                     PietColor.Red, PietColor.White,
                     PietColor.Black, PietColor.Cyan
-                },
-                program.Codels.ToArray());
+                ], CollectionOrdering.Matching);
         }
         finally
         {
