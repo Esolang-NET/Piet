@@ -22,7 +22,7 @@ public sealed class PietParserTests
                 image.Save(path);
             }
 
-            var program = PietParser.Parse(path, cancellationToken: CancellationToken.None);
+            var program = PietParser.Parse(path);
 
             await Assert.That(program.Width).IsEqualTo(2);
             await Assert.That(program.Height).IsEqualTo(2);

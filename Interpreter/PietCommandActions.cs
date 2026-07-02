@@ -27,7 +27,7 @@ static class PietCommandActions
         return await processor.RunToConsoleAsync(cancellationToken);
     }
 
-    public static Task<int> ParseAsync(string path, int codelSize, bool pietPlusPlus, CancellationToken cancellationToken)
+    public static Task<int> ParseAsync(string path, int codelSize, bool pietPlusPlus, CancellationToken cancellationToken = default)
     {
         var program = PietParser.Parse(path, codelSize, cancellationToken);
         return pietPlusPlus ? Task.FromResult(WriteAsciiPietPlusPlus(program)) : WriteAsciiPietAsync(program);
