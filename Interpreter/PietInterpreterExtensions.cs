@@ -93,12 +93,12 @@ public static class PietInterpreterExtensions
             pietPlusPlusOption,
         };
 
-        parseCommand.SetAction(parseResult =>
+        parseCommand.SetAction((parseResult, cancellationToken) =>
         {
             var path = parseResult.GetValue(inputArgument);
             var codelSize = parseResult.GetValue(codelSizeOption);
             var pietPlusPlus = parseResult.GetValue(pietPlusPlusOption);
-            return PietCommandActions.ParseAsync(path!, codelSize, pietPlusPlus);
+            return PietCommandActions.ParseAsync(path!, codelSize, pietPlusPlus, cancellationToken);
         });
 
         return parseCommand;

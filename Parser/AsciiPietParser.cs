@@ -64,11 +64,13 @@ public static class AsciiPietParser
     /// Determines whether the given byte array appears to be an ascii-piet text file.
     /// </summary>
     /// <param name="bytes"></param>
+    /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    public static bool LooksLikeAsciiPiet(byte[] bytes)
+    public static bool LooksLikeAsciiPiet(byte[] bytes, CancellationToken cancellationToken = default)
     {
         foreach (var b in bytes)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!AsciiPietAllowed.Contains(b))
                 return false;
         }
@@ -81,16 +83,18 @@ public static class AsciiPietParser
     /// </summary>
     /// <param name="bytes">The byte array containing the ASCII-PIET text.</param>
     /// <param name="codelSize">The size of each codel in pixels.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A PietProgram instance representing the parsed ASCII-PIET text.</returns>
-    public static PietProgram Parse(byte[] bytes, int codelSize = 1)
+    public static PietProgram Parse(byte[] bytes, int codelSize = 1, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var text = Encoding.ASCII.GetString(bytes);
         var lines = text.Replace("\r", "").Replace("\n", "");
         if (codelSize < 1)
             throw new ArgumentOutOfRangeException(nameof(codelSize), "codelSize is support 1 or over.");
         if (lines.Length == 0)
             throw new InvalidDataException("ascii-piet file is empty");
-        return InternalParse(lines, codelSize);
+        return InternalParse(lines, codelSize, cancellationToken);
     }
 
     /// <summary>
@@ -100,16 +104,21 @@ public static class AsciiPietParser
     /// <param name="bytes">The byte array containing the ASCII-PIET text.</param>
     /// <param name="codelSize">The size of each codel in pixels.</param>
     /// <param name="program">The resulting PietProgram instance if parsing is successful.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>True if parsing is successful; otherwise, false.</returns>
-    public static bool TryParse(byte[] bytes, int codelSize, out PietProgram program)
+    public static bool TryParse(byte[] bytes, int codelSize, out PietProgram program, CancellationToken cancellationToken = default)
     {
         program = default!;
         if (bytes.Length < 0) return false;
         if (codelSize < 1) return false;
         try
         {
-            program = Parse(bytes, codelSize);
+            program = Parse(bytes, codelSize, cancellationToken);
             return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
@@ -122,10 +131,11 @@ public static class AsciiPietParser
     /// </summary>
     /// <param name="lines">The ASCII-PIET text lines.</param>
     /// <param name="codelSize">The size of each codel in pixels.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A PietProgram instance representing the parsed ASCII-PIET text.</returns>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
     /// <exception cref="InvalidDataException"></exception>
-    static PietProgram InternalParse(string lines, int codelSize = 1)
+    static PietProgram InternalParse(string lines, int codelSize = 1, CancellationToken cancellationToken = default)
     {
         List<List<PietColor>> lineList = [];
         var x = 0;
@@ -133,6 +143,7 @@ public static class AsciiPietParser
         List<PietColor>? currentLine = null;
         foreach (var ch in lines)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!CharToColor.TryGetValue(ch, out var colorInfo))
                 throw new InvalidDataException($"Unknown ascii-piet char: '{ch}' (0x{(int)ch:X}) at ({x},{y})");
             if (x == 0) lineList.Add(currentLine = []);
@@ -158,6 +169,7 @@ public static class AsciiPietParser
             var colors = new PietColor[codelWidth * codelHeight];
             for (y = 0; y < codelHeight; y++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 for (x = 0; x < codelWidth; x++)
                 {
                     colors[y * codelWidth + x] = (PietColor)codels[y * codelSize * width + x * codelSize];

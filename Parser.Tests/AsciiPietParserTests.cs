@@ -47,6 +47,24 @@ public sealed class AsciiPietParserTests
         var ok = AsciiPietParser.TryParse(bytes, 1, out _);
         await Assert.That(ok).IsFalse();
     }
+
+    [Test]
+    public void AsciiPietParser_Parse_Throws_WhenCancelled()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var bytes = Encoding.ASCII.GetBytes("l_ C");
+        Assert.Throws<OperationCanceledException>(() => AsciiPietParser.Parse(bytes, cancellationToken: cts.Token));
+    }
+
+    [Test]
+    public void AsciiPietParser_TryParse_Throws_WhenCancelled()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var bytes = Encoding.ASCII.GetBytes("l_ C");
+        Assert.Throws<OperationCanceledException>(() => AsciiPietParser.TryParse(bytes, 1, out _, cts.Token));
+    }
 }
 
 public sealed class AsciiPietFormatterTests

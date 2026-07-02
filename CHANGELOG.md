@@ -6,6 +6,11 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Changed
+- `Esolang.Piet.Parser`: added `CancellationToken cancellationToken = default` to parse APIs with backward-compatible call patterns, and propagated cancellation through file reads and parse loops.
+- `Esolang.Piet.Generator`: now propagates `SourceProductionContext.CancellationToken` to parser calls during source generation.
+- `Esolang.Piet.Interpreter` (CLI): now propagates command cancellation tokens through parser call paths (including `parse` subcommand action).
+
 ## [2.0.1] - 2026-06-04
 
 ### Added
