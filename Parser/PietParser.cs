@@ -24,17 +24,20 @@ public static class PietParser
 #if NETSTANDARD2_1_OR_GREATER
     [NotNullWhen(true)]
 #endif
-    out PietProgram program)
+    out PietProgram program,
+    CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (ext is ".appp" or ".txt2")
-            return AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program);
+            return AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program, cancellationToken);
         if (ext is ".txt" or ".ap" or ".ascii-piet")
-            return AsciiPietParser.TryParse(bytes, codelSize, out program);
-        if (AsciiPietParser.LooksLikeAsciiPiet(bytes) && AsciiPietParser.TryParse(bytes, codelSize, out program))
+            return AsciiPietParser.TryParse(bytes, codelSize, out program, cancellationToken);
+        if (AsciiPietParser.LooksLikeAsciiPiet(bytes, cancellationToken)
+            && AsciiPietParser.TryParse(bytes, codelSize, out program, cancellationToken))
             return true;
-        if (TryParseInternal(bytes, codelSize, out program))
+        if (TryParseInternal(bytes, codelSize, out program, cancellationToken))
             return true;
-        if (ext == ".png" && TryParseFallbackPng(bytes, codelSize, out program))
+        if (ext == ".png" && TryParseFallbackPng(bytes, codelSize, out program, cancellationToken))
             return true;
         return false;
 
@@ -48,13 +51,15 @@ public static class PietParser
     /// <param name="codelSize">The size of each codel in pixels.</param>
     /// <returns>A PietProgram instance representing the parsed image.</returns>
     /// <exception cref="ArgumentException"></exception>
-    public static PietProgram Parse(byte[] bytes, string ext, int codelSize = 1)
+    public static PietProgram Parse(byte[] bytes, string ext, int codelSize = 1, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (ext is ".appp" or ".txt2")
-            return AsciiPietPlusPlusParser.Parse(bytes, codelSize);
+            return AsciiPietPlusPlusParser.Parse(bytes, codelSize, cancellationToken);
         if (ext is ".txt" or ".ap" or ".ascii-piet")
-            return AsciiPietParser.Parse(bytes, codelSize);
-        if (AsciiPietParser.LooksLikeAsciiPiet(bytes) && AsciiPietParser.TryParse(bytes, codelSize, out var program))
+            return AsciiPietParser.Parse(bytes, codelSize, cancellationToken);
+        if (AsciiPietParser.LooksLikeAsciiPiet(bytes, cancellationToken)
+            && AsciiPietParser.TryParse(bytes, codelSize, out var program, cancellationToken))
             return program;
         try
         {
@@ -64,6 +69,7 @@ public static class PietParser
             var colors = new PietColor[codelWidth * codelHeight];
             for (var y = 0; y < codelHeight; y++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 for (var x = 0; x < codelWidth; x++)
                 {
                     // 左上ピクセルの色で代表とする（平均化したい場合はここを修正）
@@ -75,7 +81,7 @@ public static class PietParser
         catch (Exception e) when (ext == ".png" && e is InvalidImageContentException or UnknownImageFormatException)
         {
             // PNG形式であっても、ImageSharpが対応していない特殊なPNGの場合があるため、独自のPNGデコードを試みる
-            return ParseWithRawPngFallback(bytes, codelSize);
+            return ParseWithRawPngFallback(bytes, codelSize, cancellationToken);
         }
 
         throw new ArgumentException($"not supported image format: {ext}");
@@ -85,9 +91,11 @@ public static class PietParser
 #if NETSTANDARD2_1_OR_GREATER
     [NotNullWhen(true)]
 #endif
-    out PietProgram program)
+    out PietProgram program,
+    CancellationToken cancellationToken = default)
     {
         program = default!;
+        cancellationToken.ThrowIfCancellationRequested();
         if (bytes.Length <= 0) return false;
         if (codelSize < 1) return false;
         try
@@ -98,6 +106,7 @@ public static class PietParser
             var colors = new PietColor[codelWidth * codelHeight];
             for (var y = 0; y < codelHeight; y++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 for (var x = 0; x < codelWidth; x++)
                 {
                     // 左上ピクセルの色で代表とする（平均化したい場合はここを修正）
@@ -106,6 +115,10 @@ public static class PietParser
             }
             program = new(codelWidth, codelHeight, colors);
             return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
@@ -117,42 +130,47 @@ public static class PietParser
     /// Loads a Piet program from an image file.
     /// Falls back to an internal PNG decoder when strict image decoding fails.
     /// </summary>
-    public static PietProgram Parse(string path, int codelSize = 1)
+    public static PietProgram Parse(string path, int codelSize = 1, CancellationToken cancellationToken = default)
     {
-        var bytes = File.ReadAllBytes(path);
+        cancellationToken.ThrowIfCancellationRequested();
+        var bytes = File.ReadAllBytesAsync(path, cancellationToken).GetAwaiter().GetResult();
         // 拡張子が .txt の場合は ascii-piet 形式、.ppm の場合は PPM 形式として扱う
         var ext = Path.GetExtension(path).ToLowerInvariant();
-        return Parse(bytes, ext, codelSize);
+        return Parse(bytes, ext, codelSize, cancellationToken);
     }
 
     static bool TryParseFallbackPng(byte[] pngBytes, int codelSize,
 #if NETSTANDARD2_1_OR_GREATER
     [NotNullWhen(true)]
 #endif
-    out PietProgram program)
+    out PietProgram program,
+    CancellationToken cancellationToken = default)
     {
         program = default!;
-        if (!TryDecodePng(pngBytes: pngBytes, out var width, out var height, out var codels))
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!TryDecodePng(pngBytes: pngBytes, out var width, out var height, out var codels, cancellationToken))
             return false;
 
-        program = InternalParseWithRawPngFallback(codels, width, height, codelSize);
+        program = InternalParseWithRawPngFallback(codels, width, height, codelSize, cancellationToken);
         return true;
     }
 
-    static PietProgram ParseWithRawPngFallback(byte[] pngBytes, int codelSize = 1)
+    static PietProgram ParseWithRawPngFallback(byte[] pngBytes, int codelSize = 1, CancellationToken cancellationToken = default)
     {
-        if (!TryDecodePng(pngBytes, out var width, out var height, out var codels))
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!TryDecodePng(pngBytes, out var width, out var height, out var codels, cancellationToken))
             throw new InvalidImageContentException("Failed to parse Piet PNG image.");
 
-        return InternalParseWithRawPngFallback(codels, width, height, codelSize);
+        return InternalParseWithRawPngFallback(codels, width, height, codelSize, cancellationToken);
     }
-    static PietProgram InternalParseWithRawPngFallback(byte[] codels, int width, int height, int codelSize)
+    static PietProgram InternalParseWithRawPngFallback(byte[] codels, int width, int height, int codelSize, CancellationToken cancellationToken = default)
     {
         var codelWidth = width / codelSize;
         var codelHeight = height / codelSize;
         var colors = new PietColor[codelWidth * codelHeight];
         for (var y = 0; y < codelHeight; y++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             for (var x = 0; x < codelWidth; x++)
             {
                 colors[y * codelWidth + x] = (PietColor)codels[y * codelSize * width + x * codelSize];
@@ -165,7 +183,8 @@ public static class PietParser
 #if NETSTANDARD2_1_OR_GREATER
     [NotNullWhen(true)]
 #endif
-    out byte[] bytes)
+    out byte[] bytes,
+    CancellationToken cancellationToken = default)
     {
         width = 0;
         height = 0;
@@ -185,6 +204,7 @@ public static class PietParser
 
         while (pos + 8 <= pngBytes.Length)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var chunkLength = ReadInt32BE(pngBytes, pos);
             pos += 4;
             if (pos + 4 > pngBytes.Length)
@@ -215,7 +235,10 @@ public static class PietParser
                     return false;
 
                 for (var i = 0; i < chunkLength; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
                     idatData.Add(pngBytes[pos + i]);
+                }
             }
             else if (isIEND)
             {
@@ -261,6 +284,7 @@ public static class PietParser
 
         for (var y = 0; y < height; y++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (dataPos >= decompressed.Length)
                 return false;
 
@@ -276,6 +300,7 @@ public static class PietParser
 
             for (var x = 0; x < width; x++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var pp = x * bytesPerPixel;
                 var colorIdx = MapToPietColor(row[pp], row[pp + 1], row[pp + 2]);
                 if (colorIdx < 0)
@@ -291,9 +316,9 @@ public static class PietParser
         return true;
     }
 
-    internal static byte[]? DecodePng(byte[] pngBytes, out int width, out int height)
+    internal static byte[]? DecodePng(byte[] pngBytes, out int width, out int height, CancellationToken cancellationToken = default)
     {
-        if (TryDecodePng(pngBytes, out width, out height, out var bytes))
+        if (TryDecodePng(pngBytes, out width, out height, out var bytes, cancellationToken))
             return bytes;
         return null;
     }
@@ -352,27 +377,31 @@ public static class PietParser
 #if NETSTANDARD2_1_OR_GREATER
     [NotNullWhen(true)]
 #endif
-    out PietProgram program)
+    out PietProgram program,
+    CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (language == LanguageType.PietPlusPlus)
         {
             if (ext is ".txt2" or ".appp")
-                return AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program);
-            if (AsciiPietPlusPlusParser.LooksLikeAsciiPietPlusPlus(bytes)
-                && AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program))
+                return AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program, cancellationToken);
+            if (AsciiPietPlusPlusParser.LooksLikeAsciiPietPlusPlus(bytes, cancellationToken)
+                && AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program, cancellationToken))
                 return true;
-            return TryParseInternalPietPlusPlus(bytes, codelSize, out program);
+            return TryParseInternalPietPlusPlus(bytes, codelSize, out program, cancellationToken);
         }
-        return TryParse(bytes, ext, codelSize, out program);
+        return TryParse(bytes, ext, codelSize, out program, cancellationToken);
     }
 
     internal static bool TryParseInternalPietPlusPlus(byte[] bytes, int codelSize,
 #if NETSTANDARD2_1_OR_GREATER
     [NotNullWhen(true)]
 #endif
-    out PietProgram program)
+    out PietProgram program,
+    CancellationToken cancellationToken = default)
     {
         program = default!;
+        cancellationToken.ThrowIfCancellationRequested();
         if (bytes.Length <= 0 || codelSize < 1) return false;
         try
         {
@@ -381,6 +410,8 @@ public static class PietParser
             var ch = image.Height / codelSize;
             var colors = new PietColor[cw * ch];
             for (var y = 0; y < ch; y++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
                 for (var x = 0; x < cw; x++)
                 {
                     var px = image[x * codelSize, y * codelSize];
@@ -388,8 +419,13 @@ public static class PietParser
                     if (idx < 0) return false;
                     colors[y * cw + x] = (PietColor)idx;
                 }
+            }
             program = new(cw, ch, colors);
             return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch { return false; }
     }

@@ -283,4 +283,35 @@ public sealed class PietParserTests
 
         await Assert.That(ok).IsFalse();
     }
+
+    [Test]
+    public void Parse_Path_Throws_WhenCancelled()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var path = FindSamplePath("hello-world.png");
+        Assert.Throws<OperationCanceledException>(() => PietParser.Parse(path, cancellationToken: cts.Token));
+    }
+
+    [Test]
+    public void TryParse_Throws_WhenCancelled()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var bytes = Encoding.ASCII.GetBytes("l_\n C");
+        Assert.Throws<OperationCanceledException>(() => PietParser.TryParse(bytes, ".txt", 1, out _, cts.Token));
+    }
+
+    static string FindSamplePath(string fileName)
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            var candidate = Path.Combine(directory.FullName, "samples", "Generator.UseConsole", "samples", fileName);
+            if (File.Exists(candidate))
+                return candidate;
+            directory = directory.Parent;
+        }
+        throw new FileNotFoundException(fileName);
+    }
 }

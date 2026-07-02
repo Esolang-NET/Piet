@@ -173,6 +173,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(generationInputs, static (context, input) =>
         {
+            var cancellationToken = context.CancellationToken;
             ((((var sources, var imagePaths), var currentLanguageVersion), var projectDir), var types) = input;
 
             if (sources.IsDefaultOrEmpty)
@@ -187,7 +188,8 @@ public partial class MethodGenerator : IIncrementalGenerator
 
             foreach (var source in sources)
             {
-                var (emitted, features_) = Emit(context, source, imagePaths, currentLanguageVersion, projectDir, types);
+                cancellationToken.ThrowIfCancellationRequested();
+                var (emitted, features_) = Emit(context, source, imagePaths, currentLanguageVersion, projectDir, types, cancellationToken);
                 features |= features_;
                 if (!emitted.HasValue)
                 {
@@ -215,8 +217,10 @@ public partial class MethodGenerator : IIncrementalGenerator
         ImmutableArray<AdditionalImageFile> additionalImageFiles,
         LanguageVersion currentLanguageVersion,
         string? projectDirectory,
-        KnownTypes types)
+        KnownTypes types,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (source.TargetSymbol is not IMethodSymbol methodSymbol || source.TargetNode is not MethodDeclarationSyntax methodSyntax)
         {
             return (null, GeneratorFeatures.None);
@@ -452,7 +456,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 $"The image file {imagePath} has an unsupported format or is not readable"
             );
         }
-        if (!PietParser.TryParse(bytes, extension, codelSize, language, out var program))
+        if (!PietParser.TryParse(bytes, extension, codelSize, language, out var program, cancellationToken))
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.InvalidImageFormat,

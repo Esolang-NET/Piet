@@ -121,6 +121,24 @@ public sealed class AsciiPietPlusPlusParserTests
     }
 
     [Test]
+    public void Parse_Throws_WhenCancelled()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var bytes = Encoding.ASCII.GetBytes("01|ab|");
+        Assert.Throws<OperationCanceledException>(() => AsciiPietPlusPlusParser.Parse(bytes, cancellationToken: cts.Token));
+    }
+
+    [Test]
+    public void TryParse_Throws_WhenCancelled()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var bytes = Encoding.ASCII.GetBytes("01|ab|");
+        Assert.Throws<OperationCanceledException>(() => AsciiPietPlusPlusParser.TryParse(bytes, 1, out _, cts.Token));
+    }
+
+    [Test]
     public async Task LooksLikeAsciiPietPlusPlus_ReturnsFalse_ForBinaryData()
     {
         var binaryBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 }; // PNG header

@@ -37,10 +37,13 @@ public static class AsciiPietPlusPlusParser
     /// Determines whether the given byte array looks like an ascii-piet2 file
     /// (all bytes are in the allowed character set).
     /// </summary>
-    public static bool LooksLikeAsciiPietPlusPlus(byte[] bytes)
+    public static bool LooksLikeAsciiPietPlusPlus(byte[] bytes, CancellationToken cancellationToken = default)
     {
         foreach (var b in bytes)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!AllowedBytes.Contains(b)) return false;
+        }
         return true;
     }
 
@@ -49,14 +52,15 @@ public static class AsciiPietPlusPlusParser
     /// </summary>
     /// <param name="bytes">ASCII-encoded ascii-piet2 content.</param>
     /// <param name="codelSize">Codel size (1 or greater).</param>
-    public static PietProgram Parse(byte[] bytes, int codelSize = 1)
+    public static PietProgram Parse(byte[] bytes, int codelSize = 1, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (codelSize < 1)
             throw new ArgumentOutOfRangeException(nameof(codelSize), "codelSize must be 1 or greater.");
         if (bytes.Length == 0)
             throw new InvalidDataException("ascii-piet++ file is empty.");
         var text = Encoding.ASCII.GetString(bytes).Replace("\r", "").Replace("\n", "");
-        return InternalParse(text, codelSize);
+        return InternalParse(text, codelSize, cancellationToken);
     }
 
     /// <summary>
@@ -66,25 +70,31 @@ public static class AsciiPietPlusPlusParser
 #if NETSTANDARD2_1_OR_GREATER
     [System.Diagnostics.CodeAnalysis.NotNullWhen(true)]
 #endif
-    out PietProgram program)
+    out PietProgram program,
+    CancellationToken cancellationToken = default)
     {
         program = default!;
         if (bytes.Length == 0 || codelSize < 1) return false;
         try
         {
-            program = Parse(bytes, codelSize);
+            program = Parse(bytes, codelSize, cancellationToken);
             return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch { return false; }
     }
 
-    static PietProgram InternalParse(string text, int codelSize)
+    static PietProgram InternalParse(string text, int codelSize, CancellationToken cancellationToken = default)
     {
         var lineList = new List<List<int>>();
         List<int>? currentLine = null;
 
         foreach (var ch in text)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (ch == EolMarker)
             {
                 if (currentLine is not null)
@@ -118,8 +128,11 @@ public static class AsciiPietPlusPlusParser
         var codelHeight = height / codelSize;
         var colors = new PietColor[cw * codelHeight];
         for (var y = 0; y < codelHeight; y++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             for (var x = 0; x < cw; x++)
                 colors[y * cw + x] = (PietColor)flat[y * codelSize * width + x * codelSize];
+        }
         return new PietProgram(cw, codelHeight, colors);
     }
 }

@@ -13,11 +13,11 @@ static class PietCommandActions
         if (!string.IsNullOrWhiteSpace(asciiPietText))
         {
             var bytes = Encoding.ASCII.GetBytes(asciiPietText);
-            program = PietParser.Parse(bytes, pietPlusPlus ? ".appp" : ".txt", codelSize);
+            program = PietParser.Parse(bytes, pietPlusPlus ? ".appp" : ".txt", codelSize, cancellationToken);
         }
         else
         {
-            program = PietParser.Parse(path!, codelSize);
+            program = PietParser.Parse(path!, codelSize, cancellationToken);
         }
 
         if (asciiPiet)
@@ -27,9 +27,9 @@ static class PietCommandActions
         return await processor.RunToConsoleAsync(cancellationToken);
     }
 
-    public static Task<int> ParseAsync(string path, int codelSize, bool pietPlusPlus)
+    public static Task<int> ParseAsync(string path, int codelSize, bool pietPlusPlus, CancellationToken cancellationToken)
     {
-        var program = PietParser.Parse(path, codelSize);
+        var program = PietParser.Parse(path, codelSize, cancellationToken);
         return pietPlusPlus ? Task.FromResult(WriteAsciiPietPlusPlus(program)) : WriteAsciiPietAsync(program);
     }
 
