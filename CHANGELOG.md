@@ -11,6 +11,10 @@ The format is based on Keep a Changelog.
 - `Esolang.Piet.Generator`: now propagates `SourceProductionContext.CancellationToken` to parser calls during source generation.
 - `Esolang.Piet.Interpreter` (CLI): now propagates command cancellation tokens through parser call paths (including `parse` subcommand action).
 
+### Fixed
+- `Esolang.Piet.Parser` (`ascii-piet++`): row separators now accept both `|` and `@` markers while continuing to ignore actual newline characters (`\r`, `\n`).
+- `dotnet-piet` (`Esolang.Piet.Interpreter`): updated ascii-piet++ color table/help text to include `|` / `@` as supported row-separator characters.
+
 ## [2.0.1] - 2026-06-04
 
 ### Added

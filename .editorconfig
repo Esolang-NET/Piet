@@ -39,7 +39,6 @@ dotnet_style_parentheses_in_other_operators = never_if_unnecessary:warning
 dotnet_style_parentheses_in_relational_binary_operators = always_for_clarity:warning
 
 # Accessibility modifier settings
-dotnet_style_require_accessibility_modifiers = for_non_interface_members
 
 # Expression-level preferences
 dotnet_style_coalesce_expression = true:warning
@@ -252,8 +251,14 @@ dotnet_diagnostic.IDE0005.severity = warning
 csharp_style_pattern_matching_over_is_with_cast_check = true:warning
 # 既定の修飾子である場合を除き、アクセシビリティ修飾子を優先します。
 dotnet_style_require_accessibility_modifiers = omit_if_default:warning
+# 名前を簡素化できます (IDE0001)
+dotnet_diagnostic.IDE0001.severity = warning
 # 未使用のプライベート メンバーを削除する (IDE0051)
 dotnet_diagnostic.IDE0051.severity = warning
+# メンバー アクセスを簡略化する (IDE0002)
+dotnet_diagnostic.IDE0002.severity = warning
+# 名前空間がフォルダー構造と一致しない (IDE0130)
+dotnet_diagnostic.IDE0130.severity = warning
 
 #region
 # CA2012: ValueTask を正しく使用する必要があります
@@ -264,53 +269,4 @@ dotnet_diagnostic.CA2016.severity = warning
 dotnet_diagnostic.CA2200.severity = warning
 # CA2217: 列挙型に FlagsAttributeを付与しないでください。
 dotnet_diagnostic.CA2217.severity = warning
-#endregion
-
-#region MSTest Analyzers
-
-# MSTEST0017: アサーション引数は正しい順序で渡す必要があります
-dotnet_diagnostic.MSTEST0017.severity = warning
-# MSTEST0020: TestInitialize メソッドよりもコンストラクターを優先する
-dotnet_diagnostic.MSTEST0020.severity = warning
-# MSTEST0021: TestCleanup メソッドよりも Dispose を優先する
-dotnet_diagnostic.MSTEST0021.severity = warning
-# MSTEST0022: Dispose メソッドよりも TestCleanup を優先する
-dotnet_diagnostic.MSTEST0022.severity = warning
-# MSTEST0023: ブール アサーションを否定しないこと
-dotnet_diagnostic.MSTEST0023.severity = warning
-# MSTEST0024: TestContext を静的メンバーに格納しない
-dotnet_diagnostic.MSTEST0024.severity = warning
-# MSTEST0025: 常に失敗するアサートではなく 'Assert.Fail' を使う
-dotnet_diagnostic.MSTEST0025.severity = warning
-# MSTEST0026: アサーションでの条件付きアクセスを回避する
-dotnet_diagnostic.MSTEST0026.severity = warning
-# MSTEST0029: パブリック メソッドをテスト メソッドにする必要がある
-dotnet_diagnostic.MSTEST0029.severity = warning
-# MSTEST0032: 条件が常に真であることがわかっているため、アサーションを確認するか削除してください
-dotnet_diagnostic.MSTEST0032.severity = warning
-# MSTEST0036: テスト クラス内でシャドウイングを使用しない
-dotnet_diagnostic.MSTEST0036.severity = warning
-# MSTEST0037: 適切な 'Assert' メソッドを使用する
-dotnet_diagnostic.MSTEST0037.severity = warning
-# MSTEST0038: 値型では 'Assert.AreSame' または 'Assert.AreNotSame' を使用しない
-dotnet_diagnostic.MSTEST0038.severity = warning
-# MSTEST0040: 'async void' コンテキスト内でアサートしない
-dotnet_diagnostic.MSTEST0040.severity = warning
-# MSTEST0044: DataTestMethod よりも TestMethod を優先する
-dotnet_diagnostic.MSTEST0044.severity = warning
-# MSTEST0045: タイムアウトに協調キャンセルを使用する
-dotnet_diagnostic.MSTEST0045.severity = warning
-# MSTEST0046: StringAssertではなくAssertを使います
-dotnet_diagnostic.MSTEST0046.severity = warning
-# MSTEST0049: Flow TestContext キャンセル トークンを使用する
-dotnet_diagnostic.MSTEST0049.severity = warning
-# MSTEST0051: Assert.Throws には 1 つのステートメントのみを含める必要があります
-dotnet_diagnostic.MSTEST0051.severity = warning
-# MSTEST0054: TestContext.CancellationToken からのキャンセル トークンを使用する
-dotnet_diagnostic.MSTEST0054.severity = warning
-# MSTEST0058: catch ブロック内の assert を避ける
-dotnet_diagnostic.MSTEST0058.severity = warning
-# MSTEST0061: ランタイム チェックの代わりに OSCondition 属性を使用する
-dotnet_diagnostic.MSTEST0061.severity = warning
-
 #endregion

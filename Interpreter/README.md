@@ -53,6 +53,8 @@ To run an inline ascii-piet++ program directly:
 dotnet-piet --ascii-piet-text "~|" --piet-plus-plus
 ```
 
+In ascii-piet++, row separators can be either `|` or `@`. Actual newline characters (`\r`, `\n`) are ignored while parsing.
+
 To show the ascii-piet character encoding table:
 
 ```bash

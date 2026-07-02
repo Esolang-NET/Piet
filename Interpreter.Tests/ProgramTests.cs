@@ -22,6 +22,7 @@ public class ProgramTests
 #pragma warning restore TUnit0055 // Do not overwrite the Console writer
 
             }
+
             var entryPoint = typeof(Program).Assembly.EntryPoint;
             Assert.NotNull(entryPoint);
             object?[] parameters = [args];
@@ -183,7 +184,8 @@ public class ProgramTests
                 .Contains("ascii-piet++")
                 .And.Contains("(Black)")
                 .And.Contains("(White)")
-                .And.Contains("'~'");
+                .And.Contains("'~'")
+                .And.Contains("'|' / '@'");
         }
         catch (AssertionException)
         {
@@ -327,6 +329,14 @@ public class ProgramTests
 
     [Test]
     [NotInParallel]
+    public async Task RunAsync_AsciiPietPlusPlusTextOption_WithAlternateEolMarker_Executes(CancellationToken CancellationToken)
+    {
+        using var writer = new StringWriter(new StringBuilder());
+        await Assert.That(RunAsync(["--ascii-piet-text", "~@", "--piet-plus-plus"], writer: writer, cancellationToken: CancellationToken)).IsEqualTo(0);
+    }
+
+    [Test]
+    [NotInParallel]
     public async Task RunAsync_AsciiPietPlusPlusTextWithAsciiPietOption_WritesAsciiPietPlusPlusText(CancellationToken CancellationToken)
     {
         // '~' = White (index 63), '|' = EOL
@@ -349,4 +359,3 @@ public class ProgramTests
         throw new FileNotFoundException($"Could not find file: {Path.Combine(relativeParts)}");
     }
 }
-
