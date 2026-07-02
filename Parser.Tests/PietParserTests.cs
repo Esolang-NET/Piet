@@ -22,7 +22,7 @@ public sealed class PietParserTests
                 image.Save(path);
             }
 
-            var program = PietParser.Parse(path);
+            var program = PietParser.Parse(path, cancellationToken: CancellationToken.None);
 
             await Assert.That(program.Width).IsEqualTo(2);
             await Assert.That(program.Height).IsEqualTo(2);
@@ -81,7 +81,7 @@ public sealed class PietParserTests
             bytes[32] = 0x00;
             File.WriteAllBytes(path, bytes);
 
-            var program = PietParser.Parse(path);
+            var program = PietParser.Parse(path, cancellationToken: CancellationToken);
 
             await Assert.That(program.Width).IsEqualTo(1);
             await Assert.That(program.Height).IsEqualTo(1);
@@ -103,7 +103,7 @@ public sealed class PietParserTests
         {
             await File.WriteAllTextAsync(path, "not a png", CancellationToken);
 
-            Assert.Throws<InvalidImageContentException>(() => PietParser.Parse(path));
+            Assert.Throws<InvalidImageContentException>(() => PietParser.Parse(path, cancellationToken: CancellationToken));
         }
         finally
         {
@@ -131,7 +131,7 @@ public sealed class PietParserTests
             bytes[32] = 0x00;
             await File.WriteAllBytesAsync(path, bytes, CancellationToken);
 
-            Assert.Throws<InvalidImageContentException>(() => PietParser.Parse(path));
+            Assert.Throws<InvalidImageContentException>(() => PietParser.Parse(path, cancellationToken: CancellationToken));
         }
         finally
         {
@@ -144,7 +144,7 @@ public sealed class PietParserTests
     public async Task TryDecodePng_ReturnsNullForInvalidSignatureAndUnsupportedColorType(CancellationToken CancellationToken)
     {
         var invalidSig = new byte[] { 0x00, 0x11, 0x22 };
-        var decoded = PietParser.DecodePng(invalidSig, out _, out _);
+        var decoded = PietParser.DecodePng(invalidSig, out _, out _, CancellationToken);
         await Assert.That(decoded).IsNull();
 
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
@@ -158,7 +158,7 @@ public sealed class PietParserTests
 
             var bytes = await File.ReadAllBytesAsync(path, CancellationToken);
             bytes[25] = 3;
-            decoded = PietParser.DecodePng(bytes, out _, out _);
+            decoded = PietParser.DecodePng(bytes, out _, out _, CancellationToken);
             await Assert.That(decoded).IsNull();
         }
         finally
@@ -222,7 +222,7 @@ public sealed class PietParserTests
         using var ms = new MemoryStream();
         await img.SaveAsPngAsync(ms, CancellationToken);
 
-        var ok = PietParser.TryParse(ms.ToArray(), ".png", 1, out var program);
+        var ok = PietParser.TryParse(ms.ToArray(), ".png", 1, out var program, CancellationToken);
 
         await Assert.That(ok).IsTrue();
         await Assert.That(program.Codels[0]).IsEqualTo(PietColor.Red);
@@ -239,7 +239,7 @@ public sealed class PietParserTests
         var bytes = ms.ToArray();
         bytes[29] = bytes[30] = bytes[31] = bytes[32] = 0x00;
 
-        var ok = PietParser.TryParse(bytes, ".png", 1, out var program);
+        var ok = PietParser.TryParse(bytes, ".png", 1, out var program, CancellationToken);
 
         await Assert.That(ok).IsTrue();
         await Assert.That(program.Codels).HasItemAt(0, PietColor.White);
@@ -270,7 +270,7 @@ public sealed class PietParserTests
         using var ms = new MemoryStream();
         await img.SaveAsPngAsync(ms, CancellationToken);
 
-        var ok = PietParser.TryParse(ms.ToArray(), ".png", 1, out _);
+        var ok = PietParser.TryParse(ms.ToArray(), ".png", 1, out _, CancellationToken);
 
         await Assert.That(ok).IsFalse();
     }

@@ -52,6 +52,7 @@ public static class AsciiPietPlusPlusParser
     /// </summary>
     /// <param name="bytes">ASCII-encoded ascii-piet2 content.</param>
     /// <param name="codelSize">Codel size (1 or greater).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static PietProgram Parse(byte[] bytes, int codelSize = 1, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -66,6 +67,10 @@ public static class AsciiPietPlusPlusParser
     /// <summary>
     /// Attempts to parse an ascii-piet2 byte array into a <see cref="PietProgram"/>.
     /// </summary>
+    /// <param name="bytes">ASCII-encoded ascii-piet2 content.</param>
+    /// <param name="codelSize">Codel size (1 or greater).</param>
+    /// <param name="program">Parsed program when successful.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static bool TryParse(byte[] bytes, int codelSize,
 #if NETSTANDARD2_1_OR_GREATER
     [System.Diagnostics.CodeAnalysis.NotNullWhen(true)]

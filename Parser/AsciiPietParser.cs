@@ -64,6 +64,7 @@ public static class AsciiPietParser
     /// Determines whether the given byte array appears to be an ascii-piet text file.
     /// </summary>
     /// <param name="bytes"></param>
+    /// <param name="cancellationToken"></param>
     /// <returns></returns>
     public static bool LooksLikeAsciiPiet(byte[] bytes, CancellationToken cancellationToken = default)
     {
@@ -82,6 +83,7 @@ public static class AsciiPietParser
     /// </summary>
     /// <param name="bytes">The byte array containing the ASCII-PIET text.</param>
     /// <param name="codelSize">The size of each codel in pixels.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A PietProgram instance representing the parsed ASCII-PIET text.</returns>
     public static PietProgram Parse(byte[] bytes, int codelSize = 1, CancellationToken cancellationToken = default)
     {
@@ -102,6 +104,7 @@ public static class AsciiPietParser
     /// <param name="bytes">The byte array containing the ASCII-PIET text.</param>
     /// <param name="codelSize">The size of each codel in pixels.</param>
     /// <param name="program">The resulting PietProgram instance if parsing is successful.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>True if parsing is successful; otherwise, false.</returns>
     public static bool TryParse(byte[] bytes, int codelSize, out PietProgram program, CancellationToken cancellationToken = default)
     {
@@ -128,6 +131,7 @@ public static class AsciiPietParser
     /// </summary>
     /// <param name="lines">The ASCII-PIET text lines.</param>
     /// <param name="codelSize">The size of each codel in pixels.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A PietProgram instance representing the parsed ASCII-PIET text.</returns>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
     /// <exception cref="InvalidDataException"></exception>

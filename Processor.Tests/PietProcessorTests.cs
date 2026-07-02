@@ -81,7 +81,7 @@ public sealed class PietProcessorTests
     public async Task RunAndOutputString_ParsesAndRunsHelloWorldSample(CancellationToken CancellationToken)
     {
         var path = FindFileInRepository("samples", "Generator.UseConsole", "samples", "hello-world.png");
-        var program = PietParser.Parse(path);
+        var program = PietParser.Parse(path, cancellationToken: CancellationToken);
         var processor = new PietProcessor(program);
 
         var result = await RunAndOutputStringAsync(processor, cancellationToken: CancellationToken).ConfigureAwait(false);

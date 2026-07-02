@@ -31,7 +31,7 @@ public sealed class PietParserTextFormatTests
                 "l_",
                 " C"
             ], CancellationToken);
-            var program = PietParser.Parse(path);
+            var program = PietParser.Parse(path, cancellationToken: CancellationToken);
             await Assert.That(program.Width).IsEqualTo(2);
             await Assert.That(program.Height).IsEqualTo(2);
             await Assert.That(program.Codels)
@@ -82,7 +82,7 @@ public sealed class PietParserTextFormatTests
                 "255 0 0   255 255 255",
                 "0 0 0     0 255 255"
             ], CancellationToken);
-            var program = PietParser.Parse(path);
+            var program = PietParser.Parse(path, cancellationToken: CancellationToken);
             await Assert.That(program.Width).IsEqualTo(2);
             await Assert.That(program.Height).IsEqualTo(2);
             await Assert.That(program.Codels).IsEquivalentTo((PietColor[])[

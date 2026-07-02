@@ -19,6 +19,7 @@ public static class PietParser
     /// <param name="ext"></param>
     /// <param name="codelSize"></param>
     /// <param name="program"></param>
+    /// <param name="cancellationToken"></param>
     /// <returns></returns>
     public static bool TryParse(byte[] bytes, string ext, int codelSize,
 #if NETSTANDARD2_1_OR_GREATER
@@ -49,6 +50,7 @@ public static class PietParser
     /// <param name="bytes">The byte array containing the image data.</param>
     /// <param name="ext">The file extension indicating the image format.</param>
     /// <param name="codelSize">The size of each codel in pixels.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A PietProgram instance representing the parsed image.</returns>
     /// <exception cref="ArgumentException"></exception>
     public static PietProgram Parse(byte[] bytes, string ext, int codelSize = 1, CancellationToken cancellationToken = default)
@@ -133,10 +135,31 @@ public static class PietParser
     public static PietProgram Parse(string path, int codelSize = 1, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var bytes = File.ReadAllBytesAsync(path, cancellationToken).GetAwaiter().GetResult();
+        var bytes = ReadAllBytes(path, cancellationToken);
         // 拡張子が .txt の場合は ascii-piet 形式、.ppm の場合は PPM 形式として扱う
         var ext = Path.GetExtension(path).ToLowerInvariant();
         return Parse(bytes, ext, codelSize, cancellationToken);
+    }
+
+    static byte[] ReadAllBytes(string path, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (stream.Length > int.MaxValue)
+            throw new IOException($"File is too large: {path}");
+        var bytes = new byte[(int)stream.Length];
+        var offset = 0;
+        while (offset < bytes.Length)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var read = stream.Read(bytes, offset, bytes.Length - offset);
+            if (read <= 0)
+                break;
+            offset += read;
+        }
+        if (offset < bytes.Length)
+            Array.Resize(ref bytes, offset);
+        return bytes;
     }
 
     static bool TryParseFallbackPng(byte[] pngBytes, int codelSize,
