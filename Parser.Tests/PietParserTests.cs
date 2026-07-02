@@ -1,19 +1,14 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using System.Reflection;
 using System.Text;
+using TUnit.Assertions.Enums;
 
 namespace Esolang.Piet.Parser.Tests;
 
-[TestClass]
 public sealed class PietParserTests
 {
-    static readonly MethodInfo ApplyPngFilterMethod = typeof(PietParser)
-        .GetMethod("ApplyPngFilter", BindingFlags.NonPublic | BindingFlags.Static)!;
-
-
-    [TestMethod]
-    public void Parse_ReturnsNormalizedProgram()
+    [Test]
+    public async Task Parse_ReturnsNormalizedProgram()
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         try
@@ -29,17 +24,15 @@ public sealed class PietParserTests
 
             var program = PietParser.Parse(path);
 
-            Assert.AreEqual(2, program.Width);
-            Assert.AreEqual(2, program.Height);
-            CollectionAssert.AreEqual(
-                new[]
-                {
+            await Assert.That(program.Width).IsEqualTo(2);
+            await Assert.That(program.Height).IsEqualTo(2);
+            await Assert.That(program.Codels)
+                .IsEquivalentTo((PietColor[])[
                     PietColor.Red,
                     PietColor.White,
                     PietColor.Black,
                     PietColor.Cyan,
-                },
-                program.Codels.ToArray());
+                ], CollectionOrdering.Matching);
         }
         finally
         {
@@ -48,7 +41,7 @@ public sealed class PietParserTests
         }
     }
 
-    [TestMethod]
+    [Test]
     public void Parse_ThrowsForUnsupportedColor()
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
@@ -60,7 +53,7 @@ public sealed class PietParserTests
                 image.Save(path);
             }
 
-            _ = Assert.ThrowsExactly<InvalidOperationException>(() => PietParser.Parse(path));
+            Assert.Throws<InvalidOperationException>(() => PietParser.Parse(path));
         }
         finally
         {
@@ -69,8 +62,8 @@ public sealed class PietParserTests
         }
     }
 
-    [TestMethod]
-    public void Parse_FallsBackWhenPngChunkCrcIsInvalid()
+    [Test]
+    public async Task Parse_FallsBackWhenPngChunkCrcIsInvalid(CancellationToken CancellationToken)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         try
@@ -78,7 +71,7 @@ public sealed class PietParserTests
             using (var image = new Image<Rgba32>(1, 1))
             {
                 image[0, 0] = new Rgba32(0xFF, 0xFF, 0xFF);
-                image.Save(path);
+                await image.SaveAsync(path, CancellationToken);
             }
 
             var bytes = File.ReadAllBytes(path);
@@ -90,9 +83,10 @@ public sealed class PietParserTests
 
             var program = PietParser.Parse(path);
 
-            Assert.AreEqual(1, program.Width);
-            Assert.AreEqual(1, program.Height);
-            CollectionAssert.AreEqual(new[] { PietColor.White }, program.Codels.ToArray());
+            await Assert.That(program.Width).IsEqualTo(1);
+            await Assert.That(program.Height).IsEqualTo(1);
+            await Assert.That(program.Codels)
+                .IsEquivalentTo((PietColor[])[PietColor.White], CollectionOrdering.Matching);
         }
         finally
         {
@@ -101,15 +95,15 @@ public sealed class PietParserTests
         }
     }
 
-    [TestMethod]
-    public void Parse_ThrowsInvalidImageContent_ForNonPngData()
+    [Test]
+    public async Task Parse_ThrowsInvalidImageContent_ForNonPngData(CancellationToken CancellationToken)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         try
         {
-            File.WriteAllText(path, "not a png");
+            await File.WriteAllTextAsync(path, "not a png", CancellationToken);
 
-            _ = Assert.ThrowsExactly<InvalidImageContentException>(() => PietParser.Parse(path));
+            Assert.Throws<InvalidImageContentException>(() => PietParser.Parse(path));
         }
         finally
         {
@@ -118,8 +112,8 @@ public sealed class PietParserTests
         }
     }
 
-    [TestMethod]
-    public void Parse_FallbackThrowsForUnsupportedColor()
+    [Test]
+    public async Task Parse_FallbackThrowsForUnsupportedColor(CancellationToken CancellationToken)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         try
@@ -127,17 +121,17 @@ public sealed class PietParserTests
             using (var image = new Image<Rgba32>(1, 1))
             {
                 image[0, 0] = new Rgba32(0x12, 0x34, 0x56);
-                image.Save(path);
+                await image.SaveAsync(path, CancellationToken);
             }
 
-            var bytes = File.ReadAllBytes(path);
+            var bytes = await File.ReadAllBytesAsync(path, CancellationToken);
             bytes[29] = 0x00;
             bytes[30] = 0x00;
             bytes[31] = 0x00;
             bytes[32] = 0x00;
-            File.WriteAllBytes(path, bytes);
+            await File.WriteAllBytesAsync(path, bytes, CancellationToken);
 
-            _ = Assert.ThrowsExactly<InvalidImageContentException>(() => PietParser.Parse(path));
+            Assert.Throws<InvalidImageContentException>(() => PietParser.Parse(path));
         }
         finally
         {
@@ -146,12 +140,12 @@ public sealed class PietParserTests
         }
     }
 
-    [TestMethod]
-    public void TryDecodePng_ReturnsNullForInvalidSignatureAndUnsupportedColorType()
+    [Test]
+    public async Task TryDecodePng_ReturnsNullForInvalidSignatureAndUnsupportedColorType(CancellationToken CancellationToken)
     {
         var invalidSig = new byte[] { 0x00, 0x11, 0x22 };
         var decoded = PietParser.DecodePng(invalidSig, out _, out _);
-        Assert.IsNull(decoded);
+        await Assert.That(decoded).IsNull();
 
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         try
@@ -159,13 +153,13 @@ public sealed class PietParserTests
             using (var image = new Image<Rgba32>(1, 1))
             {
                 image[0, 0] = new Rgba32(0xFF, 0xFF, 0xFF);
-                image.Save(path);
+                await image.SaveAsync(path, CancellationToken);
             }
 
-            var bytes = File.ReadAllBytes(path);
+            var bytes = await File.ReadAllBytesAsync(path, CancellationToken);
             bytes[25] = 3;
             decoded = PietParser.DecodePng(bytes, out _, out _);
-            Assert.IsNull(decoded);
+            await Assert.That(decoded).IsNull();
         }
         finally
         {
@@ -174,85 +168,85 @@ public sealed class PietParserTests
         }
     }
 
-    [TestMethod]
-    public void PrivateHelpers_ApplyPngFilterAndColorMap_Work()
+    [Test]
+    public async Task PrivateHelpers_ApplyPngFilterAndColorMap_Work()
     {
         var row = new byte[] { 1, 2, 3, 1, 1, 1 };
         var prev = new byte[] { 1, 1, 1, 1, 1, 1 };
 
         PietParser.ApplyPngFilter(1, row, prev, 3);
-        CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 2, 3, 4 }, row);
+        await Assert.That(row).IsEquivalentTo((byte[])[1, 2, 3, 2, 3, 4]);
 
         row = [1, 1, 1];
         PietParser.ApplyPngFilter(2, row, prev, 3);
-        CollectionAssert.AreEqual(new byte[] { 2, 2, 2 }, row);
+        await Assert.That(row).IsEquivalentTo((byte[])[2, 2, 2]);
 
         row = [2, 2, 2];
         PietParser.ApplyPngFilter(3, row, prev, 3);
-        CollectionAssert.AreEqual(new byte[] { 2, 2, 2 }, row);
+        await Assert.That(row).IsEquivalentTo((byte[])[2, 2, 2]);
 
         row = [1, 1, 1];
         PietParser.ApplyPngFilter(4, row, prev, 3);
-        CollectionAssert.AreEqual(new byte[] { 2, 2, 2 }, row);
+        await Assert.That(row).IsEquivalentTo((byte[])[2, 2, 2]);
 
         var color = PietParser.MapToPietColor(0x12, 0x34, 0x56);
-        Assert.AreEqual(-1, color);
+        await Assert.That(color).IsEqualTo(-1);
     }
 
-    [TestMethod]
-    public void TryParse_AsciiPiet_ByExtension_Works()
+    [Test]
+    public async Task TryParse_AsciiPiet_ByExtension_Works()
     {
         var bytes = Encoding.ASCII.GetBytes("l_\n C");
         var ok = PietParser.TryParse(bytes, ".txt", 1, out var program);
 
-        Assert.IsTrue(ok);
-        Assert.AreEqual(2, program.Width);
-        Assert.AreEqual(2, program.Height);
+        await Assert.That(ok).IsTrue();
+        await Assert.That(program.Width).IsEqualTo(2);
+        await Assert.That(program.Height).IsEqualTo(2);
     }
 
-    [TestMethod]
-    public void TryParse_AsciiPiet_ByContent_Works()
+    [Test]
+    public async Task TryParse_AsciiPiet_ByContent_Works()
     {
         var bytes = Encoding.ASCII.GetBytes("l_\n C");
         var ok = PietParser.TryParse(bytes, ".dat", 1, out var program);
 
-        Assert.IsTrue(ok);
-        Assert.AreEqual(2, program.Width);
+        await Assert.That(ok).IsTrue();
+        await Assert.That(program.Width).IsEqualTo(2);
     }
 
-    [TestMethod]
-    public void TryParse_PngImageSharp_Works()
+    [Test]
+    public async Task TryParse_PngImageSharp_Works(CancellationToken CancellationToken)
     {
         using var img = new Image<Rgba32>(1, 1);
         img[0, 0] = new Rgba32(255, 0, 0);
         using var ms = new MemoryStream();
-        img.SaveAsPng(ms);
+        await img.SaveAsPngAsync(ms, CancellationToken);
 
         var ok = PietParser.TryParse(ms.ToArray(), ".png", 1, out var program);
 
-        Assert.IsTrue(ok);
-        Assert.AreEqual(PietColor.Red, program.Codels[0]);
+        await Assert.That(ok).IsTrue();
+        await Assert.That(program.Codels[0]).IsEqualTo(PietColor.Red);
     }
 
-    [TestMethod]
-    public void TryParse_PngFallback_Works()
+    [Test]
+    public async Task TryParse_PngFallback_Works(CancellationToken CancellationToken)
     {
         using var img = new Image<Rgba32>(1, 1);
         img[0, 0] = new Rgba32(255, 255, 255);
         using var ms = new MemoryStream();
-        img.SaveAsPng(ms);
+        await img.SaveAsPngAsync(ms, CancellationToken);
 
         var bytes = ms.ToArray();
         bytes[29] = bytes[30] = bytes[31] = bytes[32] = 0x00;
 
         var ok = PietParser.TryParse(bytes, ".png", 1, out var program);
 
-        Assert.IsTrue(ok);
-        Assert.AreEqual(PietColor.White, program.Codels[0]);
+        await Assert.That(ok).IsTrue();
+        await Assert.That(program.Codels).HasItemAt(0, PietColor.White);
     }
 
-    [TestMethod]
-    public void TryParse_Ppm_Works()
+    [Test]
+    public async Task TryParse_Ppm_Works()
     {
         var text = """
             P3
@@ -264,29 +258,29 @@ public sealed class PietParserTests
 
         var ok = PietParser.TryParse(bytes, ".ppm", 1, out var program);
 
-        Assert.IsTrue(ok);
-        Assert.AreEqual(PietColor.Red, program.Codels[0]);
+        await Assert.That(ok).IsTrue();
+        await Assert.That(program.Codels[0]).IsEqualTo(PietColor.Red);
     }
 
-    [TestMethod]
-    public void TryParse_UnsupportedColor_ReturnsFalse()
+    [Test]
+    public async Task TryParse_UnsupportedColor_ReturnsFalse(CancellationToken CancellationToken)
     {
         using var img = new Image<Rgba32>(1, 1);
         img[0, 0] = new Rgba32(0x12, 0x34, 0x56);
         using var ms = new MemoryStream();
-        img.SaveAsPng(ms);
+        await img.SaveAsPngAsync(ms, CancellationToken);
 
         var ok = PietParser.TryParse(ms.ToArray(), ".png", 1, out _);
 
-        Assert.IsFalse(ok);
+        await Assert.That(ok).IsFalse();
     }
 
-    [TestMethod]
-    public void TryParse_InvalidData_ReturnsFalse()
+    [Test]
+    public async Task TryParse_InvalidData_ReturnsFalse()
     {
         var bytes = Encoding.ASCII.GetBytes("not an image");
         var ok = PietParser.TryParse(bytes, ".png", 1, out _);
 
-        Assert.IsFalse(ok);
+        await Assert.That(ok).IsFalse();
     }
 }

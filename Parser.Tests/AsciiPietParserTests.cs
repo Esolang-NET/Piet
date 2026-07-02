@@ -2,11 +2,10 @@ using System.Text;
 
 namespace Esolang.Piet.Parser.Tests;
 
-[TestClass]
 public sealed class AsciiPietParserTests
 {
-    [TestMethod]
-    public void AsciiPietParser_CanDownscale_WithCodelSize()
+    [Test]
+    public async Task AsciiPietParser_CanDownscale_WithCodelSize()
     {
         // 改行は無視されるので 1 行で書く
         var text = "lLll";
@@ -14,82 +13,81 @@ public sealed class AsciiPietParserTests
 
         var ok = AsciiPietParser.TryParse(bytes, codelSize: 2, out var program);
 
-        Assert.IsTrue(ok);
-        Assert.AreEqual(1, program.Width);
-        Assert.AreEqual(1, program.Height);
-        Assert.AreEqual(PietColor.Red, program.Codels.Single());
+        await Assert.That(ok).IsTrue();
+        await Assert.That(program.Width).IsEqualTo(1);
+        await Assert.That(program.Height).IsEqualTo(1);
+        await Assert.That(program.Codels.Single()).IsEqualTo(PietColor.Red);
     }
 
-    [TestMethod]
-    public void AsciiPietParser_Throws_ForEmpty()
+    [Test]
+    public async Task AsciiPietParser_Throws_ForEmpty()
     {
         var bytes = Array.Empty<byte>();
-        Assert.ThrowsExactly<InvalidDataException>(() => AsciiPietParser.Parse(bytes));
+        Assert.Throws<InvalidDataException>(() => AsciiPietParser.Parse(bytes));
     }
 
-    [TestMethod]
+    [Test]
     public void AsciiPietParser_Throws_ForInvalidChar()
     {
         var bytes = Encoding.ASCII.GetBytes("lXl"); // X は不正
-        Assert.ThrowsExactly<InvalidDataException>(() => AsciiPietParser.Parse(bytes));
+        Assert.Throws<InvalidDataException>(() => AsciiPietParser.Parse(bytes));
     }
 
-    [TestMethod]
+    [Test]
     public void AsciiPietParser_Throws_ForInvalidCodelSize()
     {
         var bytes = Encoding.ASCII.GetBytes("ll");
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => AsciiPietParser.Parse(bytes, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => AsciiPietParser.Parse(bytes, 0));
     }
 
-    [TestMethod]
-    public void AsciiPietParser_TryParse_ReturnsFalse_ForInvalidChar()
+    [Test]
+    public async Task AsciiPietParser_TryParse_ReturnsFalse_ForInvalidChar()
     {
         var bytes = Encoding.ASCII.GetBytes("lXl");
         var ok = AsciiPietParser.TryParse(bytes, 1, out _);
-        Assert.IsFalse(ok);
+        await Assert.That(ok).IsFalse();
     }
 }
 
-[TestClass]
 public sealed class AsciiPietFormatterTests
 {
-    [TestMethod]
-    public void Format_TrailingBlackTrimmed()
+    [Test]
+    public async Task Format_TrailingBlackTrimmed()
     {
         // Row: [Red, Black, Black] — trailing Blacks trimmed → "L" (Red EOL)
         var program = new PietProgram(3, 1, [PietColor.Red, PietColor.Black, PietColor.Black]);
         var result = AsciiPietFormatter.Format(program);
-        Assert.AreEqual("L", result);
+        await Assert.That(result).IsEqualTo("L");
     }
 
-    [TestMethod]
-    public void Format_AllBlackRow_EmitsAtSign()
+    [Test]
+    public async Task Format_AllBlackRow_EmitsAtSign()
     {
         // All-Black row → '@' (Black EOL)
         var program = new PietProgram(2, 1, [PietColor.Black, PietColor.Black]);
         var result = AsciiPietFormatter.Format(program);
-        Assert.AreEqual("@", result);
+        await Assert.That(result).IsEqualTo("@");
     }
 
-    [TestMethod]
-    public void Format_NonTrailingBlackPreserved()
+    [Test]
+    public async Task Format_NonTrailingBlackPreserved()
     {
         // Row: [Black, Red] — Black is not trailing → ' ' + 'L'
         var program = new PietProgram(2, 1, [PietColor.Black, PietColor.Red]);
         var result = AsciiPietFormatter.Format(program);
-        Assert.AreEqual(" L", result);
+        await Assert.That(result).IsEqualTo(" L");
     }
 
-    [TestMethod]
-    public void Format_TrailingBlack_RoundTrips()
+    [Test]
+    public async Task Format_TrailingBlack_RoundTrips()
     {
         // Format trims trailing Blacks, so parsed width shrinks to last non-Black.
         // [Red, Black, Black] → "L" → parsed as width=1 [Red].
         var original = new PietProgram(3, 1, [PietColor.Red, PietColor.Black, PietColor.Black]);
         var text = AsciiPietFormatter.Format(original);
         var parsed = AsciiPietParser.Parse(Encoding.ASCII.GetBytes(text));
-        Assert.AreEqual(1, parsed.Width);
-        Assert.AreEqual(1, parsed.Height);
-        Assert.AreEqual(PietColor.Red, parsed.Codels[0]);
+        await Assert.That(parsed.Width).IsEqualTo(1);
+        await Assert.That(parsed.Height).IsEqualTo(1);
+        await Assert.That(parsed.Codels).HasItemAt(0, PietColor.Red);
     }
 }

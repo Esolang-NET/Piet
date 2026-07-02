@@ -1,147 +1,200 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Text;
+using TUnit.Assertions.Exceptions;
 
 namespace Esolang.Piet.Interpreter.Tests;
 
-[TestClass]
-public class ProgramTests(TestContext TestContext)
+public class ProgramTests
 {
-#pragma warning disable MSTEST0054
-    CancellationToken CancellationToken => TestContext.CancellationTokenSource.Token;
-#pragma warning restore MSTEST0054
-    static int Run(string[] args)
+    static void WriteLog(string message) => TestContext.Current!.OutputWriter.WriteLine(message);
+    static int Run(string[] args, TextWriter? writer = null)
     {
-        var entryPoint = typeof(Program).Assembly.EntryPoint;
-        Assert.IsNotNull(entryPoint);
-        object?[] parameters = [args];
-        var result = entryPoint.Invoke(null, parameters) as int?;
-        Assert.IsNotNull(result);
-        return result.Value;
+        WriteLog($"args: {string.Join(", ", args)}");
+        TextWriter? originalOutput = null;
+        try
+        {
+            if (writer is not null)
+            {
+                originalOutput = Console.Out;
+#pragma warning disable TUnit0055 // Do not overwrite the Console writer
+                Console.SetOut(writer);
+#pragma warning restore TUnit0055 // Do not overwrite the Console writer
+
+            }
+            var entryPoint = typeof(Program).Assembly.EntryPoint;
+            Assert.NotNull(entryPoint);
+            object?[] parameters = [args];
+            var result = entryPoint.Invoke(null, parameters) as int?;
+            Assert.NotNull(result);
+            return result.Value;
+        }
+        finally
+        {
+            if (originalOutput is not null)
+            {
+#pragma warning disable TUnit0055 // Do not overwrite the Console writer
+                Console.SetOut(originalOutput);
+#pragma warning restore TUnit0055 // Do not overwrite the Console writer
+            }
+        }
     }
 
-    [TestMethod]
-    public void Run_Default_ReturnOne() => Assert.AreEqual(1, Run([]));
 
-    [TestMethod]
-    [DataRow("_")]
-    [DataRow("??")]
-    public void Run_AsciiPietTextWithoutPath_ReturnsZero(string asciiPietText) => Assert.AreEqual(0, Run(["--ascii-piet-text", asciiPietText]));
-
-    [TestMethod]
-    [DataRow("_", "_")]
-    public void Run_AsciiPietTextWithoutPath_WithAsciiPietOption_WritesText(string asciiPietText, string expectedAsciiPiet)
+    static async Task<int> RunAsync(string[] args, TextWriter? writer = null, TextReader? reader = null, CancellationToken cancellationToken = default)
     {
-        var originalOutput = Console.Out;
+        WriteLog($"args: {string.Join(", ", args.Select(a => $"\"{a}\""))}");
+        return await Program.RunAsync(args, writer: writer, reader: reader, cancellationToken: cancellationToken);
+    }
+
+    [Test]
+    public async Task Run_Default_ReturnOne() => await Assert.That(Run([])).IsEqualTo(1);
+
+    [Test]
+    [Arguments("_")]
+    [Arguments("??")]
+    public async Task Run_AsciiPietTextWithoutPath_ReturnsZero(string asciiPietText) => await Assert.That(Run(["--ascii-piet-text", asciiPietText])).IsEqualTo(0);
+
+    [Test]
+    [Arguments("_", "_")]
+    [NotInParallel]
+    public async Task Run_AsciiPietTextWithoutPath_WithAsciiPietOption_WritesText(string asciiPietText, string expectedAsciiPiet)
+    {
         using var writer = new StringWriter(new StringBuilder());
         try
         {
-            Console.SetOut(writer);
-            Assert.AreEqual(0, Run(["--ascii-piet-text", asciiPietText, "--ascii-piet"]));
-            Assert.AreEqual(expectedAsciiPiet, writer.ToString());
+            await Assert.That(Run(["--ascii-piet-text", asciiPietText, "--ascii-piet"], writer)).IsEqualTo(0);
+            await Assert.That(writer.ToString()).IsEqualTo(expectedAsciiPiet);
         }
-        finally { Console.SetOut(originalOutput); }
+        catch (AssertionException)
+        {
+            WriteLog($"// output start:\r\n{writer}\r\n// output end");
+            throw;
+        }
     }
 
-    [TestMethod]
-    public void Run_WithoutPathAndWithoutAsciiPietText_ReturnsNonZero() => Assert.AreNotEqual(0, Run([]));
+    [Test]
+    [NotInParallel]
+    public async Task Run_WithoutPathAndWithoutAsciiPietText_ReturnsNonZero() => await Assert.That(Run([])).IsNotEqualTo(0);
 
-    [TestMethod]
-    public void Run_WithPathAndAsciiPietText_ReturnsNonZero()
+    [Test]
+    public async Task Run_WithPathAndAsciiPietText_ReturnsNonZero()
     {
         var path = FindFileInRepository("samples", "Generator.UseConsole", "samples", "no-op.png");
-        Assert.AreNotEqual(0, Run([path, "--ascii-piet-text", "_"]));
+        await Assert.That(Run([path, "--ascii-piet-text", "_"])).IsNotEqualTo(0);
     }
 
-    [TestMethod]
-    [DataRow("hello-world.png")]
-    [DataRow("ascii-piet-sample.txt")]
-    [DataRow("ppm-sample.ppm")]
-    [DataRow("dot.gif")]
-    public void Run_SamplePrograms_ReturnZero(string sampleFileName)
+    [Test]
+    [Arguments("hello-world.png")]
+    [Arguments("ascii-piet-sample.txt")]
+    [Arguments("ppm-sample.ppm")]
+    [Arguments("dot.gif")]
+    [NotInParallel]
+    public async Task Run_SamplePrograms_ReturnZero(string sampleFileName)
     {
         var path = FindFileInRepository("samples", "Generator.UseConsole", "samples", sampleFileName);
-        Assert.AreEqual(0, Run([path]), $"Expected success exit code for sample '{sampleFileName}'.");
+        await Assert.That(Run([path])).IsEqualTo(0);
     }
 
-    [TestMethod]
-    public async Task RunAsync_SamplePrograms_ProduceExpectedOutput()
+    [Test]
+    [NotInParallel]
+    public async Task RunAsync_SamplePrograms_ProduceExpectedOutput(CancellationToken CancellationToken)
     {
         const string sampleFileName = "hello-world.png";
         const string expectedOutput = "Hello, world!";
         var path = FindFileInRepository("samples", "Generator.UseConsole", "samples", sampleFileName);
-        var originalOutput = Console.Out;
         using var writer = new StringWriter(new StringBuilder());
         try
         {
-            Console.SetOut(writer);
-            Assert.AreEqual(0, await Program.RunAsync([path], CancellationToken));
-            Assert.AreEqual(expectedOutput, writer.ToString().TrimEnd('\r', '\n'));
+            await Assert.That(RunAsync([path], writer: writer, cancellationToken: CancellationToken)).IsEqualTo(0);
+            await Assert.That(writer.ToString().TrimEnd('\r', '\n')).IsEqualTo(expectedOutput);
         }
-        finally { Console.SetOut(originalOutput); }
+        catch (AssertionException)
+        {
+            WriteLog($"// output start:\r\n{writer}\r\n// output end");
+            throw;
+        }
     }
 
-    [TestMethod]
-    public async Task RunAsync_InlineAsciiPiet_ProduceExpectedExecutionOutput()
+    [Test]
+    [NotInParallel]
+    public async Task RunAsync_InlineAsciiPiet_ProduceExpectedExecutionOutput(CancellationToken CancellationToken)
     {
-        var originalOutput = Console.Out;
         using var writer = new StringWriter(new StringBuilder());
         try
         {
-            Console.SetOut(writer);
-            Assert.AreEqual(0, await Program.RunAsync(["--ascii-piet-text", "_"], CancellationToken));
-            Assert.AreEqual(string.Empty, writer.ToString().TrimEnd('\r', '\n'));
+            await Assert
+                .That(RunAsync(["--piet-plus-plus", "--ascii-piet-text", "~"], writer: writer, cancellationToken: CancellationToken))
+                .IsEqualTo(0);
+            await Assert
+                .That(writer.ToString().TrimEnd('\r', '\n'))
+                .IsEqualTo(string.Empty);
         }
-        finally { Console.SetOut(originalOutput); }
+        catch (AssertionException)
+        {
+            WriteLog($"// output start\r\n{writer}\r\n// output end");
+            throw;
+        }
+
     }
 
-    [TestMethod]
-    public void Run_HelpOption_ReturnsZero() => Assert.AreEqual(0, Run(["--help"]));
+    [Test]
+    [NotInParallel]
+    public async Task Run_HelpOption_ReturnsZero() => await Assert.That(Run(["--help"])).IsEqualTo(0);
 
-    [TestMethod]
-    public void Run_ColorsCommand_ReturnsZero() => Assert.AreEqual(0, Run(["colors"]));
+    [Test]
+    [NotInParallel]
+    public async Task Run_ColorsCommand_ReturnsZero() => await Assert.That(Run(["colors"])).IsEqualTo(0);
 
-    [TestMethod]
-    public void Run_ColorsCommand_PietPlusPlus_ReturnsZero() => Assert.AreEqual(0, Run(["colors", "--piet-plus-plus"]));
+    [Test]
+    [NotInParallel]
+    public async Task Run_ColorsCommand_PietPlusPlus_ReturnsZero() => await Assert.That(Run(["colors", "--piet-plus-plus"])).IsEqualTo(0);
 
-    [TestMethod]
-    public async Task RunAsync_ColorsCommand_WritesAsciiPietTable()
+    [Test]
+    [NotInParallel]
+    public async Task RunAsync_ColorsCommand_WritesAsciiPietTable(CancellationToken CancellationToken)
     {
-        var originalOutput = Console.Out;
         using var writer = new StringWriter(new StringBuilder());
         try
         {
-            Console.SetOut(writer);
-            Assert.AreEqual(0, await Program.RunAsync(["colors"], CancellationToken));
-            var output = writer.ToString();
-            Assert.Contains("ascii-piet", output);
-            Assert.Contains("Black", output);
-            Assert.Contains("'l'", output);
-            Assert.Contains("'_'", output);
+            await Assert.That(RunAsync(["colors"], writer, cancellationToken: CancellationToken)).IsEqualTo(0);
+            await Assert.That(writer.ToString())
+                .Contains("ascii-piet")
+                .And.Contains("Black")
+                .And.Contains("'l'")
+                .And.Contains("'_'");
         }
-        finally { Console.SetOut(originalOutput); }
+        catch (AssertionException)
+        {
+            WriteLog($"// output start\r\n{writer}\r\n// output end");
+            throw;
+        }
     }
 
-    [TestMethod]
-    public async Task RunAsync_ColorsCommand_PietPlusPlus_WritesAsciiPietPlusPlusTable()
+    [Test]
+    [NotInParallel]
+    public async Task RunAsync_ColorsCommand_PietPlusPlus_WritesAsciiPietPlusPlusTable(CancellationToken CancellationToken)
     {
-        var originalOutput = Console.Out;
         using var writer = new StringWriter(new StringBuilder());
         try
         {
-            Console.SetOut(writer);
-            Assert.AreEqual(0, await Program.RunAsync(["colors", "--piet-plus-plus"], CancellationToken));
-            var output = writer.ToString();
-            Assert.Contains("ascii-piet++", output);
-            Assert.Contains("(Black)", output);
-            Assert.Contains("(White)", output);
-            Assert.Contains("'~'", output);
+            await Assert.That(RunAsync(["colors", "--piet-plus-plus"], writer: writer, cancellationToken: CancellationToken)).IsEqualTo(0);
+            await Assert.That(writer.ToString())
+                .Contains("ascii-piet++")
+                .And.Contains("(Black)")
+                .And.Contains("(White)")
+                .And.Contains("'~'");
         }
-        finally { Console.SetOut(originalOutput); }
+        catch (AssertionException)
+        {
+            WriteLog($"// output start:\r\n{writer}\r\n// output end");
+            throw;
+        }
     }
 
-    [TestMethod]
-    public async Task RunAsync_WhitePixelImage_ReturnsZero()
+    [Test]
+    [NotInParallel]
+    public async Task RunAsync_WhitePixelImage_ReturnsZero(CancellationToken CancellationToken)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         try
@@ -151,17 +204,17 @@ public class ProgramTests(TestContext TestContext)
                 image[0, 0] = new Rgba32(255, 255, 255);
                 image.Save(path);
             }
-            Assert.AreEqual(0, await Program.RunAsync([path], CancellationToken));
+            await Assert.That(RunAsync([path], cancellationToken: CancellationToken)).IsEqualTo(0);
         }
         finally { if (File.Exists(path)) File.Delete(path); }
     }
 
-    [TestMethod]
-    public async Task RunAsync_AsciiPietOption_WritesTextWithoutTrailingNewline()
+    [Test]
+    [NotInParallel]
+    public async Task RunAsync_AsciiPietOption_WritesTextWithoutTrailingNewline(CancellationToken CancellationToken)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
-        var originalOutput = Console.Out;
-        var writer = new StringWriter(new StringBuilder());
+        using var writer = new StringWriter(new StringBuilder());
         try
         {
             using (var image = new Image<Rgba32>(2, 2))
@@ -172,23 +225,26 @@ public class ProgramTests(TestContext TestContext)
                 image[1, 1] = new Rgba32(0, 192, 192);
                 image.Save(path);
             }
-            Console.SetOut(writer);
-            Assert.AreEqual(0, await Program.RunAsync([path, "--ascii-piet"], CancellationToken));
-            Assert.AreEqual("l_ C", writer.ToString());
+            await Assert.That(RunAsync([path, "--ascii-piet"], writer, cancellationToken: CancellationToken)).IsEqualTo(0);
+            await Assert.That(writer.ToString()).IsEqualTo("l_ C");
+        }
+        catch (AssertionException)
+        {
+            WriteLog($"// output start:\r\n{writer}\r\n// output end");
+            throw;
         }
         finally
         {
-            Console.SetOut(originalOutput);
             if (File.Exists(path)) File.Delete(path);
         }
     }
 
-    [TestMethod]
-    public async Task RunAsync_ParseCommand_WritesTextWithoutTrailingNewline()
+    [Test]
+    [NotInParallel]
+    public async Task RunAsync_ParseCommand_WritesTextWithoutTrailingNewline(CancellationToken CancellationToken)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
-        var originalOutput = Console.Out;
-        var writer = new StringWriter(new StringBuilder());
+        using var writer = new StringWriter(new StringBuilder());
         try
         {
             using (var image = new Image<Rgba32>(2, 2))
@@ -199,19 +255,23 @@ public class ProgramTests(TestContext TestContext)
                 image[1, 1] = new Rgba32(0, 192, 192);
                 image.Save(path);
             }
-            Console.SetOut(writer);
-            Assert.AreEqual(0, await Program.RunAsync(["parse", path], CancellationToken));
-            Assert.AreEqual("l_ C", writer.ToString());
+            await Assert.That(RunAsync(["parse", path], writer, cancellationToken: CancellationToken)).IsEqualTo(0);
+            await Assert.That(writer.ToString()).IsEqualTo("l_ C");
+        }
+        catch (AssertionException)
+        {
+            WriteLog($"// output start:\r\n{writer}\r\n// output end");
+            throw;
         }
         finally
         {
-            Console.SetOut(originalOutput);
             if (File.Exists(path)) File.Delete(path);
         }
     }
 
-    [TestMethod]
-    public async Task RunAsync_ParseCommand_PietPlusPlus_WritesAsciiPietPlusPlusText()
+    [Test]
+    [NotInParallel]
+    public async Task RunAsync_ParseCommand_PietPlusPlus_WritesAsciiPietPlusPlusText(CancellationToken CancellationToken)
     {
         // Red(index=3), White(index=1), Black(index=0), DarkCyan(index=13)
         // ascii-piet++: row0 -> "3~|" (Red='3', White='~', EOL='|'), but trailing Black trimming applies per row
@@ -227,7 +287,6 @@ public class ProgramTests(TestContext TestContext)
         // row1: Black(0)=' ' (trimmed as trailing), DarkCyan(13)='c' → but Black is at x=0, DarkCyan at x=1
         //   lastNonBlack = 1, so x=0 outputs ' ', x=1 outputs 'c' → " c|"
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
-        var originalOutput = Console.Out;
         var writer = new StringWriter(new StringBuilder());
         try
         {
@@ -239,48 +298,43 @@ public class ProgramTests(TestContext TestContext)
                 image[1, 1] = new Rgba32(0, 192, 192);   // DarkCyan (index 13)
                 image.Save(path);
             }
-            Console.SetOut(writer);
-            Assert.AreEqual(0, await Program.RunAsync(["parse", path, "--piet-plus-plus"], CancellationToken));
-            var output = writer.ToString();
+            await Assert.That(RunAsync(["parse", path, "--piet-plus-plus"], writer: writer, cancellationToken: CancellationToken)).IsEqualTo(0);
+            await Assert.That(writer.ToString())
             // Each row ends with '|', no trailing newline
-            Assert.EndsWith("|", output);
-            Assert.IsFalse(output.Contains('\n'), "ascii-piet++ output should not contain newlines");
+                .EndsWith("|")
+                .And.DoesNotContain("\n").Because("ascii-piet++ output should not contain newlines");
+        }
+        catch (AssertionException)
+        {
+            WriteLog($"// output start:\r\n{writer}\r\n// output end");
+            throw;
         }
         finally
         {
-            Console.SetOut(originalOutput);
             if (File.Exists(path)) File.Delete(path);
         }
     }
 
-    [TestMethod]
-    public async Task RunAsync_AsciiPietPlusPlusTextOption_Executes()
+    [Test]
+    [NotInParallel]
+    public async Task RunAsync_AsciiPietPlusPlusTextOption_Executes(CancellationToken CancellationToken)
     {
         // '~' = White (index 63) = noop, '|' = EOL → single-row, single-White-codel program
-        var originalOutput = Console.Out;
         using var writer = new StringWriter(new StringBuilder());
-        try
-        {
-            Console.SetOut(writer);
-            Assert.AreEqual(0, await Program.RunAsync(["--ascii-piet-text", "~|", "--piet-plus-plus"], CancellationToken));
-        }
-        finally { Console.SetOut(originalOutput); }
+        await Assert.That(RunAsync(["--ascii-piet-text", "~|", "--piet-plus-plus"], writer: writer, cancellationToken: CancellationToken)).IsEqualTo(0);
+
     }
 
-    [TestMethod]
-    public async Task RunAsync_AsciiPietPlusPlusTextWithAsciiPietOption_WritesAsciiPietPlusPlusText()
+    [Test]
+    [NotInParallel]
+    public async Task RunAsync_AsciiPietPlusPlusTextWithAsciiPietOption_WritesAsciiPietPlusPlusText(CancellationToken CancellationToken)
     {
         // '~' = White (index 63), '|' = EOL
-        var originalOutput = Console.Out;
         using var writer = new StringWriter(new StringBuilder());
-        try
-        {
-            Console.SetOut(writer);
-            Assert.AreEqual(0, await Program.RunAsync(["--ascii-piet-text", "~|", "--piet-plus-plus", "--ascii-piet"], CancellationToken));
-            var output = writer.ToString();
-            Assert.EndsWith("|", output);
-        }
-        finally { Console.SetOut(originalOutput); }
+
+        await Assert.That(RunAsync(["--ascii-piet-text", "~|", "--piet-plus-plus", "--ascii-piet"], writer: writer, cancellationToken: CancellationToken)).IsEqualTo(0);
+        await Assert.That(writer.ToString())
+            .EndsWith("|");
     }
 
     static string FindFileInRepository(params string[] relativeParts)
@@ -295,3 +349,4 @@ public class ProgramTests(TestContext TestContext)
         throw new FileNotFoundException($"Could not find file: {Path.Combine(relativeParts)}");
     }
 }
+
