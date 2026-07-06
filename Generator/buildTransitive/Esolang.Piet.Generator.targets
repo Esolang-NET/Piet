@@ -68,7 +68,7 @@
   <ItemGroup Condition="'$(MSBuildThisPackageRoot)' != ''">
     <Analyzer Include="$(MSBuildThisPackageRoot)analyzers/dotnet/cs/Esolang.Piet.Generator.dll" />
     <Analyzer Include="$(MSBuildThisPackageRoot)analyzers/dotnet/cs/Esolang.Piet.Parser.dll" />
-    <Analyzer Include="$(MSBuildThisPackageRoot)analyzers/dotnet/cs/SixLabors.ImageSharp.dll" />
+    <Analyzer Include="$(MSBuildThisPackageRoot)analyzers/dotnet/cs/SkiaSharp.dll" />
     <Analyzer Include="$(MSBuildThisPackageRoot)analyzers/dotnet/cs/Esolang.Generator.Abstractions.dll" />
   </ItemGroup>
 </Project>

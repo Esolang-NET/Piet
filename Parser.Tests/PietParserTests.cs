@@ -1,5 +1,4 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using System.Text;
 using TUnit.Assertions.Enums;
 
@@ -13,14 +12,13 @@ public sealed class PietParserTests
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         try
         {
-            using (var image = new Image<Rgba32>(2, 2))
+            WritePng(path, 2, 2, bitmap =>
             {
-                image[0, 0] = new Rgba32(0xFF, 0x00, 0x00);
-                image[1, 0] = new Rgba32(0xFF, 0xFF, 0xFF);
-                image[0, 1] = new Rgba32(0x00, 0x00, 0x00);
-                image[1, 1] = new Rgba32(0x00, 0xFF, 0xFF);
-                image.Save(path);
-            }
+                bitmap.SetPixel(0, 0, new SKColor(0xFF, 0x00, 0x00));
+                bitmap.SetPixel(1, 0, new SKColor(0xFF, 0xFF, 0xFF));
+                bitmap.SetPixel(0, 1, new SKColor(0x00, 0x00, 0x00));
+                bitmap.SetPixel(1, 1, new SKColor(0x00, 0xFF, 0xFF));
+            });
 
             var program = PietParser.Parse(path);
 
@@ -47,11 +45,7 @@ public sealed class PietParserTests
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         try
         {
-            using (var image = new Image<Rgba32>(1, 1))
-            {
-                image[0, 0] = new Rgba32(0x12, 0x34, 0x56);
-                image.Save(path);
-            }
+            WritePng(path, 1, 1, bitmap => bitmap.SetPixel(0, 0, new SKColor(0x12, 0x34, 0x56)));
 
             Assert.Throws<InvalidOperationException>(() => PietParser.Parse(path));
         }
@@ -68,11 +62,7 @@ public sealed class PietParserTests
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         try
         {
-            using (var image = new Image<Rgba32>(1, 1))
-            {
-                image[0, 0] = new Rgba32(0xFF, 0xFF, 0xFF);
-                await image.SaveAsync(path, CancellationToken);
-            }
+            await WritePngAsync(path, 1, 1, bitmap => bitmap.SetPixel(0, 0, new SKColor(0xFF, 0xFF, 0xFF)), CancellationToken);
 
             var bytes = File.ReadAllBytes(path);
             bytes[29] = 0x00;
@@ -118,11 +108,7 @@ public sealed class PietParserTests
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         try
         {
-            using (var image = new Image<Rgba32>(1, 1))
-            {
-                image[0, 0] = new Rgba32(0x12, 0x34, 0x56);
-                await image.SaveAsync(path, CancellationToken);
-            }
+            await WritePngAsync(path, 1, 1, bitmap => bitmap.SetPixel(0, 0, new SKColor(0x12, 0x34, 0x56)), CancellationToken);
 
             var bytes = await File.ReadAllBytesAsync(path, CancellationToken);
             bytes[29] = 0x00;
@@ -150,11 +136,7 @@ public sealed class PietParserTests
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         try
         {
-            using (var image = new Image<Rgba32>(1, 1))
-            {
-                image[0, 0] = new Rgba32(0xFF, 0xFF, 0xFF);
-                await image.SaveAsync(path, CancellationToken);
-            }
+            await WritePngAsync(path, 1, 1, bitmap => bitmap.SetPixel(0, 0, new SKColor(0xFF, 0xFF, 0xFF)), CancellationToken);
 
             var bytes = await File.ReadAllBytesAsync(path, CancellationToken);
             bytes[25] = 3;
@@ -215,14 +197,11 @@ public sealed class PietParserTests
     }
 
     [Test]
-    public async Task TryParse_PngImageSharp_Works(CancellationToken CancellationToken)
+    public async Task TryParse_PngSkiaSharp_Works(CancellationToken CancellationToken)
     {
-        using var img = new Image<Rgba32>(1, 1);
-        img[0, 0] = new Rgba32(255, 0, 0);
-        using var ms = new MemoryStream();
-        await img.SaveAsPngAsync(ms, CancellationToken);
+        var bytes = CreatePngBytes(1, 1, bitmap => bitmap.SetPixel(0, 0, new SKColor(255, 0, 0)));
 
-        var ok = PietParser.TryParse(ms.ToArray(), ".png", 1, out var program, CancellationToken);
+        var ok = PietParser.TryParse(bytes, ".png", 1, out var program, CancellationToken);
 
         await Assert.That(ok).IsTrue();
         await Assert.That(program.Codels[0]).IsEqualTo(PietColor.Red);
@@ -231,12 +210,7 @@ public sealed class PietParserTests
     [Test]
     public async Task TryParse_PngFallback_Works(CancellationToken CancellationToken)
     {
-        using var img = new Image<Rgba32>(1, 1);
-        img[0, 0] = new Rgba32(255, 255, 255);
-        using var ms = new MemoryStream();
-        await img.SaveAsPngAsync(ms, CancellationToken);
-
-        var bytes = ms.ToArray();
+        var bytes = CreatePngBytes(1, 1, bitmap => bitmap.SetPixel(0, 0, new SKColor(255, 255, 255)));
         bytes[29] = bytes[30] = bytes[31] = bytes[32] = 0x00;
 
         var ok = PietParser.TryParse(bytes, ".png", 1, out var program, CancellationToken);
@@ -265,12 +239,9 @@ public sealed class PietParserTests
     [Test]
     public async Task TryParse_UnsupportedColor_ReturnsFalse(CancellationToken CancellationToken)
     {
-        using var img = new Image<Rgba32>(1, 1);
-        img[0, 0] = new Rgba32(0x12, 0x34, 0x56);
-        using var ms = new MemoryStream();
-        await img.SaveAsPngAsync(ms, CancellationToken);
+        var bytes = CreatePngBytes(1, 1, bitmap => bitmap.SetPixel(0, 0, new SKColor(0x12, 0x34, 0x56)));
 
-        var ok = PietParser.TryParse(ms.ToArray(), ".png", 1, out _, CancellationToken);
+        var ok = PietParser.TryParse(bytes, ".png", 1, out _, CancellationToken);
 
         await Assert.That(ok).IsFalse();
     }
@@ -313,5 +284,21 @@ public sealed class PietParserTests
             directory = directory.Parent;
         }
         throw new FileNotFoundException(fileName);
+    }
+
+    static void WritePng(string path, int width, int height, Action<SKBitmap> configureBitmap) =>
+        File.WriteAllBytes(path, CreatePngBytes(width, height, configureBitmap));
+
+    static Task WritePngAsync(string path, int width, int height, Action<SKBitmap> configureBitmap, CancellationToken cancellationToken) =>
+        File.WriteAllBytesAsync(path, CreatePngBytes(width, height, configureBitmap), cancellationToken);
+
+    static byte[] CreatePngBytes(int width, int height, Action<SKBitmap> configureBitmap)
+    {
+        using var bitmap = new SKBitmap(width, height);
+        configureBitmap(bitmap);
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100)
+            ?? throw new InvalidOperationException("Failed to encode test PNG image.");
+        return data.ToArray();
     }
 }
