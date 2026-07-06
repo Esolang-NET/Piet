@@ -1,5 +1,4 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using System.Text;
 using TUnit.Assertions.Exceptions;
 
@@ -199,11 +198,7 @@ public class ProgramTests
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         try
         {
-            using (var image = new Image<Rgba32>(1, 1))
-            {
-                image[0, 0] = new Rgba32(255, 255, 255);
-                image.Save(path);
-            }
+            WritePng(path, 1, 1, bitmap => bitmap.SetPixel(0, 0, new SKColor(255, 255, 255)));
             await Assert.That(RunAsync([path], cancellationToken: CancellationToken)).IsEqualTo(0);
         }
         finally { if (File.Exists(path)) File.Delete(path); }
@@ -217,14 +212,13 @@ public class ProgramTests
         using var writer = new StringWriter(new StringBuilder());
         try
         {
-            using (var image = new Image<Rgba32>(2, 2))
+            WritePng(path, 2, 2, bitmap =>
             {
-                image[0, 0] = new Rgba32(255, 0, 0);
-                image[1, 0] = new Rgba32(255, 255, 255);
-                image[0, 1] = new Rgba32(0, 0, 0);
-                image[1, 1] = new Rgba32(0, 192, 192);
-                image.Save(path);
-            }
+                bitmap.SetPixel(0, 0, new SKColor(255, 0, 0));
+                bitmap.SetPixel(1, 0, new SKColor(255, 255, 255));
+                bitmap.SetPixel(0, 1, new SKColor(0, 0, 0));
+                bitmap.SetPixel(1, 1, new SKColor(0, 192, 192));
+            });
             await Assert.That(RunAsync([path, "--ascii-piet"], writer, cancellationToken: CancellationToken)).IsEqualTo(0);
             await Assert.That(writer.ToString()).IsEqualTo("l_ C");
         }
@@ -247,14 +241,13 @@ public class ProgramTests
         using var writer = new StringWriter(new StringBuilder());
         try
         {
-            using (var image = new Image<Rgba32>(2, 2))
+            WritePng(path, 2, 2, bitmap =>
             {
-                image[0, 0] = new Rgba32(255, 0, 0);
-                image[1, 0] = new Rgba32(255, 255, 255);
-                image[0, 1] = new Rgba32(0, 0, 0);
-                image[1, 1] = new Rgba32(0, 192, 192);
-                image.Save(path);
-            }
+                bitmap.SetPixel(0, 0, new SKColor(255, 0, 0));
+                bitmap.SetPixel(1, 0, new SKColor(255, 255, 255));
+                bitmap.SetPixel(0, 1, new SKColor(0, 0, 0));
+                bitmap.SetPixel(1, 1, new SKColor(0, 192, 192));
+            });
             await Assert.That(RunAsync(["parse", path], writer, cancellationToken: CancellationToken)).IsEqualTo(0);
             await Assert.That(writer.ToString()).IsEqualTo("l_ C");
         }
@@ -290,14 +283,13 @@ public class ProgramTests
         var writer = new StringWriter(new StringBuilder());
         try
         {
-            using (var image = new Image<Rgba32>(2, 2))
+            WritePng(path, 2, 2, bitmap =>
             {
-                image[0, 0] = new Rgba32(255, 0, 0);     // Red (index 3)
-                image[1, 0] = new Rgba32(255, 255, 255); // White (index 1)
-                image[0, 1] = new Rgba32(0, 0, 0);       // Black (index 0)
-                image[1, 1] = new Rgba32(0, 192, 192);   // DarkCyan (index 13)
-                image.Save(path);
-            }
+                bitmap.SetPixel(0, 0, new SKColor(255, 0, 0));     // Red (index 3)
+                bitmap.SetPixel(1, 0, new SKColor(255, 255, 255)); // White (index 1)
+                bitmap.SetPixel(0, 1, new SKColor(0, 0, 0));       // Black (index 0)
+                bitmap.SetPixel(1, 1, new SKColor(0, 192, 192));   // DarkCyan (index 13)
+            });
             await Assert.That(RunAsync(["parse", path, "--piet-plus-plus"], writer: writer, cancellationToken: CancellationToken)).IsEqualTo(0);
             await Assert.That(writer.ToString())
             // Each row ends with '|', no trailing newline
@@ -348,5 +340,14 @@ public class ProgramTests
         }
         throw new FileNotFoundException($"Could not find file: {Path.Combine(relativeParts)}");
     }
-}
 
+    static void WritePng(string path, int width, int height, Action<SKBitmap> configureBitmap)
+    {
+        using var bitmap = new SKBitmap(width, height);
+        configureBitmap(bitmap);
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100)
+            ?? throw new InvalidOperationException("Failed to encode test PNG image.");
+        File.WriteAllBytes(path, data.ToArray());
+    }
+}

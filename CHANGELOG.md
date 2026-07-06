@@ -10,6 +10,9 @@ The format is based on Keep a Changelog.
 - `Esolang.Piet.Parser`: added `CancellationToken cancellationToken = default` to parse APIs with backward-compatible call patterns, and propagated cancellation through file reads and parse loops.
 - `Esolang.Piet.Generator`: now propagates `SourceProductionContext.CancellationToken` to parser calls during source generation.
 - `Esolang.Piet.Interpreter` (CLI): now propagates command cancellation tokens through parser call paths (including `parse` subcommand action).
+- `Esolang.Piet.Parser` / `Esolang.Piet.Generator` / related tests: replaced `SixLabors.ImageSharp` with `SkiaSharp` `4.148.0`, with package versions centrally managed via `Directory.Build.targets`.
+- `Esolang.Piet.Parser`: kept Netpbm PPM (P3, `.ppm`) support via a built-in parser because `SkiaSharp` does not decode PPM directly.
+- `Esolang.Piet.Generator`: analyzer packaging now ships `SkiaSharp` and required native assets instead of `SixLabors.ImageSharp`.
 
 ## [2.0.1] - 2026-06-04
 

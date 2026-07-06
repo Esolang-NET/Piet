@@ -40,7 +40,10 @@
 
   <ItemGroup>
     <PackageReference Include="Esolang.Generator.Abstractions" GeneratePathProperty="true" PrivateAssets="all" />
-    <PackageReference Include="SixLabors.ImageSharp" GeneratePathProperty="true" PrivateAssets="all" />
+    <PackageReference Include="SkiaSharp" GeneratePathProperty="true" PrivateAssets="all" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" GeneratePathProperty="true" PrivateAssets="all" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Win32" GeneratePathProperty="true" PrivateAssets="all" />
+    <PackageReference Include="SkiaSharp.NativeAssets.macOS" GeneratePathProperty="true" PrivateAssets="all" />
   </ItemGroup>
   
   <ItemGroup>    
@@ -50,8 +53,11 @@
   <ItemGroup>
     <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
     <None Include="$(OutputPath)\Esolang.Piet.Parser.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
-    <None Include="$(PkgSixLabors_ImageSharp)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(PkgSixLabors_ImageSharp)\lib\netstandard2.0\*.xml" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(PkgSkiaSharp)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(PkgSkiaSharp)\lib\netstandard2.0\*.xml" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(PkgSkiaSharp_NativeAssets_Linux_NoDependencies)\runtimes\**\*" Pack="true" PackagePath="analyzers/dotnet/cs\runtimes\%(RecursiveDir)" Visible="false" />
+    <None Include="$(PkgSkiaSharp_NativeAssets_Win32)\runtimes\**\*" Pack="true" PackagePath="analyzers/dotnet/cs\runtimes\%(RecursiveDir)" Visible="false" />
+    <None Include="$(PkgSkiaSharp_NativeAssets_macOS)\runtimes\**\*" Pack="true" PackagePath="analyzers/dotnet/cs\runtimes\%(RecursiveDir)" Visible="false" />
     <None Include="$(PkgEsolang_Generator_Abstractions)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(PkgEsolang_Generator_Abstractions)\lib\netstandard2.0\*.xml" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

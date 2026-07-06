@@ -1,5 +1,4 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using System.IO.Compression;
 #if NETSTANDARD2_1_OR_GREATER
 using System.Diagnostics.CodeAnalysis;
@@ -33,6 +32,11 @@ public static class PietParser
             return AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program, cancellationToken);
         if (ext is ".txt" or ".ap" or ".ascii-piet")
             return AsciiPietParser.TryParse(bytes, codelSize, out program, cancellationToken);
+        if ((ext == ".gif" || GifParser.LooksLikeGif(bytes))
+            && TryParseGif(bytes, codelSize, Normalize, out program, cancellationToken))
+            return true;
+        if (ext == ".ppm" || NetpbmPpmParser.LooksLikeP3(bytes, cancellationToken))
+            return TryParsePpm(bytes, codelSize, Normalize, out program, cancellationToken);
         if (AsciiPietParser.LooksLikeAsciiPiet(bytes, cancellationToken)
             && AsciiPietParser.TryParse(bytes, codelSize, out program, cancellationToken))
             return true;
@@ -60,31 +64,19 @@ public static class PietParser
             return AsciiPietPlusPlusParser.Parse(bytes, codelSize, cancellationToken);
         if (ext is ".txt" or ".ap" or ".ascii-piet")
             return AsciiPietParser.Parse(bytes, codelSize, cancellationToken);
+        if ((ext == ".gif" || GifParser.LooksLikeGif(bytes))
+            && TryParseGif(bytes, codelSize, Normalize, out var gifProgram, cancellationToken))
+            return gifProgram;
+        if (ext == ".ppm" || NetpbmPpmParser.LooksLikeP3(bytes, cancellationToken))
+            return ParsePpm(bytes, codelSize, Normalize, cancellationToken);
         if (AsciiPietParser.LooksLikeAsciiPiet(bytes, cancellationToken)
             && AsciiPietParser.TryParse(bytes, codelSize, out var program, cancellationToken))
             return program;
-        try
-        {
-            using var image = Image.Load<Rgba32>(bytes);
-            var codelWidth = image.Width / codelSize;
-            var codelHeight = image.Height / codelSize;
-            var colors = new PietColor[codelWidth * codelHeight];
-            for (var y = 0; y < codelHeight; y++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                for (var x = 0; x < codelWidth; x++)
-                {
-                    // 左上ピクセルの色で代表とする（平均化したい場合はここを修正）
-                    colors[y * codelWidth + x] = Normalize(image[x * codelSize, y * codelSize]);
-                }
-            }
-            return new PietProgram(codelWidth, codelHeight, colors);
-        }
-        catch (Exception e) when (ext == ".png" && e is InvalidImageContentException or UnknownImageFormatException)
-        {
-            // PNG形式であっても、ImageSharpが対応していない特殊なPNGの場合があるため、独自のPNGデコードを試みる
+        using var image = TryDecodeBitmap(bytes);
+        if (image is not null)
+            return CreateProgramFromBitmap(image, codelSize, Normalize, cancellationToken);
+        if (ext == ".png")
             return ParseWithRawPngFallback(bytes, codelSize, cancellationToken);
-        }
 
         throw new ArgumentException($"not supported image format: {ext}");
     }
@@ -102,20 +94,10 @@ public static class PietParser
         if (codelSize < 1) return false;
         try
         {
-            using var image = Image.Load<Rgba32>(bytes);
-            var codelWidth = image.Width / codelSize;
-            var codelHeight = image.Height / codelSize;
-            var colors = new PietColor[codelWidth * codelHeight];
-            for (var y = 0; y < codelHeight; y++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                for (var x = 0; x < codelWidth; x++)
-                {
-                    // 左上ピクセルの色で代表とする（平均化したい場合はここを修正）
-                    colors[y * codelWidth + x] = Normalize(image[x * codelSize, y * codelSize]);
-                }
-            }
-            program = new(codelWidth, codelHeight, colors);
+            using var image = TryDecodeBitmap(bytes);
+            if (image is null)
+                return false;
+            program = CreateProgramFromBitmap(image, codelSize, Normalize, cancellationToken);
             return true;
         }
         catch (OperationCanceledException)
@@ -411,6 +393,11 @@ public static class PietParser
             if (AsciiPietPlusPlusParser.LooksLikeAsciiPietPlusPlus(bytes, cancellationToken)
                 && AsciiPietPlusPlusParser.TryParse(bytes, codelSize, out program, cancellationToken))
                 return true;
+            if ((ext == ".gif" || GifParser.LooksLikeGif(bytes))
+                && TryParseGif(bytes, codelSize, NormalizePietPlusPlus, out program, cancellationToken))
+                return true;
+            if (ext == ".ppm" || NetpbmPpmParser.LooksLikeP3(bytes, cancellationToken))
+                return TryParsePpm(bytes, codelSize, NormalizePietPlusPlus, out program, cancellationToken);
             return TryParseInternalPietPlusPlus(bytes, codelSize, out program, cancellationToken);
         }
         return TryParse(bytes, ext, codelSize, out program, cancellationToken);
@@ -428,22 +415,10 @@ public static class PietParser
         if (bytes.Length <= 0 || codelSize < 1) return false;
         try
         {
-            using var image = Image.Load<Rgba32>(bytes);
-            var cw = image.Width / codelSize;
-            var ch = image.Height / codelSize;
-            var colors = new PietColor[cw * ch];
-            for (var y = 0; y < ch; y++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                for (var x = 0; x < cw; x++)
-                {
-                    var px = image[x * codelSize, y * codelSize];
-                    var idx = MapToPietPlusPlusColor(px.R, px.G, px.B);
-                    if (idx < 0) return false;
-                    colors[y * cw + x] = (PietColor)idx;
-                }
-            }
-            program = new(cw, ch, colors);
+            using var image = TryDecodeBitmap(bytes);
+            if (image is null)
+                return false;
+            program = CreateProgramFromBitmap(image, codelSize, NormalizePietPlusPlus, cancellationToken);
             return true;
         }
         catch (OperationCanceledException)
@@ -487,28 +462,127 @@ public static class PietParser
         return -1;
     }
 
-    internal static PietColor Normalize(Rgba32 color) => color switch
+    static PietProgram ParsePpm(byte[] bytes, int codelSize, Func<byte, byte, byte, PietColor> normalizeColor, CancellationToken cancellationToken = default)
     {
-        { R: 0x00, G: 0x00, B: 0x00 } => PietColor.Black,
-        { R: 0xFF, G: 0xFF, B: 0xFF } => PietColor.White,
-        { R: 0xFF, G: 0xC0, B: 0xC0 } => PietColor.LightRed,
-        { R: 0xFF, G: 0x00, B: 0x00 } => PietColor.Red,
-        { R: 0xC0, G: 0x00, B: 0x00 } => PietColor.DarkRed,
-        { R: 0xFF, G: 0xFF, B: 0xC0 } => PietColor.LightYellow,
-        { R: 0xFF, G: 0xFF, B: 0x00 } => PietColor.Yellow,
-        { R: 0xC0, G: 0xC0, B: 0x00 } => PietColor.DarkYellow,
-        { R: 0xC0, G: 0xFF, B: 0xC0 } => PietColor.LightGreen,
-        { R: 0x00, G: 0xFF, B: 0x00 } => PietColor.Green,
-        { R: 0x00, G: 0xC0, B: 0x00 } => PietColor.DarkGreen,
-        { R: 0xC0, G: 0xFF, B: 0xFF } => PietColor.LightCyan,
-        { R: 0x00, G: 0xFF, B: 0xFF } => PietColor.Cyan,
-        { R: 0x00, G: 0xC0, B: 0xC0 } => PietColor.DarkCyan,
-        { R: 0xC0, G: 0xC0, B: 0xFF } => PietColor.LightBlue,
-        { R: 0x00, G: 0x00, B: 0xFF } => PietColor.Blue,
-        { R: 0x00, G: 0x00, B: 0xC0 } => PietColor.DarkBlue,
-        { R: 0xFF, G: 0xC0, B: 0xFF } => PietColor.LightMagenta,
-        { R: 0xFF, G: 0x00, B: 0xFF } => PietColor.Magenta,
-        { R: 0xC0, G: 0x00, B: 0xC0 } => PietColor.DarkMagenta,
-        _ => throw new InvalidOperationException($"Unsupported Piet color: {color}")
-    };
+        var rgbPixels = NetpbmPpmParser.ParseP3(bytes, out var width, out var height, cancellationToken);
+        return CreateProgramFromRgbPixels(rgbPixels, width, height, codelSize, normalizeColor, cancellationToken);
+    }
+
+    static bool TryParsePpm(byte[] bytes, int codelSize, Func<byte, byte, byte, PietColor> normalizeColor,
+#if NETSTANDARD2_1_OR_GREATER
+    [NotNullWhen(true)]
+#endif
+    out PietProgram program,
+    CancellationToken cancellationToken = default)
+    {
+        program = default!;
+        if (codelSize < 1)
+            return false;
+        if (!NetpbmPpmParser.TryParseP3(bytes, out var width, out var height, out var rgbPixels, cancellationToken))
+            return false;
+        try
+        {
+            program = CreateProgramFromRgbPixels(rgbPixels, width, height, codelSize, normalizeColor, cancellationToken);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    static bool TryParseGif(byte[] bytes, int codelSize, Func<byte, byte, byte, PietColor> normalizeColor,
+#if NETSTANDARD2_1_OR_GREATER
+    [NotNullWhen(true)]
+#endif
+    out PietProgram program,
+    CancellationToken cancellationToken = default)
+    {
+        program = default!;
+        if (codelSize < 1)
+            return false;
+        if (!GifParser.TryDecodeFirstImage(bytes, out var width, out var height, out var rgbPixels, cancellationToken))
+            return false;
+        try
+        {
+            program = CreateProgramFromRgbPixels(rgbPixels, width, height, codelSize, normalizeColor, cancellationToken);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    static SKBitmap? TryDecodeBitmap(byte[] bytes)
+    {
+        using var stream = new SKMemoryStream(bytes);
+        using var codec = SKCodec.Create(stream);
+        if (codec is null)
+            return null;
+        return SKBitmap.Decode(codec);
+    }
+
+    static PietProgram CreateProgramFromBitmap(SKBitmap image, int codelSize, Func<byte, byte, byte, PietColor> normalizeColor, CancellationToken cancellationToken = default)
+    {
+        var codelWidth = image.Width / codelSize;
+        var codelHeight = image.Height / codelSize;
+        var colors = new PietColor[codelWidth * codelHeight];
+        for (var y = 0; y < codelHeight; y++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            for (var x = 0; x < codelWidth; x++)
+            {
+                var pixel = image.GetPixel(x * codelSize, y * codelSize);
+                colors[y * codelWidth + x] = normalizeColor(pixel.Red, pixel.Green, pixel.Blue);
+            }
+        }
+        return new PietProgram(codelWidth, codelHeight, colors);
+    }
+
+    static PietProgram CreateProgramFromRgbPixels(byte[] rgbPixels, int width, int height, int codelSize, Func<byte, byte, byte, PietColor> normalizeColor, CancellationToken cancellationToken = default)
+    {
+        var codelWidth = width / codelSize;
+        var codelHeight = height / codelSize;
+        var colors = new PietColor[codelWidth * codelHeight];
+        for (var y = 0; y < codelHeight; y++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            for (var x = 0; x < codelWidth; x++)
+            {
+                var pixelOffset = (y * codelSize * width + x * codelSize) * 3;
+                colors[y * codelWidth + x] = normalizeColor(
+                    rgbPixels[pixelOffset],
+                    rgbPixels[pixelOffset + 1],
+                    rgbPixels[pixelOffset + 2]);
+            }
+        }
+        return new PietProgram(codelWidth, codelHeight, colors);
+    }
+
+    static PietColor NormalizePietPlusPlus(byte r, byte g, byte b)
+    {
+        var color = MapToPietPlusPlusColor(r, g, b);
+        if (color < 0)
+            throw new InvalidOperationException($"Unsupported Piet++ color: #{r:X2}{g:X2}{b:X2}");
+        return (PietColor)color;
+    }
+
+    internal static PietColor Normalize(SKColor color) => Normalize(color.Red, color.Green, color.Blue);
+
+    internal static PietColor Normalize(byte r, byte g, byte b)
+    {
+        var color = MapToPietColor(r, g, b);
+        if (color < 0)
+            throw new InvalidOperationException($"Unsupported Piet color: #{r:X2}{g:X2}{b:X2}");
+        return (PietColor)color;
+    }
 }

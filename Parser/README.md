@@ -39,13 +39,14 @@ Console.WriteLine($"Top-left codel: {program[0, 0]}");
 - ascii-piet text format (`.txt`)
 - Netpbm PPM (P3, `.ppm`)
 
-Other common static image formats supported by ImageSharp (such as JPEG) can also be loaded.
+Other common static raster formats supported by SkiaSharp (such as JPEG) can also be loaded.
 
 Image format is detected automatically from the file extension.
 
 ## Notes
 
-- Input is read from an image file path (PNG, .gif, .txt, .ppm and other ImageSharp-supported static formats)
+- Input is read from an image file path (PNG, .gif, .txt, .ppm and other SkiaSharp-supported static formats)
+- Netpbm PPM (`.ppm`) is handled by the built-in P3 parser because SkiaSharp does not decode that format directly.
 - Unsupported colors or unknown ascii-piet chars cause parsing to fail.
 - This package focuses on normalization, not execution.
 
