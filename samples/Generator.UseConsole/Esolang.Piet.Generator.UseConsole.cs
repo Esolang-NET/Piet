@@ -188,8 +188,9 @@ partial class PietSample
     /// <summary>
     /// Executes the codel-size-11 hello-world sample.
     /// </summary>
+    /// <param name="input">Optional input text. <see langword="null"/> is treated as empty input.</param>
     [GeneratePietMethod("hw1-11.gif", codelSize: 11)]
-    public static partial string RunHw111Gif();
+    public static partial string RunHw111Gif(string? input = null);
 
     /// <summary>
     /// Executes the dot ascii-piet++ sample. Language is specified via &lt;PietImage Language="PietPlusPlus" /&gt; in the project file.
