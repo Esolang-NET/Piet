@@ -14,6 +14,7 @@
     <PackageReference Update="Microsoft.Extensions.Logging" Version="6.0.1" />
     <PackageReference Update="PolySharp" Version="1.16.0" />
     <PackageReference Update="SkiaSharp" Version="4.148.0" />
+    <PackageReference Update="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.148.0" />
     <PackageReference Update="SkiaSharp.NativeAssets.Win32" Version="4.148.0" />
     <PackageReference Update="SkiaSharp.NativeAssets.macOS" Version="4.148.0" />
     <PackageReference Update="System.CommandLine" Version="2.0.6" />
@@ -24,6 +25,7 @@
 
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard2.1'">
     <PackageReference Update="SkiaSharp" Version="4.148.0" />
+    <PackageReference Update="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.148.0" />
     <PackageReference Update="SkiaSharp.NativeAssets.Win32" Version="4.148.0" />
     <PackageReference Update="SkiaSharp.NativeAssets.macOS" Version="4.148.0" />
   </ItemGroup>
