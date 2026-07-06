@@ -352,7 +352,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             );
         }
 
-        var binding = MethodSignatureBinder.Bind(methodSymbol, types);
+        var binding = NormalizeNullableStringInputBinding(MethodSignatureBinder.Bind(methodSymbol, types), types);
 
         if (binding is { IsValid: true, UnhandledParameters.Count: > 0 })
         {
@@ -387,14 +387,14 @@ public partial class MethodGenerator : IIncrementalGenerator
                 DuplicateInput e => (
                     e.ExistingKind switch
                     {
-                        MethodInputKind.String when types.IsString(e.Parameter.Type, false) => DiagnosticDescriptors.DuplicateParameter,
+                        MethodInputKind.String when types.IsString(e.Parameter.Type, null) => DiagnosticDescriptors.DuplicateParameter,
                         MethodInputKind.TextReader when types.IsTextReader(e.Parameter.Type) => DiagnosticDescriptors.DuplicateParameter,
                         MethodInputKind.PipeReader when types.IsPipeReader(e.Parameter.Type) => DiagnosticDescriptors.DuplicateParameter,
                         _ => DiagnosticDescriptors.InvalidParameter
                     },
                     e.ExistingKind switch
                     {
-                        MethodInputKind.String when types.IsString(e.Parameter.Type, false) => [methodSymbol.Name],
+                        MethodInputKind.String when types.IsString(e.Parameter.Type, null) => [methodSymbol.Name],
                         MethodInputKind.TextReader when types.IsTextReader(e.Parameter.Type) => [methodSymbol.Name],
                         MethodInputKind.PipeReader when types.IsPipeReader(e.Parameter.Type) => [methodSymbol.Name],
                         _ => [e.Parameter.Name]
@@ -557,11 +557,13 @@ public partial class MethodGenerator : IIncrementalGenerator
         EmitBody(
             code,
             binding,
+            methodSymbol,
             $"new byte[] {{ {string.Join(", ", codels)} }}",
             imageWidth.ToString(),
             imageHeight.ToString(),
             mightUseOutput,
             mightUseInput,
+            types,
             language
         );
 
@@ -597,11 +599,13 @@ public partial class MethodGenerator : IIncrementalGenerator
     static void EmitBody(
             StringBuilder builder,
             MethodSignatureBinding binding,
+            IMethodSymbol methodSymbol,
             string codelArrayExpression,
             string widthExpression,
             string heightExpression,
             bool mightUseOutput,
             bool mightUseInput,
+            KnownTypes types,
             Esolang.Piet.Parser.LanguageType language = Esolang.Piet.Parser.LanguageType.Piet
         )
     {
@@ -628,6 +632,8 @@ public partial class MethodGenerator : IIncrementalGenerator
         // ------------------------------------------------------------
         // 入力デリゲート生成
         // ------------------------------------------------------------
+
+        var stringInputExpression = GetStringInputExpression(binding, methodSymbol, types);
 
         switch (binding)
         {
@@ -665,7 +671,7 @@ public partial class MethodGenerator : IIncrementalGenerator
                 break;
             case { InputKind: MethodInputKind.String } when baseFeatures is GeneratorFeatures.Sync or GeneratorFeatures.Enumerable:
                 builder.AppendLine($$"""
-                var __pietStringReader = new global::System.IO.StringReader({{binding.InputExpression}});
+                var __pietStringReader = new global::System.IO.StringReader({{stringInputExpression}});
 
                 int? __pietReadNumber()
                 {
@@ -684,7 +690,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
             case { InputKind: MethodInputKind.String } when baseFeatures is GeneratorFeatures.Async or GeneratorFeatures.AsyncEnumerable:
                 builder.AppendLine($$"""
-                var __pietStringReader = new global::System.IO.StringReader({{binding.InputExpression}});
+                var __pietStringReader = new global::System.IO.StringReader({{stringInputExpression}});
 
                 global::System.Threading.Tasks.ValueTask<int?> __pietReadNumberAsync(global::System.Threading.CancellationToken __ct)
                 {
@@ -1167,6 +1173,97 @@ public partial class MethodGenerator : IIncrementalGenerator
         _ => "private",
     };
 
+    static MethodSignatureBinding NormalizeNullableStringInputBinding(
+        MethodSignatureBinding binding,
+        KnownTypes types)
+    {
+        if (!binding.IsValid || binding.UnhandledParameters.Count == 0)
+        {
+            return binding;
+        }
+
+        var nullableStringParameters = binding.UnhandledParameters
+            .Where(p => IsNullableOrObliviousStringParameter(p, types))
+            .ToImmutableArray();
+
+        if (nullableStringParameters.Length == 0 || nullableStringParameters.Length != binding.UnhandledParameters.Count)
+        {
+            return binding;
+        }
+
+        if (binding.HasExplicitInput)
+        {
+            var duplicate = nullableStringParameters[0];
+            return new MethodSignatureBinding(
+                binding.ReturnKind,
+                binding.InputKind,
+                binding.OutputKind,
+                binding.InputExpression,
+                binding.OutputExpression,
+                binding.CancellationTokenName,
+                binding.LoggerExpression,
+                binding.IsLoggerFromParameter,
+                [],
+                new DuplicateInput(duplicate, binding.InputKind, duplicate.Locations.FirstOrDefault()));
+        }
+
+        if (nullableStringParameters.Length > 1)
+        {
+            var duplicate = nullableStringParameters[1];
+            return new MethodSignatureBinding(
+                binding.ReturnKind,
+                MethodInputKind.String,
+                binding.OutputKind,
+                nullableStringParameters[0].Name,
+                binding.OutputExpression,
+                binding.CancellationTokenName,
+                binding.LoggerExpression,
+                binding.IsLoggerFromParameter,
+                [],
+                new DuplicateInput(duplicate, MethodInputKind.String, duplicate.Locations.FirstOrDefault()));
+        }
+
+        var inputParameter = nullableStringParameters[0];
+        return new MethodSignatureBinding(
+            binding.ReturnKind,
+            MethodInputKind.String,
+            binding.OutputKind,
+            inputParameter.Name,
+            binding.OutputExpression,
+            binding.CancellationTokenName,
+            binding.LoggerExpression,
+            binding.IsLoggerFromParameter,
+            [],
+            null);
+    }
+
+    static string GetStringInputExpression(
+        MethodSignatureBinding binding,
+        IMethodSymbol methodSymbol,
+        KnownTypes types)
+    {
+        if (binding.InputKind != MethodInputKind.String || string.IsNullOrEmpty(binding.InputExpression))
+        {
+            return binding.InputExpression;
+        }
+
+        var inputParameter = methodSymbol.Parameters.FirstOrDefault(p => string.Equals(p.Name, binding.InputExpression, StringComparison.Ordinal));
+        if (inputParameter is null)
+        {
+            return binding.InputExpression;
+        }
+
+        return ShouldFallbackForStringInput(inputParameter, types)
+            ? binding.InputExpression + " ?? string.Empty"
+            : binding.InputExpression;
+    }
+
+    static bool IsNullableOrObliviousStringParameter(IParameterSymbol parameter, KnownTypes types)
+        => types.IsString(parameter.Type, null) && parameter.NullableAnnotation != NullableAnnotation.NotAnnotated;
+
+    static bool ShouldFallbackForStringInput(IParameterSymbol parameter, KnownTypes types)
+        => IsNullableOrObliviousStringParameter(parameter, types);
+
     static string FormatParameter(IParameterSymbol parameter)
     {
         var modifier = parameter.RefKind switch
@@ -1178,7 +1275,10 @@ public partial class MethodGenerator : IIncrementalGenerator
         };
 
         var paramsPrefix = parameter.IsParams ? "params " : string.Empty;
-        var typeName = parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var typeName = parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat
+            .WithMiscellaneousOptions(
+                SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions
+                | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier));
         return $"{paramsPrefix}{modifier}{typeName} {parameter.Name}";
     }
 

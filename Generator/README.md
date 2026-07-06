@@ -43,9 +43,11 @@ partial class PietSample
     public static partial void RunDotCodel11Gif();
 
     [GeneratePietMethod("hw1-11.gif", codelSize: 11)]
-    public static partial string RunHw111Gif(string input = "");
+    public static partial string RunHw111Gif(string? input = null);
 }
 ```
+
+Nullable string input is supported; when `null` is passed, the generated adapter treats it as empty input.
 
 You can also embed small Piet programs inline using a data URI (`data:text/ascii-piet,...`) instead of a `PietImage` item.
 

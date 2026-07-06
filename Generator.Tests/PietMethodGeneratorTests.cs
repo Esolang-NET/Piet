@@ -982,6 +982,7 @@ public class MethodGeneratorTests
     public async Task Generator_WithStringInputParameter_GeneratesStringReaderInputAdapter(CancellationToken CancellationToken)
     {
         const string source = """
+            #nullable enable
             namespace Demo;
 
             public partial class Sample
@@ -1020,6 +1021,103 @@ public class MethodGeneratorTests
             throw;
         }
 
+    }
+
+    [Test]
+    public async Task Generator_WithNullableOptionalStringInputParameter_GeneratesNullableStringReaderInputAdapter(CancellationToken CancellationToken)
+    {
+        const string source = """
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("input.png")]
+                public partial System.Threading.Tasks.Task<string> Run(string? input = null);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/input.png.piet.txt",
+                MakeTransformedText("input.png", TwoPixelInputPng)),
+            CancellationToken: CancellationToken);
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+            await AssertNoErrors(diagnostics, outputCompilation, CancellationToken);
+
+            await Assert.That(generatorDiagnostics)
+                .DoesNotContain(static x => x.Id == "PT0008")
+                .Because("PT0008 should not be reported when the method has a nullable string parameter.");
+
+            var generatedText = runResult.GeneratedTrees
+                .Select(tree => tree.GetText(CancellationToken).ToString())
+                .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
+            await Assert.That(generatedText)
+                .Contains("Run(string? input)")
+                .Because("Expected generated method signature to preserve nullable string input.");
+            await Assert.That(generatedText)
+                .Contains("new global::System.IO.StringReader(input ?? string.Empty)")
+                .Because("Expected nullable string input to be treated as empty input when null.");
+        }
+        catch (Exception e) when (e is AssertionException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation, CancellationToken);
+            throw;
+        }
+    }
+
+    [Test]
+    public async Task Generator_WithNullableDisabledStringInputParameter_GeneratesStringReaderFallback(CancellationToken CancellationToken)
+    {
+        const string source = """
+            #nullable disable
+            namespace Demo;
+
+            public partial class Sample
+            {
+                [Esolang.Piet.GeneratePietMethod("input.png")]
+                public partial System.Threading.Tasks.Task<string> Run(string input);
+            }
+            """;
+
+        var driver = RunGeneratorsAndUpdateCompilation(
+            source,
+            out var outputCompilation,
+            out var diagnostics,
+            new TestAdditionalText("obj/input.png.piet.txt",
+                MakeTransformedText("input.png", TwoPixelInputPng)),
+            CancellationToken: CancellationToken);
+        try
+        {
+            var runResult = driver.GetRunResult();
+            var generatorDiagnostics = runResult.Results.SelectMany(static r => r.Diagnostics).ToImmutableArray();
+
+            await AssertNoErrors(diagnostics, outputCompilation, CancellationToken);
+
+            await Assert.That(generatorDiagnostics)
+                .DoesNotContain(static x => x.Id is "PT0008" or "PT0003")
+                .Because("String input should be accepted even when nullable annotations are disabled.");
+
+            var generatedText = runResult.GeneratedTrees
+                .Select(tree => tree.GetText(CancellationToken).ToString())
+                .FirstOrDefault(static t => t.Contains("partial class Sample")) ?? string.Empty;
+            await Assert.That(generatedText)
+                .Contains("Run(string input)")
+                .Because("Expected generated method signature to preserve the original oblivious string input.");
+            await Assert.That(generatedText)
+                .Contains("new global::System.IO.StringReader(input ?? string.Empty)")
+                .Because("Expected nullable-disabled string input to be treated like unknown nullability and guarded.");
+        }
+        catch (Exception e) when (e is AssertionException or TargetInvocationException)
+        {
+            LogDiagnostics(diagnostics, outputCompilation, CancellationToken);
+            throw;
+        }
     }
 
     [Test]
