@@ -39,6 +39,20 @@ public sealed class AsciiPietPlusPlusParserTests
     }
 
     [Test]
+    public async Task Parse_MultipleRows_WithAlternateEolMarker()
+    {
+        var bytes = Encoding.ASCII.GetBytes("01@ab@");
+        var program = AsciiPietPlusPlusParser.Parse(bytes);
+
+        await Assert.That(program.Width).IsEqualTo(2);
+        await Assert.That(program.Height).IsEqualTo(2);
+        await Assert.That(program.Codels)
+            .IsEquivalentTo((PietColor[])[
+                 (PietColor)1, (PietColor)2, (PietColor)11, (PietColor)12
+            ], CollectionOrdering.Matching);
+    }
+
+    [Test]
     public async Task Parse_IgnoresActualNewlines()
     {
         var bytes = Encoding.ASCII.GetBytes("01|\r\nab|");
@@ -149,6 +163,13 @@ public sealed class AsciiPietPlusPlusParserTests
     public async Task LooksLikeAsciiPietPlusPlus_ReturnsTrue_ForValidContent()
     {
         var bytes = Encoding.ASCII.GetBytes("01|ab|");
+        await Assert.That(AsciiPietPlusPlusParser.LooksLikeAsciiPietPlusPlus(bytes)).IsTrue();
+    }
+
+    [Test]
+    public async Task LooksLikeAsciiPietPlusPlus_ReturnsTrue_ForAlternateEolMarker()
+    {
+        var bytes = Encoding.ASCII.GetBytes("01@ab@");
         await Assert.That(AsciiPietPlusPlusParser.LooksLikeAsciiPietPlusPlus(bytes)).IsTrue();
     }
 }

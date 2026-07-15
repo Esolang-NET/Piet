@@ -58,7 +58,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         public string Source { get; } = source;
     }
 
-    readonly struct AdditionalImageFile(string path, string? text, int? codelSize = null, string? transformedOriginalPath = null, Esolang.Piet.Parser.LanguageType? language = null)
+    readonly struct AdditionalImageFile(string path, string? text, int? codelSize = null, string? transformedOriginalPath = null, LanguageType? language = null)
     {
         public string Path { get; } = path;
 
@@ -68,7 +68,7 @@ public partial class MethodGenerator : IIncrementalGenerator
 
         public string? TransformedOriginalPath { get; } = transformedOriginalPath;
 
-        public Esolang.Piet.Parser.LanguageType? Language { get; } = language;
+        public LanguageType? Language { get; } = language;
 
         public bool IsReadable => Text is not null;
         public static AdditionalImageFile Make(string path, string? text)
@@ -325,12 +325,12 @@ public partial class MethodGenerator : IIncrementalGenerator
         // 属性引数（3つ目）にlanguageがあればそれを優先、なければ追加ファイルのPIET_LANGUAGEコメントを使う
         // Note: Roslyn includes default parameter values in ConstructorArguments, so we only override
         // the header-based language if the attribute value is non-default (non-Piet).
-        var language = resolvedImageFile.Language ?? Esolang.Piet.Parser.LanguageType.Piet;
+        var language = resolvedImageFile.Language ?? LanguageType.Piet;
         if (source.Attributes[0].ConstructorArguments.Length > 2)
         {
             var arg = source.Attributes[0].ConstructorArguments[2];
-            if (arg.Value is int langVal && langVal != (int)Esolang.Piet.Parser.LanguageType.Piet)
-                language = (Esolang.Piet.Parser.LanguageType)langVal;
+            if (arg.Value is int langVal && langVal != (int)LanguageType.Piet)
+                language = (LanguageType)langVal;
         }
 
         if (methodSymbol.TypeParameters.Length > 0)
@@ -497,7 +497,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             );
         }
 
-        var (mightUseOutput, mightUseInput) = language == Esolang.Piet.Parser.LanguageType.PietPlusPlus
+        var (mightUseOutput, mightUseInput) = language == LanguageType.PietPlusPlus
             ? ScanPietPlusPlusIoCommands(codels, imageWidth, imageHeight)
             : ScanPietIoCommands(codels, imageWidth, imageHeight);
         if (mightUseOutput && !binding.HasExplicitOutput)
@@ -581,9 +581,9 @@ public partial class MethodGenerator : IIncrementalGenerator
         return (new EmittedMethod(code.ToString()), generatorFeatures);
     }
 
-    static GeneratorFeatures GetGeneratorFeatures(MethodSignatureBinding binding, Esolang.Piet.Parser.LanguageType language = Esolang.Piet.Parser.LanguageType.Piet)
+    static GeneratorFeatures GetGeneratorFeatures(MethodSignatureBinding binding, LanguageType language = LanguageType.Piet)
     {
-        if (language == Esolang.Piet.Parser.LanguageType.PietPlusPlus)
+        if (language == LanguageType.PietPlusPlus)
         {
             if (binding.IsAsyncEnumerable) return GeneratorFeatures.AsyncEnumerablePlusPlus;
             if (binding.IsEnumerable) return GeneratorFeatures.EnumerablePlusPlus;
@@ -606,7 +606,7 @@ public partial class MethodGenerator : IIncrementalGenerator
             bool mightUseOutput,
             bool mightUseInput,
             KnownTypes types,
-            Esolang.Piet.Parser.LanguageType language = Esolang.Piet.Parser.LanguageType.Piet
+            LanguageType language = LanguageType.Piet
         )
     {
         var ctName = binding.CancellationTokenName ?? "default(global::System.Threading.CancellationToken)";
@@ -617,7 +617,7 @@ public partial class MethodGenerator : IIncrementalGenerator
         var logParameter = binding.LoggerExpression is not null ? $"logger: {loggerExpr}," : string.Empty;
 
         var features = GetGeneratorFeatures(binding, language);
-        var runtimeClass = language == Esolang.Piet.Parser.LanguageType.PietPlusPlus
+        var runtimeClass = language == LanguageType.PietPlusPlus
             ? "global::Esolang.Piet.__Generated.PietPlusPlusRuntime"
             : "global::Esolang.Piet.__Generated.PietRuntime";
         var baseFeatures = features switch
@@ -1485,16 +1485,16 @@ public partial class MethodGenerator : IIncrementalGenerator
         return text[thirdStart..thirdEnd].Replace("\r", string.Empty);
     }
 
-    internal static bool TryGetLanguage(string text, out Esolang.Piet.Parser.LanguageType language)
+    internal static bool TryGetLanguage(string text, out LanguageType language)
     {
-        language = Esolang.Piet.Parser.LanguageType.Piet;
+        language = LanguageType.Piet;
         if (text is null) return false;
         const string prefix = "// PIET_LANGUAGE=";
         var thirdLine = GetThirdLine(text);
         if (!thirdLine.StartsWith(prefix, StringComparison.Ordinal))
             return false;
         var langText = thirdLine[prefix.Length..].Trim();
-        if (Enum.TryParse(langText, out Esolang.Piet.Parser.LanguageType parsed))
+        if (Enum.TryParse(langText, out LanguageType parsed))
         {
             language = parsed;
             return true;
