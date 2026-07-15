@@ -98,5 +98,6 @@ static class PietCommandActions
         for (var i = 0; i < 26; i++)
             Console.WriteLine($"{37 + i,5}  {$"'{(char)('A' + i)}'",5}");
         Console.WriteLine($"{63,5}  {$"'~'",5}  (White)");
+        Console.WriteLine($"{"EOL",-5}  {"'|' / '@'",5}  (row separators; CR/LF are ignored)");
     }
 }

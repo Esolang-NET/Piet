@@ -222,7 +222,7 @@ public class MethodGeneratorTests
     readonly TestContext TestContext;
     public MethodGeneratorTests()
     {
-        this.TestContext = TUnit.Core.TestContext.Current!;
+        this.TestContext = TestContext.Current!;
         IEnumerable<PortableExecutableReference> references =
 #if NET10_0_OR_GREATER
             Net100.References.All;
@@ -2310,7 +2310,7 @@ public class MethodGeneratorTests
     public async Task TryGetLanguageInt_WithPietPlusPlusHeader_Returns1()
     {
         var text = "// PIET_IMAGE_PATH=dot.appp\n// PIET_CODEL_SIZE=1\n// PIET_LANGUAGE=PietPlusPlus\nfnw=";
-        var result = Esolang.Piet.Generator.MethodGenerator.TryGetLanguageInt(text);
+        var result = MethodGenerator.TryGetLanguageInt(text);
         await Assert.That(result)
             .IsEqualTo(1)
             .Because($"Expected PietPlusPlus (1) but got {result?.ToString() ?? "null"}");
@@ -2320,7 +2320,7 @@ public class MethodGeneratorTests
     public async Task TryGetLanguageInt_WithPietHeader_Returns0()
     {
         var text = "// PIET_IMAGE_PATH=hello.png\n// PIET_CODEL_SIZE=1\n// PIET_LANGUAGE=Piet\nabc=";
-        var result = Esolang.Piet.Generator.MethodGenerator.TryGetLanguageInt(text);
+        var result = MethodGenerator.TryGetLanguageInt(text);
         await Assert.That(result)
             .IsEqualTo(0)
             .Because($"Expected Piet (0) but got {result?.ToString() ?? "null"}");
@@ -2473,7 +2473,7 @@ public class MethodGeneratorTests
 
             var asm = await Emit(outputCompilation, CancellationToken);
             var t = asm.GetType("Demo.Sample")!;
-            var instance = System.Activator.CreateInstance(t)!;
+            var instance = Activator.CreateInstance(t)!;
             var typelogger = asm.GetType("Demo.FakeLogger");
             Assert.NotNull(typelogger);
             var logger = Activator.CreateInstance(typelogger);

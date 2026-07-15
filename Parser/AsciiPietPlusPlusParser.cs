@@ -13,15 +13,17 @@ namespace Esolang.Piet.Parser;
 ///   <item><description><c>'a'</c>–<c>'z'</c> → 11–36</description></item>
 ///   <item><description><c>'A'</c>–<c>'Z'</c> → 37–62</description></item>
 ///   <item><description><c>'~'</c> → 63 (White)</description></item>
-///   <item><description><c>'|'</c> → end-of-line marker</description></item>
+///   <item><description><c>'|'</c>, <c>'@'</c> → end-of-line markers</description></item>
 /// </list>
 /// <para>Actual newline characters (<c>\r</c>, <c>\n</c>) are ignored and may appear freely.</para>
 /// <para>Supported file extensions: <c>.appp</c>, <c>.txt2</c>.</para>
 /// </remarks>
 public static class AsciiPietPlusPlusParser
 {
-    /// <summary>The character used to mark the end of a row.</summary>
+    /// <summary>The default character used to mark the end of a row.</summary>
     public const char EolMarker = '|';
+    /// <summary>An alternate character used to mark the end of a row.</summary>
+    public const char AlternateEolMarker = '@';
 
     static readonly Dictionary<char, int> CharToIndex =
         new[] { (' ', 0) }
@@ -31,7 +33,9 @@ public static class AsciiPietPlusPlusParser
         .Append(('~', 63))
         .ToDictionary(t => t.Item1, t => t.Item2);
 
-    static readonly HashSet<byte> AllowedBytes = [.. CharToIndex.Keys.Select(c => (byte)c).Concat([(byte)EolMarker, (byte)'\t', (byte)'\r', (byte)'\n'])];
+    static readonly HashSet<char> EolMarkers = [EolMarker, AlternateEolMarker];
+
+    static readonly HashSet<byte> AllowedBytes = [.. CharToIndex.Keys.Select(c => (byte)c).Concat(EolMarkers.Select(c => (byte)c)).Concat([(byte)'\t', (byte)'\r', (byte)'\n'])];
 
     /// <summary>
     /// Determines whether the given byte array looks like an ascii-piet2 file
@@ -100,7 +104,7 @@ public static class AsciiPietPlusPlusParser
         foreach (var ch in text)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (ch == EolMarker)
+            if (EolMarkers.Contains(ch))
             {
                 if (currentLine is not null)
                 {
