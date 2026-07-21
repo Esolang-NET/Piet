@@ -10,7 +10,8 @@ public static class PietInterpreterExtensions
     /// <summary>
     /// Builds the root command for the dotnet-piet CLI.
     /// </summary>
-    public static RootCommand BuildRootCommand()
+    public static T AddPietCommands<T>(this T rootCommand)
+        where T : Command
     {
         var inputArgument = new Argument<string?>("path")
         {
@@ -37,16 +38,15 @@ public static class PietInterpreterExtensions
 
         var parseCommand = BuildParseCommand(codelSizeOption);
         var colorsCommand = BuildColorsCommand();
-        var rootCommand = new RootCommand("Run Piet programs from image files.")
-        {
-            inputArgument,
-            codelSizeOption,
-            asciiPietOption,
-            asciiPietTextOption,
-            pietPlusPlusOption,
-            parseCommand,
-            colorsCommand,
-        };
+        rootCommand.Description = "Run Piet programs from image files.";
+        rootCommand.Add(inputArgument);
+        rootCommand.Add(codelSizeOption);
+        rootCommand.Add(asciiPietOption);
+        rootCommand.Add(asciiPietTextOption);
+        rootCommand.Add(pietPlusPlusOption);
+        rootCommand.Add(parseCommand);
+        rootCommand.Add(colorsCommand);
+
         rootCommand.Validators.Add(parseResult =>
         {
             var path = parseResult.GetValue(inputArgument);
